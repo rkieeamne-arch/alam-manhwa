@@ -65,18 +65,20 @@ export default function HomeView({
     }
     
     try {
-      // نطلب البيانات من كل المصادر في نفس الوقت (Parallel)
-      const promises = sources.map(source => 
-        scrapeMangaList(source, pageNum, query).catch(err => {
-          console.error(`Error fetching from ${source.name}:`, err);
-          return []; // إذا فشل مصدر، نستمر مع البقية
-        })
-      );
-
-      const results = await Promise.all(promises);
+      let combinedList: any[] = [];
       
-      // دمج كل النتائج في مصفوفة واحدة
-      let combinedList = results.flat();
+      // Sequential fetching to avoid rate limiting
+      for (const source of sources) {
+        try {
+          const results = await scrapeMangaList(source, pageNum, query);
+          combinedList = [...combinedList, ...results];
+          // Slight delay between sources
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (err: any) {
+          console.error(`Error fetching from ${source.name}:`, err);
+          // If a source fails, we just skip it, but don't crash the whole process
+        }
+      }
       
       // إذا لم يكن هناك بحث، نقوم بترتيب عشوائي بسيط للتنويع
       if (!query) {
@@ -119,6 +121,9 @@ export default function HomeView({
   useEffect(() => {
     handleFetchAllSources(1);
   }, [sources]);
+
+  // Combine mock manhuas and scraped manhuas for the display list
+  const displayManhuas = [...manhuas, ...scrapedList];
 
   // دالة البحث الموحد
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -182,14 +187,14 @@ export default function HomeView({
             <Loader2 className="w-10 h-10 text-red-500 animate-spin" />
             <p className="text-zinc-400 text-sm animate-pulse">جاري تحميل</p>
           </div>
-        ) : scrapedError ? (
+        ) : scrapedError && scrapedList.length === 0 ? (
           <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-8 text-center">
             <p className="text-red-400 text-sm">{scrapedError}</p>
           </div>
         ) : (
           <div className="space-y-8">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 sm:gap-6">
-              {scrapedList.map((item) => (
+              {displayManhuas.map((item) => (
                 <ManhuaCard 
                   key={item.id}
                   manhua={{
@@ -201,7 +206,7 @@ export default function HomeView({
                     views: item.views || 0,
                     chapters: item.chapters || [],
                     releaseYear: item.releaseYear || 2026,
-                    categories: [sources.find(s => s.id === item.sourceId)?.name || 'مصدر خارجي']
+                    categories: item.categories || [sources.find(s => s.id === item.sourceId)?.name || 'مصدر خارجي']
                   } as any} 
                   onSelect={() => handleSelectScrapedItem(item)}
                   user={user}

@@ -193,25 +193,17 @@ export const azoraflySourceHandler: SourceHandler = {
     } 
     
     if (allChapters.length === 0) {
-      // Fallback to HTML parsing if JSON is not found
-      $first('a[href*="/chapter-"]').each((_, el) => {
+      // More aggressive fallback: find all links with hrefs containing 'chapter' or 'الفصل' in text
+      $first('a').each((_, el) => {
         const href = $first(el).attr('href');
-        if (href) {
+        const text = $first(el).text().trim();
+        if (href && (href.toLowerCase().includes('chapter') || text.includes('الفصل'))) {
           const fullUrl = href.startsWith('http') ? href : `${BASE_URL}${href}`;
-          // Azora's HTML chapter links usually contain something like "الفصل X"
-          let nameText = $first(el).text().replace(/\s+/g, ' ').trim();
-          const match = nameText.match(/الفصل\s*[\d.]+/);
-          const name = match ? match[0] : nameText || 'فصل مجهول';
-          
-          const isLocked = nameText.includes('مدفوع') || 
-                           nameText.includes('VIP') || 
-                           nameText.includes('vip') || 
-                           nameText.includes('بريميوم') || 
-                           $first(el).find('.fa-lock, .lock, .premium, .coin, svg[class*="lock"], svg[class*="coin"]').length > 0 || 
-                           $first(el).parent().find('.fa-lock, .lock, .premium, .coin, svg[class*="lock"], svg[class*="coin"]').length > 0;
+          const name = text.replace(/\s+/g, ' ').trim() || 'فصل';
           const id = getUniqueId(fullUrl);
+          
           if (!allChapters.some(c => c.id === id)) {
-            allChapters.push({ id, name, url: fullUrl, isLocked: !!isLocked });
+            allChapters.push({ id, name, url: fullUrl, isLocked: false });
           }
         }
       });

@@ -1,19 +1,7 @@
 import { useState, useEffect } from 'react';
 import { mockManhuas, defaultScraperSources } from './data';
 import { UserProfile, ReadingHistoryItem, ReaderSettings, Manhua, Chapter, ScraperSource, ReadingListItem } from './types';
-import { 
-  signUpUser, 
-  signInUser, 
-  signOutUser, 
-  updateUserProfile, 
-  fetchUserReadingHistory, 
-  saveUserReadingHistory, 
-  deleteUserHistoryItem, 
-  clearUserReadingHistory, 
-  fetchUserReadingList, 
-  addManhuaToReadingList, 
-  removeManhuaFromReadingList 
-} from './lib/supabase';
+import { signUpUser, signInUser, signOutUser, updateUserProfile, fetchUserReadingHistory, saveUserReadingHistory, deleteUserHistoryItem, clearUserReadingHistory, fetchUserReadingList, addManhuaToReadingList, removeManhuaFromReadingList } from './lib/supabase';
 
 // Components
 import Header from './components/Header';
@@ -106,7 +94,9 @@ export default function App() {
       } else {
         // Fallback to anonymous local storage if user is not logged in
         const savedHistory = localStorage.getItem('manhua_reading_history');
+        const savedManhuas = localStorage.getItem('manhua_list');
         setHistory(savedHistory ? JSON.parse(savedHistory) : []);
+        setManhuas(savedManhuas ? JSON.parse(savedManhuas) : []);
         setReadingList([]);
       }
     };
@@ -169,7 +159,7 @@ export default function App() {
   // Dynamic Manhuas State (starts empty as requested)
   const [manhuas, setManhuas] = useState<Manhua[]>(() => {
     const saved = localStorage.getItem('manhua_list');
-    return saved ? JSON.parse(saved) : [];
+    return saved ? JSON.parse(saved) : mockManhuas;
   });
 
   // Persist manhuas to localStorage
@@ -177,7 +167,6 @@ export default function App() {
     localStorage.setItem('manhua_list', JSON.stringify(manhuas));
   }, [manhuas]);
 
-  // Admin Management Handlers
   const handleAddManhua = (newManhua: Manhua) => {
     setManhuas((prev) => [...prev, newManhua]);
   };

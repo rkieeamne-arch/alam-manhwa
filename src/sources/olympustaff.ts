@@ -35,23 +35,26 @@ export const olympusStaffSource: SourceHandler = {
     const pHtml = await pRes.text();
     const $p = cheerio.load(pHtml);
     
-    $p('a[href*="/series/"]').each((_, el) => {
+    $p('a').each((_, el) => {
       const href = $p(el).attr('href');
-      if (href && href.split('/').length > 3) {
-        const name = $p(el).text().trim().replace(/\s+/g, ' ');
-        if (name.includes('الفصل')) {
-          const fullUrl = href.startsWith('http') ? href : `${BASE_URL}${href}`;
-          const id = getUniqueId(fullUrl);
-          const isLocked = name.includes('مدفوع') || 
-                           name.includes('مغلق') || 
-                           name.includes('VIP') || 
-                           name.includes('vip') || 
-                           name.includes('بريميوم') || 
-                           $p(el).find('.fa-lock, i.lock, svg[class*="lock"], svg[class*="coin"]').length > 0 || 
-                           $p(el).parent().find('.fa-lock, i.lock, svg[class*="lock"], svg[class*="coin"]').length > 0;
-          if (!allChapters.some(c => c.id === id)) {
-            allChapters.push({ id, name, url: fullUrl, isLocked: !!isLocked });
-          }
+      const text = $p(el).text().trim().replace(/\s+/g, ' ');
+      
+      // Look for a more specific structure if possible, but keep it robust
+      if (href && (text.includes('الفصل') || href.toLowerCase().includes('/chapter'))) {
+        const fullUrl = href.startsWith('http') ? href : `${BASE_URL}${href}`;
+        const id = getUniqueId(fullUrl);
+        
+        // Clean title: try to extract chapter number/name more specifically
+        const nameMatch = text.match(/(الفصل\s*[\d.]+|الفصل\s*[^\s]+|\d+)/i);
+        const name = nameMatch ? nameMatch[0] : text;
+        
+        const isLocked = text.includes('مدفوع') || 
+                         text.includes('مغلق') || 
+                         text.includes('VIP') || 
+                         $p(el).find('.fa-lock, i.lock, svg[class*="lock"]').length > 0;
+        
+        if (!allChapters.some(c => c.id === id)) {
+          allChapters.push({ id, name, url: fullUrl, isLocked: !!isLocked });
         }
       }
     });
@@ -73,23 +76,28 @@ export const olympusStaffSource: SourceHandler = {
     const $p = cheerio.load(pHtml);
     
     const pageChapters: Chapter[] = [];
-    $p('a[href*="/series/"]').each((_, el) => {
+    $p('a').each((_, el) => {
       const href = $p(el).attr('href');
-      if (href && href.split('/').length > 3) {
-        const name = $p(el).text().trim().replace(/\s+/g, ' ');
-        if (name.includes('الفصل')) {
-          const fullUrl = href.startsWith('http') ? href : `${BASE_URL}${href}`;
-          const id = getUniqueId(fullUrl);
-          const isLocked = name.includes('مدفوع') || 
-                           name.includes('مغلق') || 
-                           name.includes('VIP') || 
-                           name.includes('vip') || 
-                           name.includes('بريميوم') || 
-                           $p(el).find('.fa-lock, i.lock, svg[class*="lock"], svg[class*="coin"]').length > 0 || 
-                           $p(el).parent().find('.fa-lock, i.lock, svg[class*="lock"], svg[class*="coin"]').length > 0;
-          if (!pageChapters.some(c => c.id === id)) {
-            pageChapters.push({ id, name, url: fullUrl, isLocked: !!isLocked });
-          }
+      const text = $p(el).text().trim().replace(/\s+/g, ' ');
+      
+      if (href && (text.includes('الفصل') || href.toLowerCase().includes('/chapter'))) {
+        const fullUrl = href.startsWith('http') ? href : `${BASE_URL}${href}`;
+        const id = getUniqueId(fullUrl);
+        
+        // Clean title: try to extract chapter number/name more specifically
+        const nameMatch = text.match(/(الفصل\s*[\d.]+|الفصل\s*[^\s]+|\d+)/i);
+        const name = nameMatch ? nameMatch[0] : text;
+        
+        const isLocked = text.includes('مدفوع') || 
+                         text.includes('مغلق') || 
+                         text.includes('VIP') || 
+                         text.includes('vip') || 
+                         text.includes('بريميوم') || 
+                         $p(el).find('.fa-lock, i.lock, svg[class*="lock"], svg[class*="coin"]').length > 0 || 
+                         $p(el).parent().find('.fa-lock, i.lock, svg[class*="lock"], svg[class*="coin"]').length > 0;
+        
+        if (!pageChapters.some(c => c.id === id)) {
+          pageChapters.push({ id, name: name || 'فصل', url: fullUrl, isLocked: !!isLocked });
         }
       }
     });
