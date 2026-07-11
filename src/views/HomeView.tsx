@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Flame, Star, Award, TrendingUp, Compass, Grid, Loader2, RefreshCw, 
   Globe, Wifi, Cpu, ExternalLink, Plus, Trash2, Layers, X, Sparkles, 
@@ -56,78 +56,115 @@ export default function HomeView({
   const handleFetchAllSources = async (pageNum: number = 1, query?: string, isLoadMore: boolean = false) => {
     if (sources.length === 0) return;
 
+    const currentFetchId = ++fetchIdRef.current;
+
     if (isLoadMore) {
       setLoadingMore(true);
     } else {
       setLoadingScraped(true);
       setScrapedError(null);
       setPage(1); // Reset page state on fresh fetch/search
+      setScrapedList([]); // Clear the list for fresh fetch
     }
     
     try {
-      let combinedList: any[] = [];
+      let completedSources = 0;
+      let anySuccess = false;
       
       // Parallel fetching to avoid blocking with retries
       const fetchWithRetry = async (source: any, pageNum: number, query: string, retryCount = 0): Promise<any[]> => {
         try {
-          return await scrapeMangaList(source, pageNum, query);
+          const results = await scrapeMangaList(source, pageNum, query);
+          // If results are empty on page 1 without a search query, it's likely a Cloudflare block or network error
+          if (results.length === 0 && !query && pageNum === 1 && retryCount < 5) {
+            throw new Error(`Empty results from ${source.name}, likely blocked.`);
+          }
+          return results;
         } catch (err) {
           console.error(`Error fetching from ${source.name} (Attempt ${retryCount + 1}):`, err);
-          if (retryCount < 3) { // Retry up to 3 times
-            await new Promise(resolve => setTimeout(resolve, 3000));
+          if (retryCount < 5 && currentFetchId === fetchIdRef.current) { // Retry up to 5 times
+            await new Promise(resolve => setTimeout(resolve, 4000));
             return fetchWithRetry(source, pageNum, query, retryCount + 1);
           }
           return [];
         }
       };
 
-      const promises = sources.map(source => fetchWithRetry(source, pageNum, query));
-      
-      const resultsArray = await Promise.all(promises);
-      for (const results of resultsArray) {
-        combinedList = [...combinedList, ...results];
-      }
-      
-      // إذا لم يكن هناك بحث، نقوم بترتيب عشوائي بسيط للتنويع
-      if (!query) {
-        combinedList = combinedList.sort(() => Math.random() - 0.5);
-      }
-      
-      if (isLoadMore) {
-        setScrapedList(prev => {
-          // Prevent duplicates by checking if id already exists
-          const existingIds = new Set(prev.map(item => item.id));
-          const uniqueNew = combinedList.filter(item => !existingIds.has(item.id));
-          return [...prev, ...uniqueNew];
+      sources.forEach(source => {
+        fetchWithRetry(source, pageNum, query).then(results => {
+          if (currentFetchId !== fetchIdRef.current) return;
+          
+          completedSources++;
+          
+          if (results.length > 0) {
+            anySuccess = true;
+            setScrapedList(prev => {
+              const existingIds = new Set(prev.map(item => item.id));
+              const uniqueNew = results.filter(item => !existingIds.has(item.id));
+              let merged = [...prev, ...uniqueNew];
+              if (!query && !isLoadMore && prev.length === 0) {
+                merged = merged.sort(() => Math.random() - 0.5);
+              }
+              return merged;
+            });
+            
+            // Hide the big loader as soon as we have any data!
+            if (!isLoadMore) {
+               setLoadingScraped(false);
+            }
+          }
+
+          if (completedSources === sources.length) {
+            setLoadingScraped(false);
+            setLoadingMore(false);
+            
+            if (!anySuccess) {
+              if (query) {
+                setScrapedError('لم يتم العثور على نتائج للبحث في كافة المصادر.');
+                if (!isLoadMore) setScrapedList([]);
+              } else {
+                setScrapedError('تعذر جلب الأعمال من المصادر. قد يكون الموقع محجوباً (Cloudflare). جرب التحديث مرة أخرى.');
+                setScrapedList(prev => prev.length === 0 ? [] : prev);
+              }
+            } else {
+              if (isLoadMore) {
+                triggerToast(`تم تحديث القائمة الإضافية بنجاح!`);
+              } else if (query) {
+                triggerToast(`تم جلب نتائج البحث بنجاح!`);
+              } else {
+                triggerToast('تم تحديث قائمة الأعمال بنجاح!');
+              }
+            }
+          }
         });
-        if (combinedList.length > 0) {
-          triggerToast(`تم جلب ${combinedList.length} عمل إضافي!`);
-        } else {
-          triggerToast('لا يوجد مزيد من الأعمال المتاحة حالياً.');
-        }
-      } else {
-        setScrapedList(combinedList);
-        if (combinedList.length === 0 && query) {
-          setScrapedError('لم يتم العثور على نتائج للبحث في كافة المصادر.');
-        } else if (query) {
-          triggerToast(`تم جلب ${combinedList.length} نتيجة بحث بنجاح!`);
-        } else {
-          triggerToast('تم تحديث قائمة الأعمال بنجاح!');
-        }
-      }
+      });
+      
     } catch (err: any) {
+      if (currentFetchId !== fetchIdRef.current) return;
+      setLoadingScraped(false);
+      setLoadingMore(false);
       if (!isLoadMore) {
         setScrapedError('حدث خطأ أثناء جلب البيانات من المصادر.');
       }
-    } finally {
-      setLoadingScraped(false);
-      setLoadingMore(false);
     }
   };
+
+  const fetchIdRef = useRef(0);
 
   // تشغيل الجلب عند فتح الصفحة أو تغير المصادر
   useEffect(() => {
     handleFetchAllSources(1);
+  }, [sources]);
+
+  // إعادة الجلب تلقائياً بمجرد إدخال الكوكيز وتخطي الكابتشا
+  useEffect(() => {
+    const handleBypassSaved = () => {
+      handleFetchAllSources(1);
+    };
+    window.addEventListener('bypass-saved', handleBypassSaved);
+    return () => {
+      window.removeEventListener('bypass-saved', handleBypassSaved);
+    };
   }, [sources]);
 
   // Combine mock manhuas and scraped manhuas for the display list
@@ -190,14 +227,29 @@ export default function HomeView({
           </button>
         </div>
 
-        {loadingScraped && page === 1 ? (
+        {loadingScraped && page === 1 && displayManhuas.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 space-y-4">
             <Loader2 className="w-10 h-10 text-red-500 animate-spin" />
-            <p className="text-zinc-400 text-sm animate-pulse">جاري تحميل</p>
+            <p className="text-zinc-400 text-sm animate-pulse">جاري التحميل...</p>
           </div>
-        ) : scrapedError && scrapedList.length === 0 ? (
-          <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-8 text-center">
-            <p className="text-red-400 text-sm">{scrapedError}</p>
+        ) : scrapedError && displayManhuas.length === 0 ? (
+          <div className="bg-red-500/10 border border-red-500/20 rounded-3xl p-8 text-center max-w-lg mx-auto space-y-4">
+            <div className="p-3 bg-red-500/20 rounded-full w-12 h-12 flex items-center justify-center mx-auto text-red-500 animate-pulse">
+              <Shield className="w-6 h-6" />
+            </div>
+            <p className="text-zinc-200 text-sm font-bold leading-relaxed">{scrapedError}</p>
+            <p className="text-zinc-400 text-xs leading-relaxed">
+              لحماية خصوصية الخدمة وتخطي حجب Cloudflare ومشاكل الكابتشا فوراً، يمكنك تفعيل مساعد تخطي الحظر ليدمج متصفحك الحقيقي تلقائياً مع السيرفر!
+            </p>
+            <button
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('open-bypass-modal'));
+              }}
+              className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black transition-all flex items-center gap-2 mx-auto shadow-lg shadow-red-600/20 cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4 animate-pulse" />
+              تفعيل مساعد تخطي الكابتشا والاتصال المباشر
+            </button>
           </div>
         ) : (
           <div className="space-y-8">

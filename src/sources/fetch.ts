@@ -9,7 +9,22 @@ export async function proxiedFetch(input: RequestInfo | URL, init?: RequestInit)
     url = getProxiedUrl(url);
   }
   
-  const response = await fetch(url, init);
+  const headers = new Headers(init?.headers);
+  if (typeof window !== 'undefined') {
+    const bypassCookie = localStorage.getItem('manhua_bypass_cookie');
+    const bypassUserAgent = localStorage.getItem('manhua_bypass_user_agent');
+    if (bypassCookie) {
+      headers.set('X-Proxy-Cookie', bypassCookie);
+    }
+    if (bypassUserAgent) {
+      headers.set('X-Proxy-User-Agent', bypassUserAgent);
+    }
+  }
+
+  const response = await fetch(url, {
+    ...init,
+    headers
+  });
   
   if (!response.ok) {
     let errorMessage = `خطأ في الاتصال (${response.status})`;

@@ -29,6 +29,7 @@ export interface Manhua {
   isTrending?: boolean;
   chapters: Chapter[];
   sourceUrl?: string;
+  sourceId?: string;
 }
 
 export interface UserProfile {

@@ -6,6 +6,7 @@ import { signUpUser, signInUser, signOutUser, updateUserProfile, fetchUserReadin
 // Components
 import Header from './components/Header';
 import SettingsDrawer from './components/SettingsDrawer';
+import BypassModal from './components/BypassModal';
 
 // Views
 import HomeView from './views/HomeView';
@@ -120,6 +121,17 @@ export default function App() {
 
   // Settings Drawer Toggle State
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isBypassModalOpen, setIsBypassModalOpen] = useState(false);
+
+  useEffect(() => {
+    const handleOpenBypass = () => {
+      setIsBypassModalOpen(true);
+    };
+    window.addEventListener('open-bypass-modal', handleOpenBypass);
+    return () => {
+      window.removeEventListener('open-bypass-modal', handleOpenBypass);
+    };
+  }, []);
 
   // Persistence triggers
   useEffect(() => {
@@ -544,6 +556,11 @@ export default function App() {
           </div>
         </footer>
       )}
+
+      <BypassModal 
+        isOpen={isBypassModalOpen} 
+        onClose={() => setIsBypassModalOpen(false)} 
+      />
 
     </div>
   );

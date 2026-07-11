@@ -123,7 +123,7 @@ export const olympusStaffSource: SourceHandler = {
           title = title.replace(/(تحديث|مستمر|مكتمل|جديد|حصرية|مميزة|حصريه|مميزه)/gi, '').replace(/\s+/g, ' ').trim();
 
           let latestChapter = '';
-          const chapText = $(el).find('.chapter, .ep, :contains("الفصل")').last().text() || $(el).parent().find('.chapter, .ep, :contains("الفصل")').last().text();
+          const chapText = $(el).find('.chapter, .ep, .epxs, .chapter-name, :contains("الفصل")').last().text() || $(el).parent().find('.chapter, .ep, .epxs, .chapter-name, :contains("الفصل")').last().text();
           const chapMatch = chapText.match(/(?:الفصل|ch|chapter)\s*([\d.]+)/i) || chapText.match(/\b(\d+)\b/);
           if (chapMatch) {
               latestChapter = `الفصل ${chapMatch[1]}`;
@@ -173,7 +173,7 @@ export const olympusStaffSource: SourceHandler = {
       title = title.replace(/(تحديث|مستمر|مكتمل|جديد|حصرية|مميزة|حصريه|مميزه)/gi, '').replace(/\s+/g, ' ').trim();
 
       let latestChapter = '';
-      const chapText = $(el).find('.chapter, .ep, :contains("الفصل")').last().text() || $(el).parent().find('.chapter, .ep, :contains("الفصل")').last().text();
+      const chapText = $(el).find('.chapter, .ep, .epxs, .chapter-name, :contains("الفصل")').last().text() || $(el).parent().find('.chapter, .ep, .epxs, .chapter-name, :contains("الفصل")').last().text();
       const chapMatch = chapText.match(/(?:الفصل|ch|chapter)\s*([\d.]+)/i) || chapText.match(/\b(\d+)\b/);
       if (chapMatch) {
           latestChapter = `الفصل ${chapMatch[1]}`;

@@ -32,20 +32,26 @@ async function startServer() {
         referer = 'https://olympustaff.com/';
       }
 
+      const isImage = targetUrl.match(/\.(jpeg|jpg|gif|png|webp|avif)$/i) != null;
+
       const headers: Record<string, string> = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'User-Agent': req.headers['x-proxy-user-agent'] as string || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
         'Accept-Language': 'ar,en-US;q=0.9,en;q=0.8',
-        'Referer': 'https://www.google.com/', // التظاهر بأن الطلب قادم من بحث جوجل لتخفيف الحماية
+        'Referer': isImage ? referer : 'https://www.google.com/', // التظاهر بأن الطلب قادم من بحث جوجل لتخفيف الحماية للصفحات
         'Sec-Ch-Ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
         'Sec-Ch-Ua-Mobile': '?0',
         'Sec-Ch-Ua-Platform': '"Windows"',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Dest': isImage ? 'image' : 'document',
+        'Sec-Fetch-Mode': isImage ? 'no-cors' : 'navigate',
         'Sec-Fetch-Site': 'cross-site',
         'Sec-Fetch-User': '?1',
         'Upgrade-Insecure-Requests': '1'
       };
+
+      if (req.headers['x-proxy-cookie']) {
+        headers['Cookie'] = req.headers['x-proxy-cookie'] as string;
+      }
 
       const controller = new AbortController();
       // Increase timeout to 20 seconds to prevent premature aborts on slow external sites like azorafly

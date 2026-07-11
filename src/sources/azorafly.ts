@@ -56,43 +56,56 @@ export const azoraflySourceHandler: SourceHandler = {
   async parsePopularList(page: number = 1, query?: string): Promise<Manga[]> {
     const list: Manga[] = [];
 
-    // Use API if query is provided
-    if (query && query.trim() !== '') {
-      try {
-        // Try searchTerm first as it is the standard Astro parameter
-        let apiRes = await proxiedFetch(`https://api.azorafly.com/api/posts?searchTerm=${encodeURIComponent(query)}`);
-        let textData = await apiRes.text();
-        let apiData: any = null;
-        try {
-          apiData = JSON.parse(textData);
-        } catch (e) {
-          // Fallback to title query if json parse failed
-          console.warn("Azorafly search API searchTerm failed JSON parse, trying title parameter");
-          apiRes = await proxiedFetch(`https://api.azorafly.com/api/posts?title=${encodeURIComponent(query)}`);
-          textData = await apiRes.text();
-          try {
-            apiData = JSON.parse(textData);
-          } catch (err2) {
-            console.error("Azorafly search API title failed JSON parse too", err2);
-          }
-        }
-
-        if (apiData?.posts) {
-          for (const post of apiData.posts) {
-            const url = `${BASE_URL}/series/${post.slug}`;
-            list.push({
-              id: getUniqueId(url),
-              title: post.postTitle || 'بدون عنوان',
-              cover: post.featuredImage || 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=300',
-              url: url,
-              sourceId: 'azorafly'
-            });
-          }
-          if (list.length > 0) return list;
-        }
-      } catch (err) {
-        console.error("Azorafly search API fetch failed", err);
+    // Try the API first!
+    try {
+      let apiRes;
+      if (query && query.trim() !== '') {
+        apiRes = await proxiedFetch(`https://api.azorafly.com/api/posts?searchTerm=${encodeURIComponent(query)}`);
+      } else {
+        apiRes = await proxiedFetch(`https://api.azorafly.com/api/posts?page=${page}`);
       }
+      
+      const textData = await apiRes.text();
+      let apiData: any = null;
+      try {
+        apiData = JSON.parse(textData);
+      } catch (e) {
+        if (query && query.trim() !== '') {
+          // Search fallback parameter
+          apiRes = await proxiedFetch(`https://api.azorafly.com/api/posts?title=${encodeURIComponent(query)}`);
+          apiData = await apiRes.json();
+        }
+      }
+
+      if (apiData?.posts && Array.isArray(apiData.posts)) {
+        for (const post of apiData.posts) {
+          const url = `${BASE_URL}/series/${post.slug}`;
+          
+          let latestChapter = '';
+          if (post.chapters && post.chapters.length > 0) {
+            const firstCh = post.chapters[0];
+            if (firstCh) {
+              latestChapter = `الفصل ${firstCh.number}`;
+            }
+          } else if (post._count?.chapters) {
+            latestChapter = `الفصل ${post._count.chapters}`;
+          }
+
+          list.push({
+            id: getUniqueId(url),
+            title: post.postTitle || 'بدون عنوان',
+            cover: post.featuredImage || 'https://images.unsplash.com/photo-1604276583-eef5d076aa5f?w=300',
+            url: url,
+            sourceId: 'azorafly',
+            latestChapter
+          });
+        }
+        if (list.length > 0) {
+          return list;
+        }
+      }
+    } catch (err) {
+      console.warn("Azorafly API failed, falling back to HTML parsing:", err);
     }
 
     const url = `${BASE_URL}/series?page=${page}`;
@@ -128,7 +141,7 @@ export const azoraflySourceHandler: SourceHandler = {
       title = title.replace(/(تحديث|مستمر|مكتمل|جديد|حصرية|مميزة|حصريه|مميزه)/gi, '').replace(/\s+/g, ' ').trim();
 
       let latestChapter = '';
-      const chapText = $(anchor).find('.chapter, .ep, :contains("الفصل")').last().text() || $(anchor).parent().find('.chapter, .ep, :contains("الفصل")').last().text();
+      const chapText = $(anchor).find('.chapter, .ep, .epxs, .chapter-name, :contains("الفصل")').last().text() || $(anchor).parent().find('.chapter, .ep, .epxs, .chapter-name, :contains("الفصل")').last().text();
       const chapMatch = chapText.match(/(?:الفصل|ch|chapter)\s*([\d.]+)/i) || chapText.match(/\b(\d+)\b/);
       if (chapMatch) {
           latestChapter = `الفصل ${chapMatch[1]}`;

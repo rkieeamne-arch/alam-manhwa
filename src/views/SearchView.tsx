@@ -76,6 +76,18 @@ export default function SearchView({
     setFilteredManhuas(result);
   }, [query, selectedCategory, selectedStatus, manhuas]);
 
+  const [bypassTrigger, setBypassTrigger] = useState(0);
+
+  useEffect(() => {
+    const handleBypassSaved = () => {
+      setBypassTrigger(prev => prev + 1);
+    };
+    window.addEventListener('bypass-saved', handleBypassSaved);
+    return () => {
+      window.removeEventListener('bypass-saved', handleBypassSaved);
+    };
+  }, []);
+
   useEffect(() => {
     const fetchFromSources = async () => {
       if (sources.length === 0) return;
@@ -99,6 +111,9 @@ export default function SearchView({
         const fetchSource = async (retryCount = 0) => {
           try {
             const results = await scrapeMangaList(source, 1, query);
+            if (results.length === 0 && !query && retryCount < 5) {
+                throw new Error(`Empty results from ${source.name}, likely blocked.`);
+            }
             setScrapedGroups(prev => ({
               ...prev,
               [source.id]: {
@@ -110,8 +125,8 @@ export default function SearchView({
             }));
           } catch (err: any) {
             console.error(`Search failed for source ${source.name} (Attempt ${retryCount + 1}):`, err);
-            if (retryCount < 3) { // Retry up to 3 times
-              setTimeout(() => fetchSource(retryCount + 1), 3000);
+            if (retryCount < 5) { // Retry up to 5 times
+              setTimeout(() => fetchSource(retryCount + 1), 4000);
             } else {
               setScrapedGroups(prev => ({
                 ...prev,
@@ -135,7 +150,7 @@ export default function SearchView({
     }, 500);
     
     return () => clearTimeout(timer);
-  }, [query, sources]);
+  }, [query, sources, bypassTrigger]);
 
   const handleSelectScrapedItem = (item: any) => {
     const shell: Manhua = {
