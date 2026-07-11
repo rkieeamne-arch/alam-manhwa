@@ -78,7 +78,7 @@ export default function SearchView({
 
   const [bypassTrigger, setBypassTrigger] = useState(0);
 
-  useEffect(() => {
+  useEffect(() => { 
     const handleBypassSaved = () => {
       setBypassTrigger(prev => prev + 1);
     };
@@ -90,15 +90,17 @@ export default function SearchView({
 
   useEffect(() => {
     const fetchFromSources = async () => {
-      if (sources.length === 0) return;
+      if (!sources || !Array.isArray(sources) || sources.length === 0) return;
 
       const isSearching = query.trim() !== '';
       
       // Initialize groups
       const initialGroups: typeof scrapedGroups = {};
-      sources.forEach(src => {
+      sources.forEach((src, idx) => {
+        if (!src) return;
+        const displayName = `نتيجة ${idx + 1}`;
         initialGroups[src.id] = {
-          sourceName: src.name,
+          sourceName: displayName,
           results: [],
           loading: true, // Always show loading as we fetch popular when not searching
           error: null
@@ -337,7 +339,7 @@ export default function SearchView({
                             referrerPolicy="no-referrer"
                           />
                           <div className="absolute top-2 right-2 bg-red-600/90 backdrop-blur-sm text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow">
-                            نتائج {index + 1}
+                            {group.sourceName}
                           </div>
                           
                           {/* Floating list picker button for scraped results */}

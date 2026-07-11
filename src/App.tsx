@@ -74,7 +74,14 @@ export default function App() {
   // Reading History State
   const [history, setHistory] = useState<ReadingHistoryItem[]>(() => {
     const saved = localStorage.getItem('manhua_reading_history');
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
   });
 
   // User Reading Lists (Favorites, Currently reading, Plan to read)
@@ -96,8 +103,29 @@ export default function App() {
         // Fallback to anonymous local storage if user is not logged in
         const savedHistory = localStorage.getItem('manhua_reading_history');
         const savedManhuas = localStorage.getItem('manhua_list');
-        setHistory(savedHistory ? JSON.parse(savedHistory) : []);
-        setManhuas(savedManhuas ? JSON.parse(savedManhuas) : []);
+        
+        let parsedHistory: ReadingHistoryItem[] = [];
+        if (savedHistory) {
+          try {
+            parsedHistory = JSON.parse(savedHistory);
+          } catch (e) {
+            parsedHistory = [];
+          }
+        }
+        
+        let parsedManhuas: Manhua[] = [];
+        if (savedManhuas) {
+          try {
+            parsedManhuas = JSON.parse(savedManhuas);
+          } catch (e) {
+            parsedManhuas = mockManhuas;
+          }
+        } else {
+          parsedManhuas = mockManhuas;
+        }
+
+        setHistory(parsedHistory);
+        setManhuas(parsedManhuas);
         setReadingList([]);
       }
     };
@@ -108,7 +136,11 @@ export default function App() {
   const [readerSettings, setReaderSettings] = useState<ReaderSettings>(() => {
     const saved = localStorage.getItem('manhua_reader_settings');
     if (saved) {
-      return JSON.parse(saved);
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // Fallback to defaults
+      }
     }
     return {
       readingMode: 'webtoon',
@@ -171,7 +203,14 @@ export default function App() {
   // Dynamic Manhuas State (starts empty as requested)
   const [manhuas, setManhuas] = useState<Manhua[]>(() => {
     const saved = localStorage.getItem('manhua_list');
-    return saved ? JSON.parse(saved) : mockManhuas;
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return mockManhuas;
+      }
+    }
+    return mockManhuas;
   });
 
   // Persist manhuas to localStorage

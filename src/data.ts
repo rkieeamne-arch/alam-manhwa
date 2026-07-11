@@ -360,5 +360,30 @@ export const defaultScraperSources: ScraperSource[] = [
     
     pageImgSelector: 'div.page-break.no-gaps img.manga-chapter-img, .page-break img',
     pageImgAttr: 'src'
+  },
+  {
+    id: 'despair',
+    name: 'Despair Manga',
+    baseUrl: 'https://despair-manga.net',
+    popularPath: '/manga/',
+    listCardSelector: '.page-item-detail, .manga-entry',
+    listTitleSelector: '.post-title a, h3 a, h5 a',
+    listLinkSelector: 'a',
+    listCoverSelector: 'img',
+    listCoverAttr: 'src',
+    
+    detailTitleSelector: 'h1',
+    detailDescSelector: '.description-summary, .manga-about, .summary-content, .entry-content',
+    detailAuthorSelector: 'unknown',
+    detailArtistSelector: 'unknown',
+    detailStatusSelector: 'unknown',
+    detailGenreSelector: 'unknown',
+    
+    detailChapterItemSelector: 'li.wp-manga-chapter',
+    detailChapterLinkSelector: 'a',
+    detailChapterTitleSelector: 'a',
+    
+    pageImgSelector: '.page-break img, .wp-manga-chapter-img img, div.reading-content img',
+    pageImgAttr: 'src'
   }
 ];

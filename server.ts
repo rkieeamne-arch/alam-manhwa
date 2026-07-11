@@ -34,12 +34,22 @@ async function startServer() {
 
       const isImage = targetUrl.match(/\.(jpeg|jpg|gif|png|webp|avif)$/i) != null;
 
+      // Real-world modern desktop User-Agents to bypass simple agent blocking
+      const USER_AGENTS = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0'
+      ];
+      const defaultUserAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+
       const headers: Record<string, string> = {
-        'User-Agent': req.headers['x-proxy-user-agent'] as string || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'User-Agent': req.headers['x-proxy-user-agent'] as string || defaultUserAgent,
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
         'Accept-Language': 'ar,en-US;q=0.9,en;q=0.8',
         'Referer': isImage ? referer : 'https://www.google.com/', // التظاهر بأن الطلب قادم من بحث جوجل لتخفيف الحماية للصفحات
-        'Sec-Ch-Ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+        'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
         'Sec-Ch-Ua-Mobile': '?0',
         'Sec-Ch-Ua-Platform': '"Windows"',
         'Sec-Fetch-Dest': isImage ? 'image' : 'document',
@@ -53,16 +63,65 @@ async function startServer() {
         headers['Cookie'] = req.headers['x-proxy-cookie'] as string;
       }
 
-      const controller = new AbortController();
-      // Increase timeout to 20 seconds to prevent premature aborts on slow external sites like azorafly
-      const timeout = setTimeout(() => controller.abort(), 20000); 
+      // Smart Retry Mechanism - specifically for Timeouts (تايم أوت) / Slow connections
+      let response: Response | null = null;
+      let lastError: any = null;
+      const maxAttempts = 3;
+      let attempt = 0;
 
-      const response = await fetch(targetUrl, { 
-        headers,
-        signal: controller.signal,
-        redirect: 'follow'
-      });
-      clearTimeout(timeout);
+      while (attempt < maxAttempts) {
+        attempt++;
+        const controller = new AbortController();
+        // Set a 20-second timeout per attempt
+        const timeout = setTimeout(() => controller.abort(), 20000);
+
+        try {
+          response = await fetch(targetUrl, { 
+            headers,
+            signal: controller.signal,
+            redirect: 'follow'
+          });
+          clearTimeout(timeout);
+          
+          // If response is successful, break retry loop immediately
+          if (response.ok) {
+            break;
+          }
+
+          // If we got a timeout status from the upstream server, retry
+          if (response.status === 504 || response.status === 408 || response.status === 502) {
+            console.warn(`[Proxy] Attempt ${attempt} returned status ${response.status} for ${targetUrl}. Retrying...`);
+            if (attempt < maxAttempts) {
+              const delay = 1000 + Math.floor(Math.random() * 2000); // Random delay 1s-3s
+              await new Promise(resolve => setTimeout(resolve, delay));
+              continue;
+            }
+          }
+
+          // Other non-timeout errors: do not retry to avoid overloading
+          break;
+        } catch (err: any) {
+          clearTimeout(timeout);
+          lastError = err;
+          
+          const isTimeout = err.name === 'AbortError' || err.code === 'ETIMEDOUT' || err.message?.includes('timeout');
+          
+          if (isTimeout) {
+            console.warn(`[Proxy] Attempt ${attempt} timed out for ${targetUrl}.`);
+            if (attempt < maxAttempts) {
+              const delay = 1500 + Math.floor(Math.random() * 2000); // Random delay 1.5s-3.5s
+              console.log(`[Proxy] Waiting ${delay}ms before retrying due to timeout...`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+              continue;
+            }
+          }
+          break; // Break on other severe network exceptions
+        }
+      }
+
+      if (!response) {
+        throw lastError || new Error('تعذر إكمال الطلب بسبب مشكلة في الاتصال');
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -92,7 +151,8 @@ async function startServer() {
       }
     } catch (err: any) {
       console.error(`[Proxy] Critical Error for ${targetUrl}:`, err);
-      if (err.name === 'AbortError') {
+      const isTimeout = err.name === 'AbortError' || err.code === 'ETIMEDOUT' || err.message?.includes('timeout');
+      if (isTimeout) {
         return res.status(504).json({ error: 'انتهت مهلة الاتصال بالموقع المصدر (20 ثانية). يبدو أن السيرفر بطيء جداً حالياً أو قام بحظر الاتصال من منطقتك.' });
       }
       if (err.code === 'ENOTFOUND' || err.code === 'EAI_AGAIN') {

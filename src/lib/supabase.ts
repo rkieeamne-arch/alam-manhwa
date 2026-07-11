@@ -2,8 +2,22 @@ import { createClient } from '@supabase/supabase-js';
 import { UserProfile, ReadingHistoryItem, ReadingListItem, Manhua } from '../types';
 
 // Supabase Environment variables
-const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL || '';
+const rawSupabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY || '';
+
+// Clean Supabase URL if it contains /rest/v1
+const cleanSupabaseUrl = (url: string) => {
+  if (!url) return '';
+  let cleaned = url.trim();
+  if (cleaned.endsWith('/rest/v1/')) {
+    cleaned = cleaned.slice(0, -9);
+  } else if (cleaned.endsWith('/rest/v1')) {
+    cleaned = cleaned.slice(0, -8);
+  }
+  return cleaned;
+};
+
+const supabaseUrl = cleanSupabaseUrl(rawSupabaseUrl);
 
 // True if Supabase keys are fully defined
 export const hasSupabase = !!(supabaseUrl && supabaseAnonKey && supabaseUrl !== 'MY_SUPABASE_URL');
@@ -349,12 +363,26 @@ export async function fetchUserReadingHistory(userId: string): Promise<ReadingHi
     } catch (err) {
       console.warn('Error fetching reading history from Supabase, falling back to LocalStorage:', err);
       const saved = localStorage.getItem(`manhua_history_${userId}`);
-      return saved ? JSON.parse(saved) : [];
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          return [];
+        }
+      }
+      return [];
     }
   } else {
     // Fallback Local Engine
     const saved = localStorage.getItem(`manhua_history_${userId}`);
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
   }
 }
 
@@ -478,11 +506,25 @@ export async function fetchUserReadingList(userId: string): Promise<ReadingListI
     } catch (err) {
       console.warn('Error fetching reading lists from Supabase, falling back to LocalStorage:', err);
       const saved = localStorage.getItem(`manhua_list_${userId}`);
-      return saved ? JSON.parse(saved) : [];
+      if (saved) {
+        try {
+          return JSON.parse(saved);
+        } catch (e) {
+          return [];
+        }
+      }
+      return [];
     }
   } else {
     const saved = localStorage.getItem(`manhua_list_${userId}`);
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
   }
 }
 

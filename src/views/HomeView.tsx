@@ -269,7 +269,11 @@ export default function HomeView({
                     views: item.views || 0,
                     chapters: item.chapters || [],
                     releaseYear: item.releaseYear || 2026,
-                    categories: item.categories || [sources.find(s => s.id === item.sourceId)?.name || 'مصدر خارجي']
+                    categories: (item.categories && item.categories.length > 0) ? item.categories : (() => {
+                      if (!sources || !Array.isArray(sources)) return ['مصدر خارجي'];
+                      const idx = sources.findIndex(s => s && s.id === item.sourceId);
+                      return idx !== -1 ? [`نتيجة ${idx + 1}`] : ['مصدر خارجي'];
+                    })()
                   } as any} 
                   onSelect={() => handleSelectScrapedItem(item)}
                   user={user}

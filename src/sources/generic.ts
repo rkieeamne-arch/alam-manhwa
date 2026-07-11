@@ -435,10 +435,132 @@ export const genericSourceHandler: SourceHandler = {
     const $ = cheerio.load(html);
 
     const pages: ChapterPage[] = [];
+
+    // A. Check for WordPress / Mangareader dynamic scripts (ts_reader.run)
+    let tsReaderScript = '';
+    $('script').each((_idx, el) => {
+      const content = $(el).html() || '';
+      if (content.includes('ts_reader.run')) {
+        tsReaderScript = content;
+      }
+    });
+
+    if (tsReaderScript) {
+      const startIdx = tsReaderScript.indexOf('{');
+      const endIdx = tsReaderScript.lastIndexOf('}');
+      if (startIdx !== -1 && endIdx !== -1) {
+        try {
+          const jsonStr = tsReaderScript.substring(startIdx, endIdx + 1);
+          const data = JSON.parse(jsonStr);
+          const extractedUrls: string[] = [];
+          
+          if (data.sources && Array.isArray(data.sources)) {
+            for (const src of data.sources) {
+              if (src.images && Array.isArray(src.images)) {
+                for (const img of src.images) {
+                  if (typeof img === 'string' && img.trim()) {
+                    extractedUrls.push(img.trim());
+                  }
+                }
+              }
+            }
+          }
+          
+          if (data.images && Array.isArray(data.images)) {
+            for (const img of data.images) {
+              if (typeof img === 'string' && img.trim() && !extractedUrls.includes(img.trim())) {
+                extractedUrls.push(img.trim());
+              }
+            }
+          }
+
+          if (extractedUrls.length > 0) {
+            for (const rawImgUrl of extractedUrls) {
+              const cleanUrl = normalizeUrl(rawImgUrl, baseUrl);
+              if (cleanUrl.startsWith('http') && 
+                  !cleanUrl.includes('logo') && 
+                  !cleanUrl.includes('avatar') && 
+                  !cleanUrl.includes('banner') &&
+                  !cleanUrl.endsWith('.gif') &&
+                  !pages.some(p => p.url === cleanUrl)) {
+                pages.push({ url: cleanUrl });
+              }
+            }
+            if (pages.length > 0) {
+              console.log(`[Scraper] Successfully extracted ${pages.length} pages via ts_reader.run`);
+              return pages; // Return immediately to avoid picking up unrelated layout/ads images
+            }
+          }
+        } catch (err) {
+          console.warn('[Scraper] Failed to parse ts_reader.run JSON:', err);
+        }
+      }
+    }
+
+    // B. Check for other generic arrays of image URLs inside script tags (e.g. var pages = [...])
+    $('script').each((_idx, el) => {
+      const content = $(el).html() || '';
+      if (content.includes('http') && (content.includes('.jpg') || content.includes('.png') || content.includes('.webp') || content.includes('.avif'))) {
+        const arrayRegex = /["'](https?:\/\/[^"']+\.(?:jpg|jpeg|png|webp|avif)(?:\?[^"']*)?)["']/gi;
+        let match;
+        const foundUrls: string[] = [];
+        while ((match = arrayRegex.exec(content)) !== null) {
+          foundUrls.push(match[1]);
+        }
+        if (foundUrls.length > 5) { // Only count if there are enough pages to look like a chapter
+          for (const rawImgUrl of foundUrls) {
+            const cleanUrl = normalizeUrl(rawImgUrl, baseUrl);
+            if (cleanUrl.startsWith('http') && 
+                !cleanUrl.includes('logo') && 
+                !cleanUrl.includes('avatar') && 
+                !cleanUrl.includes('banner') &&
+                !cleanUrl.endsWith('.gif') &&
+                !pages.some(p => p.url === cleanUrl)) {
+              pages.push({ url: cleanUrl });
+            }
+          }
+          if (pages.length > 0) {
+            console.log(`[Scraper] Extracted ${pages.length} pages from custom script URL array`);
+          }
+        }
+      }
+    });
+
+    if (pages.length > 0) {
+      return pages;
+    }
     
     const extractFromSelector = (sel: string, attr: string) => {
       $(sel).each((_idx, el) => {
-        const rawImgUrl = $(el).attr(attr) || $(el).attr('data-src') || $(el).attr('data-lazy-src') || $(el).attr('src');
+        // Find the best attribute that has a real image URL
+        const possibleAttrs = [attr, 'data-src', 'data-lazy-src', 'data-cdn-src', 'data-original', 'src'];
+        let rawImgUrl = '';
+        
+        for (const possibleAttr of possibleAttrs) {
+          if (!possibleAttr) continue;
+          const val = $(el).attr(possibleAttr);
+          if (val && val.trim() !== '') {
+            // If it's a placeholder base64 or a tiny loader image, don't use it as the primary URL
+            const isPlaceholder = val.startsWith('data:') || 
+                                  val.includes('placeholder') || 
+                                  val.includes('transparent') || 
+                                  val.includes('blank') || 
+                                  val.includes('spacer') ||
+                                  val.includes('loading') ||
+                                  val.endsWith('.gif') ||
+                                  val.endsWith('.svg');
+            if (!isPlaceholder) {
+              rawImgUrl = val.trim();
+              break;
+            }
+          }
+        }
+        
+        // Fallback to the requested attribute or src if all are placeholders
+        if (!rawImgUrl) {
+          rawImgUrl = $(el).attr(attr) || $(el).attr('src') || '';
+        }
+
         if (rawImgUrl) {
           const cleanUrl = normalizeUrl(rawImgUrl, baseUrl);
           if (cleanUrl.startsWith('http') && 
