@@ -54,13 +54,51 @@ export const azoraflySourceHandler: SourceHandler = {
   baseUrl: BASE_URL,
 
   async parsePopularList(page: number = 1, query?: string): Promise<Manga[]> {
-    // Azorafly does not seem to support simple ?search= URL parameters. 
-    // We fetch the popular page and filter client-side if there's a query.
+    const list: Manga[] = [];
+
+    // Use API if query is provided
+    if (query && query.trim() !== '') {
+      try {
+        // Try searchTerm first as it is the standard Astro parameter
+        let apiRes = await proxiedFetch(`https://api.azorafly.com/api/posts?searchTerm=${encodeURIComponent(query)}`);
+        let textData = await apiRes.text();
+        let apiData: any = null;
+        try {
+          apiData = JSON.parse(textData);
+        } catch (e) {
+          // Fallback to title query if json parse failed
+          console.warn("Azorafly search API searchTerm failed JSON parse, trying title parameter");
+          apiRes = await proxiedFetch(`https://api.azorafly.com/api/posts?title=${encodeURIComponent(query)}`);
+          textData = await apiRes.text();
+          try {
+            apiData = JSON.parse(textData);
+          } catch (err2) {
+            console.error("Azorafly search API title failed JSON parse too", err2);
+          }
+        }
+
+        if (apiData?.posts) {
+          for (const post of apiData.posts) {
+            const url = `${BASE_URL}/series/${post.slug}`;
+            list.push({
+              id: getUniqueId(url),
+              title: post.postTitle || 'بدون عنوان',
+              cover: post.featuredImage || 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=300',
+              url: url,
+              sourceId: 'azorafly'
+            });
+          }
+          if (list.length > 0) return list;
+        }
+      } catch (err) {
+        console.error("Azorafly search API fetch failed", err);
+      }
+    }
+
     const url = `${BASE_URL}/series?page=${page}`;
     const response = await proxiedFetch(url);
     const html = await response.text();
     const $ = cheerio.load(html);
-    const list: Manga[] = [];
 
     // Narrow down to anchor elements that have images (manga cards)
     $('a').each((_, anchor) => {

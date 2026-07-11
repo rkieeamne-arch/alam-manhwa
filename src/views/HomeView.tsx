@@ -200,6 +200,9 @@ export default function HomeView({
                   manhua={{
                     id: item.id,
                     title: item.title,
+                    description: item.description || 'لا يوجد وصف',
+                    author: item.author || 'غير معروف',
+                    artist: item.artist || 'غير معروف',
                     coverUrl: item.coverUrl,
                     rating: item.rating || 4.8,
                     status: 'مستمر' as any,

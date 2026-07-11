@@ -303,10 +303,10 @@ export default function ManhuaDetailsView({
         </div>
 
         {/* Info Grid */}
-        <div className="relative z-10 p-6 sm:p-8 grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+        <div className="relative z-10 p-4 sm:p-6 grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
           
           {/* Cover Art - Column (4 cols on md) */}
-          <div className="md:col-span-4 lg:col-span-3 mx-auto md:mx-0 w-full max-w-[220px] aspect-[2/3] rounded-xl overflow-hidden border-2 border-red-500/30 shadow-2xl shrink-0 bg-zinc-900">
+          <div className="md:col-span-4 lg:col-span-3 mx-auto md:mx-0 w-32 md:w-full max-w-[220px] aspect-[2/3] rounded-xl overflow-hidden border-2 border-red-500/30 shadow-2xl shrink-0 bg-zinc-900">
             <img 
               src={displayManhua.coverUrl} 
               alt={displayManhua.title} 
@@ -318,19 +318,10 @@ export default function ManhuaDetailsView({
           {/* Details Metadata (8 cols on md) */}
           <div className="md:col-span-8 lg:col-span-9 space-y-4">
             
-            {/* Status & Rating line */}
+            {/* Status line */}
             <div className="flex flex-wrap gap-2 items-center justify-start">
               <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${getStatusColor(displayManhua.status)}`}>
                 {displayManhua.status}
-              </span>
-              <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-full px-2.5 py-1 text-xs text-amber-400">
-                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                <span className="font-extrabold font-mono">{displayManhua.rating} / 5</span>
-              </div>
-              <span className="text-zinc-600">•</span>
-              <span className="text-xs text-zinc-400 flex items-center gap-1 font-mono">
-                <Eye className="w-3.5 h-3.5 text-red-500" />
-                <span>{displayManhua.views.toLocaleString()} مشاهدة</span>
               </span>
               <span className="text-zinc-600">•</span>
               <div className="flex items-center gap-1 bg-zinc-900/60 border border-zinc-800 rounded-full pl-2.5 pr-1 py-0.5 text-xs text-zinc-300">
@@ -346,16 +337,34 @@ export default function ManhuaDetailsView({
               </div>
             </div>
 
-            {/* Title */}
-            <div className="space-y-1 text-right">
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-snug font-display">
+            {/* Title & Info Section */}
+            <div className="space-y-3 text-right">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-white tracking-tight leading-tight font-display break-words">
                 {displayManhua.title}
               </h1>
               {displayManhua.englishTitle && (
-                <p className="text-xs sm:text-sm text-zinc-500 font-mono">
+                <p className="text-[11px] sm:text-xs text-zinc-500 font-mono break-words">
                   {displayManhua.englishTitle}
                 </p>
               )}
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-3 items-center">
+               <button className="px-5 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-red-950/20 transition-all flex items-center gap-2">
+                 <span>بدء القراءة</span>
+               </button>
+               <div className="flex items-center gap-2">
+                 <AddToListPicker
+                    user={user}
+                    manhua={displayManhua as any}
+                    readingList={readingList}
+                    onAddToList={onAddToList}
+                    onRemoveFromList={onRemoveFromList}
+                    onNavigate={onNavigate}
+                    className="w-10 h-10"
+                 />
+               </div>
             </div>
 
             {/* Metadata Badges */}

@@ -105,6 +105,43 @@ export const olympusStaffSource: SourceHandler = {
   },
 
   async parsePopularList(page: number = 1, query?: string): Promise<Manga[]> {
+    if (query && query.trim() !== '') {
+      try {
+        const searchUrl = `${BASE_URL}/ajax/search?keyword=${encodeURIComponent(query)}`;
+        const response = await proxiedFetch(searchUrl);
+        const html = await response.text();
+        const $ = cheerio.load(html);
+        const results: Manga[] = [];
+        
+        $('a').each((_, el) => {
+          const href = $(el).attr('href');
+          const title = $(el).find('h4').text().trim() || $(el).attr('title')?.trim() || '';
+          const coverEl = $(el).find('img').first();
+          const cover = coverEl.attr('src') || coverEl.attr('data-src') || coverEl.attr('data-lazy-src') || '';
+          
+          if (href && title) {
+            const fullUrl = href.startsWith('http') ? href : `${BASE_URL}${href}`;
+            const uniqueId = getUniqueId(fullUrl);
+            if (fullUrl.includes('/series/') && !results.some(m => m.id === uniqueId)) {
+              results.push({
+                id: uniqueId,
+                title,
+                cover: cover ? (cover.startsWith('/') ? `${BASE_URL}${cover}` : cover) : 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=300',
+                url: fullUrl,
+                sourceId: 'olympustaff'
+              });
+            }
+          }
+        });
+        
+        if (results.length > 0) {
+          return results;
+        }
+      } catch (err) {
+        console.error("Olympus AJAX search failed, falling back", err);
+      }
+    }
+
     const url = query ? `${BASE_URL}/series?search=${query}&page=${page}` : `${BASE_URL}/series?page=${page}`;
     const response = await proxiedFetch(url);
     const html = await response.text();

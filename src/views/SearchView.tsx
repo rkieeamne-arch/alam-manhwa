@@ -36,8 +36,14 @@ export default function SearchView({
   const [selectedStatus, setSelectedStatus] = useState<ManhuaStatus | 'الكل'>('الكل');
   const [filteredManhuas, setFilteredManhuas] = useState<Manhua[]>(manhuas);
   
-  const [scrapedResults, setScrapedResults] = useState<any[]>([]);
-  const [loadingScraped, setLoadingScraped] = useState(false);
+  const [scrapedGroups, setScrapedGroups] = useState<{
+    [sourceId: string]: {
+      sourceName: string;
+      results: any[];
+      loading: boolean;
+      error: string | null;
+    }
+  }>({});
 
   // Re-sync with initial inputs if they change from external triggers
   useEffect(() => {
@@ -71,27 +77,49 @@ export default function SearchView({
   }, [query, selectedCategory, selectedStatus, manhuas]);
 
   useEffect(() => {
-    // Also fetch from sources whenever query changes
     const fetchFromSources = async () => {
       if (sources.length === 0) return;
-      setLoadingScraped(true);
-      setScrapedResults([]);
+
+      const isSearching = query.trim() !== '';
       
-      try {
-        const promises = sources.map(source => scrapeMangaList(source, 1, query));
-        const results = await Promise.allSettled(promises);
-        const combinedResults: any[] = [];
-        results.forEach(res => {
-          if (res.status === 'fulfilled') {
-            combinedResults.push(...res.value);
-          }
-        });
-        setScrapedResults(combinedResults);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoadingScraped(false);
-      }
+      // Initialize groups
+      const initialGroups: typeof scrapedGroups = {};
+      sources.forEach(src => {
+        initialGroups[src.id] = {
+          sourceName: src.name,
+          results: [],
+          loading: true, // Always show loading as we fetch popular when not searching
+          error: null
+        };
+      });
+      setScrapedGroups(initialGroups);
+
+      // Start fetching from each source in parallel
+      sources.forEach(async (source) => {
+        try {
+          const results = await scrapeMangaList(source, 1, query);
+          setScrapedGroups(prev => ({
+            ...prev,
+            [source.id]: {
+              ...prev[source.id],
+              results: results || [],
+              loading: false,
+              error: null
+            }
+          }));
+        } catch (err: any) {
+          console.error(`Search failed for source ${source.name}:`, err);
+          setScrapedGroups(prev => ({
+            ...prev,
+            [source.id]: {
+              ...prev[source.id],
+              results: [],
+              loading: false,
+              error: err?.message || 'فشل الاتصال بالمصدر الأصلي'
+            }
+          }));
+        }
+      });
     };
     
     // debounce fetching
@@ -230,99 +258,143 @@ export default function SearchView({
 
       </div>
 
-      {/* Grid of All Results Combined */}
-      {(filteredManhuas.length > 0 || scrapedResults.length > 0 || loadingScraped) && (
-        <div className="space-y-4">
-          <div className="flex justify-between items-center border-r-4 border-zinc-600 pr-3">
-            <h2 className="text-lg font-bold text-zinc-100 font-display">جميع المانهوات ({filteredManhuas.length + scrapedResults.length})</h2>
-            {loadingScraped && <Loader2 className="w-4 h-4 animate-spin text-red-500" />}
-          </div>
-          
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4">
-            {filteredManhuas.map((m) => (
-              <ManhuaCard 
-                key={m.id} 
-                manhua={m} 
-                onSelect={onSelectManhua} 
-                user={user}
-                readingList={readingList}
-                onAddToList={onAddToList}
-                onRemoveFromList={onRemoveFromList}
-                onNavigate={onNavigate}
-              />
-            ))}
-            {scrapedResults.map((item, idx) => {
-                const shell: Manhua = {
-                  id: item.id,
-                  title: item.title,
-                  description: 'جاري جلب تفاصيل القصة وقائمة الفصول كاملة ومباشرة من الموقع المصدر...',
-                  author: 'مجهول',
-                  artist: 'مجهول',
-                  status: 'مستمر' as ManhuaStatus,
-                  rating: item.rating || 4.8,
-                  views: item.views || Math.floor(Math.random() * 10000) + 1000,
-                  coverUrl: item.coverUrl || item.cover,
-                  categories: ['ويب تون'],
-                  chapters: [],
-                  releaseYear: new Date().getFullYear(),
-                  sourceUrl: item.sourceUrl || item.url,
-                };
-                return (
-                  <div 
-                    key={`${item.id}-${idx}`}
-                    onClick={() => onSelectManhua(shell.id, shell)}
-                    className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden cursor-pointer hover:border-red-500 transition-colors flex flex-col h-full"
-                  >
-                    <div className="aspect-[2/3] relative">
-                      <img src={shell.coverUrl} alt={shell.title} className="w-full h-full object-cover" />
-                      <div className="absolute top-2 right-2 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow">
-                        {sources.find(s => s.id === item.sourceId)?.name || 'مصدر خارجي'}
-                      </div>
-                      
-                      {/* Floating list picker button for scraped results */}
-                      <div className="absolute bottom-2 left-2 z-10">
-                        <AddToListPicker
-                          user={user}
-                          manhua={shell}
-                          readingList={readingList}
-                          onAddToList={onAddToList}
-                          onRemoveFromList={onRemoveFromList}
-                          onNavigate={onNavigate}
-                        />
-                      </div>
-                    </div>
-                    <div className="p-3 flex-1 flex flex-col justify-between">
-                      <h3 className="text-xs font-bold text-zinc-100 line-clamp-2">{shell.title}</h3>
-                    </div>
-                  </div>
-                );
-            })}
-          </div>
-          
-          {filteredManhuas.length === 0 && scrapedResults.length === 0 && loadingScraped && (
-            <div className="flex justify-center items-center py-12">
-               <Loader2 className="w-8 h-8 animate-spin text-red-500" />
+      {/* Grid of All Results Combined & Grouped like Mihon */}
+      <div className="space-y-8">
+        {/* 1. Local Database Results */}
+        {filteredManhuas.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center border-r-4 border-red-500 pr-3">
+              <h2 className="text-lg font-bold text-zinc-100 font-display">مكتبة عالم المانهو ({filteredManhuas.length})</h2>
             </div>
-          )}
-        </div>
-      )}
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4">
+              {filteredManhuas.map((m) => (
+                <ManhuaCard 
+                  key={m.id} 
+                  manhua={m} 
+                  onSelect={onSelectManhua} 
+                  user={user}
+                  readingList={readingList}
+                  onAddToList={onAddToList}
+                  onRemoveFromList={onRemoveFromList}
+                  onNavigate={onNavigate}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
-      {filteredManhuas.length === 0 && scrapedResults.length === 0 && !loadingScraped && (
-        <div className="bg-zinc-900/10 border border-dashed border-zinc-800 rounded-2xl py-16 text-center space-y-3">
-          <Compass className="w-12 h-12 mx-auto text-zinc-700 stroke-1 animate-pulse" />
-          <h3 className="text-sm font-bold text-zinc-300">لم يتم العثور على أي نتائج مطابقة!</h3>
-          <p className="text-xs text-zinc-500 max-w-md mx-auto">
-            تأكد من كتابة اسم المانهو بشكل صحيح، أو جرب تصفح تصنيف آخر أو تصفية حالة نشر مختلفة.
-          </p>
-          <button
-            onClick={resetFilters}
-            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-all mt-2 active:scale-95"
-            id="reset-empty-btn"
-          >
-            إعادة تعيين والبدء من جديد
-          </button>
-        </div>
-      )}
+        {/* 2. External Sources Results Grouped */}
+        {sources.map((source, index) => {
+          const group = scrapedGroups[source.id];
+          if (!group) return null;
+
+          return (
+            <div key={source.id} className="space-y-4 bg-zinc-900/10 border border-zinc-900 p-5 rounded-2xl">
+              <div className="flex justify-between items-center border-r-4 border-zinc-500 pr-3">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${group.loading ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></span>
+                  <h2 className="text-sm font-extrabold text-zinc-100 font-display">نتائج {index + 1}</h2>
+                </div>
+                {group.loading && <Loader2 className="w-4 h-4 animate-spin text-red-500" />}
+              </div>
+
+              {group.loading && group.results.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-8 gap-2">
+                  <Loader2 className="w-6 h-6 animate-spin text-red-500" />
+                  <span className="text-xs text-zinc-400">جاري {query.trim() === '' ? 'جلب الأشهر' : 'البحث وجلب النتائج'} من نتائج {index + 1}...</span>
+                </div>
+              )}
+
+              {group.error && (
+                <div className="text-xs text-red-400 bg-red-950/20 border border-red-900/30 p-4 rounded-xl text-center">
+                  فشل جلب النتائج من نتائج {index + 1}. {group.error}
+                </div>
+              )}
+
+              {!group.loading && !group.error && group.results.length === 0 && (
+                <div className="text-xs text-zinc-500 bg-zinc-950/40 p-6 rounded-xl text-center border border-dashed border-zinc-850">
+                  {query.trim() === '' ? `لا توجد مانهوات في نتائج ${index + 1}.` : `لا توجد نتائج مطابقة لبحثك في نتائج ${index + 1}.`}
+                </div>
+              )}
+
+              {group.results.length > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {group.results.map((item, idx) => {
+                    const shell: Manhua = {
+                      id: item.id,
+                      title: item.title,
+                      description: 'جاري جلب تفاصيل القصة وقائمة الفصول كاملة ومباشرة من الموقع المصدر...',
+                      author: 'مجهول',
+                      artist: 'مجهول',
+                      status: 'مستمر' as ManhuaStatus,
+                      rating: item.rating || 4.8,
+                      views: item.views || Math.floor(Math.random() * 10000) + 1000,
+                      coverUrl: item.coverUrl || item.cover,
+                      categories: ['ويب تون'],
+                      chapters: [],
+                      releaseYear: new Date().getFullYear(),
+                      sourceUrl: item.sourceUrl || item.url,
+                    };
+                    return (
+                      <div 
+                        key={`${item.id}-${idx}`}
+                        onClick={() => onSelectManhua(shell.id, shell)}
+                        className="bg-zinc-950/80 border border-zinc-850 rounded-xl overflow-hidden cursor-pointer hover:border-red-500 transition-colors flex flex-col h-full group/card"
+                      >
+                        <div className="aspect-[2/3] relative overflow-hidden">
+                          <img 
+                            src={shell.coverUrl} 
+                            alt={shell.title} 
+                            className="w-full h-full object-cover group-hover/card:scale-105 transition-transform duration-300" 
+                            referrerPolicy="no-referrer"
+                          />
+                          <div className="absolute top-2 right-2 bg-red-600/90 backdrop-blur-sm text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow">
+                            نتائج {index + 1}
+                          </div>
+                          
+                          {/* Floating list picker button for scraped results */}
+                          <div className="absolute bottom-2 left-2 z-10" onClick={(e) => e.stopPropagation()}>
+                            <AddToListPicker
+                              user={user}
+                              manhua={shell}
+                              readingList={readingList}
+                              onAddToList={onAddToList}
+                              onRemoveFromList={onRemoveFromList}
+                              onNavigate={onNavigate}
+                            />
+                          </div>
+                        </div>
+                        <div className="p-3 flex-1 flex flex-col justify-between">
+                          <h3 className="text-xs font-bold text-zinc-100 line-clamp-2 leading-relaxed group-hover/card:text-red-400 transition-colors">{shell.title}</h3>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {/* No results across all targets */}
+        {filteredManhuas.length === 0 && 
+         Object.values(scrapedGroups).every((g: any) => !g.loading && g.results.length === 0) && (
+          <div className="bg-zinc-900/10 border border-dashed border-zinc-800 rounded-2xl py-16 text-center space-y-3">
+            <Compass className="w-12 h-12 mx-auto text-zinc-700 stroke-1 animate-pulse" />
+            <h3 className="text-sm font-bold text-zinc-300">لم يتم العثور على أي نتائج مطابقة في أي مصدر!</h3>
+            <p className="text-xs text-zinc-500 max-w-md mx-auto">
+              تأكد من كتابة اسم المانهو بشكل صحيح، أو جرب تصفح تصنيف آخر أو تصفية حالة نشر مختلفة.
+            </p>
+            <button
+              onClick={resetFilters}
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-all mt-2 active:scale-95"
+              id="reset-empty-btn"
+            >
+              إعادة تعيين والبدء من جديد
+            </button>
+          </div>
+        )}
+      </div>
 
     </div>
   );

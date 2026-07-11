@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   User, Mail, Calendar, Edit, Save, CheckCircle2, ShieldAlert, Sparkles, 
-  RefreshCw, LogIn, Award, Heart, Lock, LogOut, Upload, FileText, Check, Database
+  RefreshCw, LogIn, Award, Heart, Lock, LogOut, Upload, FileText, Check, Database, ArrowLeft, MoreVertical
 } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
 import { UserProfile } from '../types';
 import { hasSupabase } from '../lib/supabase';
 
@@ -245,303 +246,110 @@ export default function AccountView({
       ) : (
         
         // 2. LOGGED IN STATE (Profile Dashboard)
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-          
-          {/* Profile overview left side */}
-          <div className="md:col-span-4 bg-zinc-900/30 p-6 rounded-2xl border border-zinc-800/80 flex flex-col items-center text-center space-y-4">
-            <div className="relative">
+        <div className="bg-zinc-950 min-h-screen text-zinc-100 pb-20">
+          {/* Banner & Header Actions */}
+          <div className="relative h-48 bg-zinc-800">
+            <img 
+              src="https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?w=1200&auto=format&fit=crop&q=80" 
+              alt="Banner" 
+              className="w-full h-full object-cover opacity-60"
+            />
+            <div className="absolute top-4 left-4 right-4 flex justify-between items-center">
+              <button onClick={() => window.history.back()} className="p-2 rounded-full bg-black/40 backdrop-blur-sm text-white">
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <button className="p-2 rounded-full bg-black/40 backdrop-blur-sm text-white">
+                <MoreVertical className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Avatar & Info Section */}
+          <div className="px-6 relative">
+            <div className="absolute -top-12 left-6">
               <img 
                 src={user.avatarUrl} 
                 alt={user.displayName}
-                className="w-24 h-24 rounded-full border-4 border-red-500 shadow-2xl object-cover bg-zinc-950"
-                referrerPolicy="no-referrer"
+                className="w-24 h-24 rounded-full border-4 border-zinc-950 shadow-xl object-cover"
               />
-              <span className="absolute bottom-1 right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-zinc-900 animate-pulse" />
             </div>
-
-            <div className="space-y-1">
-              <h2 className="text-lg font-black text-zinc-100 font-display flex items-center gap-1 justify-center">
-                {user.displayName}
-                <Sparkles className="w-4 h-4 text-red-500" />
-              </h2>
-              <p className="text-xs text-zinc-500 font-mono">{user.email}</p>
-            </div>
-
-            {/* Badge role */}
-            <div className="flex flex-col gap-1 w-full pt-2">
-              <span className={`px-3 py-1 rounded-full text-xs font-bold border mx-auto ${
-                user.role === 'admin' 
-                  ? 'bg-red-500/10 text-red-400 border-red-500/30 shadow-md shadow-red-950/20' 
-                  : 'bg-zinc-900 text-zinc-400 border-zinc-800'
-              }`}>
-                {user.role === 'admin' ? 'مدير عام الموقع (مسؤول)' : 'عضو فضي'}
-              </span>
-            </div>
-
-            {/* Meta info */}
-            <div className="w-full border-t border-zinc-900/60 pt-4 space-y-2.5 text-right text-xs text-zinc-400">
-              <div className="flex items-center justify-between">
-                <span className="text-zinc-500 flex items-center gap-1">
-                  <Calendar className="w-4 h-4 text-zinc-600" />
-                  تاريخ الانضمام:
-                </span>
-                <span className="font-bold text-zinc-300 font-mono">{user.joinedAt}</span>
-              </div>
-            </div>
-
-            {/* Logout button */}
-            <button
-              onClick={onLogout}
-              className="w-full py-2.5 px-4 mt-2 bg-zinc-950 hover:bg-red-950/20 text-zinc-400 hover:text-red-400 border border-zinc-850 hover:border-red-900/30 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>تسجيل الخروج</span>
-            </button>
-          </div>
-
-          {/* Profile custom edit settings right side */}
-          <div className="md:col-span-8 bg-zinc-900/30 p-6 rounded-2xl border border-zinc-800/80 space-y-6">
             
-            <div className="flex items-center justify-between border-b border-zinc-900 pb-3">
-              <div className="flex items-center gap-2">
-                <Edit className="w-5 h-5 text-red-500" />
-                <h1 className="text-lg font-bold text-zinc-100 font-display">تخصيص الحساب وتعديل البيانات</h1>
-              </div>
-              
-              {!editMode && (
-                <button
-                  onClick={() => setEditMode(true)}
-                  className="px-3.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 rounded-lg text-xs font-bold transition-colors cursor-pointer"
-                  id="edit-profile-btn"
-                >
-                  تعديل الملف
-                </button>
-              )}
+            <div className="flex justify-end pt-4">
+               <button className="px-4 py-1.5 border border-zinc-700 rounded-full text-sm font-semibold hover:bg-zinc-800 transition">
+                  تعديل الملف الشخصي
+               </button>
             </div>
 
-            {/* Saved indicator Toast */}
-            {showSavedToast && (
-              <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-lg text-xs font-bold flex items-center gap-2 animate-bounce">
-                <CheckCircle2 className="w-4 h-4" />
-                <span>تم حفظ تعديلات حسابك ومزامنتها بنجاح مع السيرفر!</span>
+            <div className="mt-4 space-y-2">
+              <h2 className="text-2xl font-black flex items-center gap-2">
+                {user.displayName} 🇹🇳
+              </h2>
+              <p className="text-zinc-400 font-mono">@{user.displayName.replace(/\s+/g, '').toLowerCase()}</p>
+              <p className="text-zinc-200 mt-4 leading-relaxed">
+                {user.bio || 'مترجم روايات علي موقع مجرة روايات الحاكم الغامض فوق الضباب الاحمق الذي لا ينتمي إلى هذه الحقبه شاهد على تاريخ ممتد ملك الاصفر و الأسود'}
+              </p>
+            </div>
+
+            <div className="mt-4 flex gap-4 text-zinc-500 text-sm">
+              <div className="flex items-center gap-1">
+                <span className="text-zinc-400">📍</span> تونس
               </div>
-            )}
-
-            {formError && (
-              <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-xs font-bold">
-                {formError}
+              <div className="flex items-center gap-1">
+                <span className="text-zinc-400">📅</span> تاريخ الميلاد 24 يونيو 2006
               </div>
-            )}
-
-            {/* Edit / View Form */}
-            <form onSubmit={handleSaveProfile} className="space-y-6">
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-zinc-400">الاسم المعروض على الموقع:</label>
-                  <input
-                    type="text"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    disabled={!editMode || submitting}
-                    required
-                    className="w-full bg-zinc-950 border border-zinc-850 rounded-xl px-4 py-3 text-xs text-zinc-100 focus:outline-none focus:border-red-500 disabled:bg-zinc-950/20 disabled:text-zinc-400 disabled:cursor-not-allowed"
-                    id="profile-displayName-input"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-zinc-400">البريد الإلكتروني (غير قابل للتعديل):</label>
-                  <input
-                    type="email"
-                    value={user.email}
-                    disabled
-                    className="w-full bg-zinc-950/20 border border-zinc-900 rounded-xl px-4 py-3 text-xs text-zinc-500 cursor-not-allowed"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-zinc-400">النبذة الشخصية (Bio):</label>
-                <textarea
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                  disabled={!editMode || submitting}
-                  placeholder="مثال: قارئ مانهو شغوف أحب روايات وفنون القتال وزراعة الطاقة السماوية..."
-                  className="w-full bg-zinc-950 border border-zinc-850 rounded-xl px-4 py-3 text-xs text-zinc-100 h-24 focus:outline-none focus:border-red-500 disabled:bg-zinc-950/20 disabled:text-zinc-400 disabled:cursor-not-allowed resize-none"
-                />
-              </div>
-
-              {/* Avatar Selector Gallery & Custom Image Upload */}
-              {editMode && (
-                <div className="space-y-4 pt-4 border-t border-zinc-900/60">
-                  <span className="text-xs font-bold text-zinc-300 block flex items-center gap-1.5">
-                    <Heart className="w-4 h-4 text-red-500" />
-                    اختر صورتك الرمزية (أفاتار) أو ارفع صورة خاصة بك:
-                  </span>
-                  
-                  {/* File Upload Input */}
-                  <div className="flex flex-col sm:flex-row items-center gap-4 p-3 bg-zinc-950 border border-zinc-850 rounded-xl">
-                    <div className="relative w-16 h-16 rounded-full overflow-hidden bg-zinc-900 border border-zinc-800 shrink-0">
-                      <img 
-                        src={selectedAvatar} 
-                        alt="Preview" 
-                        className="w-full h-full object-cover" 
-                      />
-                    </div>
-                    <div className="text-right w-full">
-                      <p className="text-xs text-zinc-300 font-bold">رفع صورة بروفايل مخصصة</p>
-                      <p className="text-[10px] text-zinc-500 mt-1">تنسيقات PNG, JPG أو WebP (الحد الأقصى 2 ميغابايت)</p>
-                      
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={submitting}
-                        className="mt-2.5 px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 text-xs rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Upload className="w-3.5 h-3.5" />
-                        <span>اختيار ملف الصورة</span>
-                      </button>
-                      
-                      <input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleImageUpload}
-                        accept="image/*"
-                        className="hidden"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Presets Grid */}
-                  <div className="space-y-2">
-                    <p className="text-[11px] text-zinc-500">أو اختر من الرمزيات الجاهزة:</p>
-                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-                      {presetAvatars.map((avUrl, index) => (
-                        <div 
-                          key={index}
-                          onClick={() => setSelectedAvatar(avUrl)}
-                          className={`aspect-square rounded-full overflow-hidden border-3 cursor-pointer transition-all hover:scale-105 relative ${
-                            selectedAvatar === avUrl 
-                              ? 'border-red-500 ring-2 ring-red-500/20 shadow-lg shadow-red-950/25' 
-                              : 'border-zinc-800 hover:border-zinc-700'
-                          }`}
-                        >
-                          <img 
-                            src={avUrl} 
-                            alt={`Avatar preset ${index}`} 
-                            className="w-full h-full object-cover"
-                            referrerPolicy="no-referrer"
-                          />
-                          {selectedAvatar === avUrl && (
-                            <div className="absolute inset-0 bg-red-600/10 flex items-center justify-center">
-                              <Check className="w-5 h-5 text-white bg-red-600 rounded-full" />
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Save actions */}
-              {editMode && (
-                <div className="flex gap-2 justify-end pt-4 border-t border-zinc-900/60">
-                  <button
-                    type="button"
-                    disabled={submitting}
-                    onClick={() => {
-                      setEditMode(false);
-                      setDisplayName(user.displayName);
-                      setBio(user.bio || '');
-                      setSelectedAvatar(user.avatarUrl);
-                      setFormError(null);
-                    }}
-                    className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-300 border border-zinc-800 rounded-lg text-xs font-bold transition-all disabled:opacity-50"
-                  >
-                    إلغاء التعديل
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="px-5 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 shadow-md shadow-red-950/25 disabled:opacity-50 cursor-pointer"
-                  >
-                    {submitting ? (
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Save className="w-4 h-4" />
-                    )}
-                    <span>حفظ التعديلات</span>
-                  </button>
-                </div>
-              )}
-
-            </form>
-
-            {/* Supabase copyable SQL setup instruction panel if not configured */}
-            {!hasSupabase && (
-              <div className="p-4 bg-amber-600/10 border border-amber-500/20 rounded-xl space-y-3 pt-4">
-                <h4 className="text-amber-400 text-xs font-bold flex items-center gap-1.5">
-                  <Database className="w-4 h-4" />
-                  كيفية ربط تطبيقك بقاعدة بيانات Supabase حقيقية:
-                </h4>
-                <p className="text-[10px] text-zinc-400 leading-relaxed">
-                  هذا التطبيق مجهز بالكامل للربط المباشر مع Supabase. كل ما تحتاجه هو إدخال المتغيرات التالية في لوحة <b>Secrets</b> بـ AI Studio:
-                </p>
-                <div className="bg-black/40 p-2 border border-zinc-900 rounded text-[10px] font-mono text-zinc-300 space-y-1 select-all text-left">
-                  <div>VITE_SUPABASE_URL="https://your-project.supabase.co"</div>
-                  <div>VITE_SUPABASE_ANON_KEY="your-anon-key-here"</div>
-                </div>
-                <p className="text-[10px] text-zinc-400 leading-relaxed">
-                  ثم قم بنسخ وتشغيل كود الـ SQL التالي في الـ <b>SQL Editor</b> الخاص بمشروعك في Supabase لإنشاء الجداول اللازمة فوراً:
-                </p>
-                <textarea
-                  readOnly
-                  value={`-- 1. Profiles Table
-create table public.profiles (
-  id uuid references auth.users on delete cascade primary key,
-  email text not null,
-  display_name text,
-  avatar_url text,
-  bio text,
-  role text default 'user',
-  joined_at text,
-  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-
--- 2. Reading History Table
-create table public.reading_history (
-  id text primary key,
-  user_id uuid references auth.users on delete cascade not null,
-  manhua_id text not null,
-  manhua_title text not null,
-  manhua_cover text not null,
-  chapter_id text not null,
-  chapter_title text not null,
-  chapter_number numeric not null,
-  last_read_time text not null,
-  progress_percent numeric not null,
-  page_index numeric not null
-);
-
--- 3. Reading Lists Table
-create table public.reading_lists (
-  id text primary key,
-  user_id uuid references auth.users on delete cascade not null,
-  manhua_id text not null,
-  manhua_title text not null,
-  manhua_cover text not null,
-  list_type text not null check (list_type in ('favorite', 'reading', 'plan')),
-  added_at text not null,
-  unique (user_id, manhua_id)
-);`}
-                  className="w-full bg-black/50 border border-zinc-900 text-[10px] font-mono text-zinc-400 h-28 rounded p-2 focus:outline-none focus:border-amber-600/50 resize-none select-all text-left"
-                />
-              </div>
-            )}
+            </div>
+            <div className="mt-1 flex items-center gap-1 text-zinc-500 text-sm">
+                <span className="text-zinc-400">🗓️</span> انضمّ في مايو 2021
+            </div>
           </div>
 
+          {/* Chart Section */}
+          <div className="px-6 mt-8">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: 'أنمياتي المفضلة', value: 70 },
+                      { name: 'اشاهدها حاليا', value: 7 },
+                      { name: 'ارغب بمشاهدتها', value: 573 },
+                      { name: 'تم مشاهدتها', value: 424 },
+                      { name: 'اكملها لاحقا', value: 94 },
+                      { name: 'لا ارغب بمشاهدتها', value: 11 },
+                    ]}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {[
+                      '#60a5fa', '#22c55e', '#ef4444', '#8b5cf6', '#a855f7', '#d97706'
+                    ].map((color, index) => (
+                      <Cell key={`cell-${index}`} fill={color} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-sm mt-4 text-zinc-300">
+              {[
+                { name: 'أنمياتي المفضلة', color: '#60a5fa' },
+                { name: 'اشاهدها حاليا', color: '#22c55e' },
+                { name: 'ارغب بمشاهدتها', color: '#ef4444' },
+                { name: 'تم مشاهدتها', color: '#8b5cf6' },
+                { name: 'اكملها لاحقا', color: '#a855f7' },
+                { name: 'لا ارغب بمشاهدتها', color: '#d97706' },
+              ].map((item) => (
+                <div key={item.name} className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: item.color }} />
+                  {item.name}
+                </div>
+              ))}
+            </div>
+             <p className="text-center text-zinc-500 mt-4 text-sm">عدد الحلقات التي تم مشاهدتها : 9575</p>
+          </div>
         </div>
       )}
 

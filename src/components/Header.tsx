@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { 
-  Search, Settings, BookOpen, User, ShieldAlert, History, Home, Sparkles, Heart 
+  Search, BookOpen, User, ShieldAlert, History, Home, Sparkles, Heart, Settings 
 } from 'lucide-react';
 import { UserProfile } from '../types';
+import logoImg from '../assets/images/manhua_logo_1783758713519.jpg';
 
 interface HeaderProps {
   onOpenSettings: () => void;
@@ -61,24 +62,26 @@ export default function Header({
                 onClick={() => onNavigate('home')} 
                 className="cursor-pointer flex items-center gap-2 group select-none"
               >
-                <div className="w-9 h-9 rounded-full bg-red-600 border border-red-500 flex items-center justify-center shadow-md shadow-red-900/30 group-hover:scale-105 transition-all">
-                  <span className="text-white font-extrabold font-display text-sm tracking-tighter">漫</span>
+                <div className="w-9 h-9 rounded-full overflow-hidden border border-red-500 flex items-center justify-center shadow-md shadow-red-900/30 group-hover:scale-105 transition-all">
+                  <img src={logoImg} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 </div>
                 <h1 className="text-xl md:text-2xl font-black text-white tracking-tight font-display transition-colors group-hover:text-red-500">
                   عالم <span className="text-red-500 font-extrabold">المانهو</span>
                 </h1>
               </div>
 
-              {/* Settings Curtain Button RIGHT NEXT TO THE TITLE IN THE CENTER */}
-              <button
-                onClick={onOpenSettings}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white border border-red-500/30 hover:border-red-600 font-bold text-xs transition-all active:scale-95 cursor-pointer shadow-sm animate-pulse hover:animate-none"
-                title="خيارات العرض والمزامنة"
-                id="drawer-trigger-center"
-              >
-                <Settings className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">أزرار التحكم</span>
-              </button>
+              {/* Discord Button and Settings Trigger */}
+              <div className="flex items-center gap-2">
+                <a
+                  href="https://discord.gg/NM59xtZtX3"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-indigo-600/10 hover:bg-indigo-600 text-indigo-500 hover:text-white border border-indigo-500/30 hover:border-indigo-600 font-bold text-xs transition-all active:scale-95 cursor-pointer shadow-sm"
+                  title="تواصل عبر ديسكورد"
+                >
+                  <span>ديسكورد</span>
+                </a>
+              </div>
             </div>
             
             <span className="text-[9px] text-zinc-500 font-medium tracking-widest hidden md:block">
@@ -210,6 +213,15 @@ export default function Header({
               لوحة الإدارة
             </button>
           )}
+
+          <button
+            onClick={onOpenSettings}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900"
+            id="nav-settings-btn"
+          >
+            <Settings className="w-3.5 h-3.5" />
+            الإعدادات
+          </button>
         </nav>
 
       </div>

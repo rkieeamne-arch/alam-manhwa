@@ -66,21 +66,9 @@ export default function ManhuaCard({
         {/* Dark vignette gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent opacity-80" />
 
-        {/* Rating badge top-right */}
-        <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/75 backdrop-blur-sm px-2 py-1 rounded-md border border-zinc-800">
-          <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-          <span className="text-[10px] font-extrabold text-amber-400 font-mono">{manhua.rating}</span>
-        </div>
-
         {/* Status badge top-left */}
         <div className={`absolute top-2 left-2 px-2 py-1 rounded-md text-[9px] font-bold border ${getStatusColor(manhua.status)}`}>
           {manhua.status}
-        </div>
-
-        {/* View count bottom overlay */}
-        <div className="absolute bottom-2 right-2 flex items-center gap-1 text-zinc-300 text-[10px] bg-black/60 backdrop-blur-xs py-0.5 px-2 rounded-full">
-          <Eye className="w-3 h-3 text-red-500" />
-          <span>{formatViews(manhua.views)} مشاهدة</span>
         </div>
 
         {/* Add to list trigger bottom-left */}
