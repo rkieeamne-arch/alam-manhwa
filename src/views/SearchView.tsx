@@ -95,30 +95,37 @@ export default function SearchView({
       setScrapedGroups(initialGroups);
 
       // Start fetching from each source in parallel
-      sources.forEach(async (source) => {
-        try {
-          const results = await scrapeMangaList(source, 1, query);
-          setScrapedGroups(prev => ({
-            ...prev,
-            [source.id]: {
-              ...prev[source.id],
-              results: results || [],
-              loading: false,
-              error: null
+      sources.forEach((source) => {
+        const fetchSource = async (retryCount = 0) => {
+          try {
+            const results = await scrapeMangaList(source, 1, query);
+            setScrapedGroups(prev => ({
+              ...prev,
+              [source.id]: {
+                ...prev[source.id],
+                results: results || [],
+                loading: false,
+                error: null
+              }
+            }));
+          } catch (err: any) {
+            console.error(`Search failed for source ${source.name} (Attempt ${retryCount + 1}):`, err);
+            if (retryCount < 3) { // Retry up to 3 times
+              setTimeout(() => fetchSource(retryCount + 1), 3000);
+            } else {
+              setScrapedGroups(prev => ({
+                ...prev,
+                [source.id]: {
+                  ...prev[source.id],
+                  results: [],
+                  loading: false,
+                  error: null // Hide the error so it doesn't annoy the user
+                }
+              }));
             }
-          }));
-        } catch (err: any) {
-          console.error(`Search failed for source ${source.name}:`, err);
-          setScrapedGroups(prev => ({
-            ...prev,
-            [source.id]: {
-              ...prev[source.id],
-              results: [],
-              loading: false,
-              error: err?.message || 'فشل الاتصال بالمصدر الأصلي'
-            }
-          }));
-        }
+          }
+        };
+        fetchSource();
       });
     };
     
@@ -264,13 +271,14 @@ export default function SearchView({
         {sources.map((source, index) => {
           const group = scrapedGroups[source.id];
           if (!group) return null;
+          if (!group.loading && group.results.length === 0) return null;
 
           return (
             <div key={source.id} className="space-y-4 bg-zinc-900/10 border border-zinc-900 p-5 rounded-2xl">
               <div className="flex justify-between items-center border-r-4 border-zinc-500 pr-3">
                 <div className="flex items-center gap-2">
                   <span className={`w-2 h-2 rounded-full ${group.loading ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></span>
-                  <h2 className="text-sm font-extrabold text-zinc-100 font-display">نتائج {index + 1}</h2>
+                  <h2 className="text-sm font-extrabold text-zinc-100 font-display">{group.sourceName}</h2>
                 </div>
                 {group.loading && <Loader2 className="w-4 h-4 animate-spin text-red-500" />}
               </div>
@@ -278,19 +286,7 @@ export default function SearchView({
               {group.loading && group.results.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-8 gap-2">
                   <Loader2 className="w-6 h-6 animate-spin text-red-500" />
-                  <span className="text-xs text-zinc-400">جاري {query.trim() === '' ? 'جلب الأشهر' : 'البحث وجلب النتائج'} من نتائج {index + 1}...</span>
-                </div>
-              )}
-
-              {group.error && (
-                <div className="text-xs text-red-400 bg-red-950/20 border border-red-900/30 p-4 rounded-xl text-center">
-                  فشل جلب النتائج من نتائج {index + 1}. {group.error}
-                </div>
-              )}
-
-              {!group.loading && !group.error && group.results.length === 0 && (
-                <div className="text-xs text-zinc-500 bg-zinc-950/40 p-6 rounded-xl text-center border border-dashed border-zinc-850">
-                  {query.trim() === '' ? `لا توجد مانهوات في نتائج ${index + 1}.` : `لا توجد نتائج مطابقة لبحثك في نتائج ${index + 1}.`}
+                  <span className="text-xs text-zinc-400">جاري {query.trim() === '' ? 'جلب الأشهر' : 'البحث وجلب النتائج'} من {group.sourceName}...</span>
                 </div>
               )}
 

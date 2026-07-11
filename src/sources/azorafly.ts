@@ -124,6 +124,16 @@ export const azoraflySourceHandler: SourceHandler = {
                 getSlugTitle(normalizedHref);
       }
 
+      // Clean title from random badges
+      title = title.replace(/(تحديث|مستمر|مكتمل|جديد|حصرية|مميزة|حصريه|مميزه)/gi, '').replace(/\s+/g, ' ').trim();
+
+      let latestChapter = '';
+      const chapText = $(anchor).find('.chapter, .ep, :contains("الفصل")').last().text() || $(anchor).parent().find('.chapter, .ep, :contains("الفصل")').last().text();
+      const chapMatch = chapText.match(/(?:الفصل|ch|chapter)\s*([\d.]+)/i) || chapText.match(/\b(\d+)\b/);
+      if (chapMatch) {
+          latestChapter = `الفصل ${chapMatch[1]}`;
+      }
+
       let cover = $(anchor).find('img').attr('src') || 
                   $(anchor).find('img').attr('data-src') || 
                   $(anchor).find('img').attr('data-lazy-src') || 
@@ -142,7 +152,8 @@ export const azoraflySourceHandler: SourceHandler = {
           title,
           cover,
           url: normalizedHref,
-          sourceId: 'azorafly'
+          sourceId: 'azorafly',
+          latestChapter
       });
     });
 

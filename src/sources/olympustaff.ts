@@ -115,10 +115,20 @@ export const olympusStaffSource: SourceHandler = {
         
         $('a').each((_, el) => {
           const href = $(el).attr('href');
-          const title = $(el).find('h4').text().trim() || $(el).attr('title')?.trim() || '';
+          let title = $(el).find('h4').text().trim() || $(el).attr('title')?.trim() || '';
           const coverEl = $(el).find('img').first();
           const cover = coverEl.attr('src') || coverEl.attr('data-src') || coverEl.attr('data-lazy-src') || '';
           
+          // Clean title from random badges
+          title = title.replace(/(تحديث|مستمر|مكتمل|جديد|حصرية|مميزة|حصريه|مميزه)/gi, '').replace(/\s+/g, ' ').trim();
+
+          let latestChapter = '';
+          const chapText = $(el).find('.chapter, .ep, :contains("الفصل")').last().text() || $(el).parent().find('.chapter, .ep, :contains("الفصل")').last().text();
+          const chapMatch = chapText.match(/(?:الفصل|ch|chapter)\s*([\d.]+)/i) || chapText.match(/\b(\d+)\b/);
+          if (chapMatch) {
+              latestChapter = `الفصل ${chapMatch[1]}`;
+          }
+
           if (href && title) {
             const fullUrl = href.startsWith('http') ? href : `${BASE_URL}${href}`;
             const uniqueId = getUniqueId(fullUrl);
@@ -128,7 +138,8 @@ export const olympusStaffSource: SourceHandler = {
                 title,
                 cover: cover ? (cover.startsWith('/') ? `${BASE_URL}${cover}` : cover) : 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=300',
                 url: fullUrl,
-                sourceId: 'olympustaff'
+                sourceId: 'olympustaff',
+                latestChapter
               });
             }
           }
@@ -153,11 +164,21 @@ export const olympusStaffSource: SourceHandler = {
       const linkEl = $(el).find('a[href*="/series/"]').first();
       if (linkEl.length === 0) return;
 
-      const title = linkEl.text().trim() || $(el).find('h5, h6, .card-title, .title').text().trim();
+      let title = linkEl.text().trim() || $(el).find('h5, h6, .card-title, .title').text().trim();
       const link = linkEl.attr('href');
       const coverEl = $(el).find('img').first();
       const cover = coverEl.attr('src') || coverEl.attr('data-src') || coverEl.attr('data-lazy-src');
       
+      // Clean title from random badges
+      title = title.replace(/(تحديث|مستمر|مكتمل|جديد|حصرية|مميزة|حصريه|مميزه)/gi, '').replace(/\s+/g, ' ').trim();
+
+      let latestChapter = '';
+      const chapText = $(el).find('.chapter, .ep, :contains("الفصل")').last().text() || $(el).parent().find('.chapter, .ep, :contains("الفصل")').last().text();
+      const chapMatch = chapText.match(/(?:الفصل|ch|chapter)\s*([\d.]+)/i) || chapText.match(/\b(\d+)\b/);
+      if (chapMatch) {
+          latestChapter = `الفصل ${chapMatch[1]}`;
+      }
+
       if (title && link && cover) {
         const fullUrl = link.startsWith('http') ? link : `${BASE_URL}${link}`;
         const uniqueId = getUniqueId(fullUrl);
@@ -169,7 +190,8 @@ export const olympusStaffSource: SourceHandler = {
           title,
           cover: cover.startsWith('/') ? `${BASE_URL}${cover}` : cover,
           url: fullUrl,
-          sourceId: 'olympustaff'
+          sourceId: 'olympustaff',
+          latestChapter
         });
       }
     });

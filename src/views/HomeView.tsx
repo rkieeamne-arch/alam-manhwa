@@ -67,14 +67,21 @@ export default function HomeView({
     try {
       let combinedList: any[] = [];
       
-      // Parallel fetching to avoid blocking
-      const promises = sources.map(source => 
-        scrapeMangaList(source, pageNum, query)
-          .catch(err => {
-            console.error(`Error fetching from ${source.name}:`, err);
-            return [];
-          })
-      );
+      // Parallel fetching to avoid blocking with retries
+      const fetchWithRetry = async (source: any, pageNum: number, query: string, retryCount = 0): Promise<any[]> => {
+        try {
+          return await scrapeMangaList(source, pageNum, query);
+        } catch (err) {
+          console.error(`Error fetching from ${source.name} (Attempt ${retryCount + 1}):`, err);
+          if (retryCount < 3) { // Retry up to 3 times
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            return fetchWithRetry(source, pageNum, query, retryCount + 1);
+          }
+          return [];
+        }
+      };
+
+      const promises = sources.map(source => fetchWithRetry(source, pageNum, query));
       
       const resultsArray = await Promise.all(promises);
       for (const results of resultsArray) {

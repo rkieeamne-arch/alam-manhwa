@@ -29,23 +29,37 @@ export async function scrapeMangaList(source: ScraperSource, page: number = 1, q
     
     const result = await handler.parsePopularList(page, query, source);
     
-    return result.map(manga => ({
-      id: `scr-${source.id}-${manga.id}`,
-      title: manga.title,
-      englishTitle: manga.title,
-      coverUrl: getProxiedUrl(manga.cover),
-      rawCoverUrl: manga.cover,
-      sourceUrl: manga.url,
-      sourceId: source.id,
-      description: manga.description || '',
-      rating: 4.5,
-      views: 0,
-      status: 'مستمر' as any,
-      categories: [],
-      releaseYear: new Date().getFullYear(),
-      chapters: [],
-      latestChapter: 'عرض الفصول'
-    }));
+    return result.map(manga => {
+      // Create a dummy chapters array if we have a latestChapter string like "الفصل 105"
+      let chapters: any[] = manga.chapters || [];
+      if (chapters.length === 0 && manga.latestChapter) {
+        const chapMatch = manga.latestChapter.match(/\d+/);
+        if (chapMatch) {
+          const num = parseInt(chapMatch[0], 10);
+          if (!isNaN(num) && num > 0) {
+            chapters = Array(num).fill(0).map((_, i) => ({ id: `dummy-${i}`, title: `الفصل ${i+1}`, chapterNumber: i+1 }));
+          }
+        }
+      }
+
+      return {
+        id: `scr-${source.id}-${manga.id}`,
+        title: manga.title.replace(/(تحديث|مستمر|مكتمل|جديد|حصرية|مميزة|حصريه|مميزه|الموسم\s*الثاني|الموسم\s*الأول|الموسم\s*الثالث)/gi, '').replace(/\s+/g, ' ').trim(),
+        englishTitle: manga.title,
+        coverUrl: getProxiedUrl(manga.cover),
+        rawCoverUrl: manga.cover,
+        sourceUrl: manga.url,
+        sourceId: source.id,
+        description: manga.description || '',
+        rating: 4.5,
+        views: 0,
+        status: 'مستمر' as any,
+        categories: [],
+        releaseYear: new Date().getFullYear(),
+        chapters: chapters,
+        latestChapter: manga.latestChapter || 'عرض الفصول'
+      };
+    });
   } catch (err: any) {
     console.warn('Warning in scrapeMangaList (handled):', err.message || err);
     return [];

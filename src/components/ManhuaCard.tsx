@@ -115,10 +115,10 @@ export default function ManhuaCard({
         <div className="pt-2 border-t border-zinc-900 flex items-center justify-between text-[10px] text-zinc-400">
           <span className="flex items-center gap-0.5">
             <BookOpen className="w-3 h-3 text-zinc-600" />
-            <span>{manhua.chapters.length} فصول</span>
+            <span>{manhua.chapters.length > 0 ? `${manhua.chapters.length} فصول` : (manhua as any).latestChapter ? (manhua as any).latestChapter : '? فصول'}</span>
           </span>
           <span className="text-zinc-500 font-mono">
-            {manhua.releaseYear}
+            {manhua.sourceId === 'azorafly' ? 'عزورا' : manhua.sourceId === 'olympustaff' ? 'أوليمبوس' : manhua.releaseYear === 2026 ? '' : manhua.releaseYear}
           </span>
         </div>
       </div>
