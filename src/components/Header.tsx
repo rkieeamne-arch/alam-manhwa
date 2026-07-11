@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { 
-  Search, BookOpen, User, ShieldAlert, History, Home, Sparkles, Heart, Settings 
+  Search, BookOpen, User, ShieldAlert, History, Home, Sparkles, Heart 
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import logoImg from '../assets/images/manhua_logo_1783758713519.jpg';
@@ -213,15 +213,6 @@ export default function Header({
               لوحة الإدارة
             </button>
           )}
-
-          <button
-            onClick={onOpenSettings}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900"
-            id="nav-settings-btn"
-          >
-            <Settings className="w-3.5 h-3.5" />
-            الإعدادات
-          </button>
         </nav>
 
       </div>

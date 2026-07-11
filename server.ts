@@ -4,6 +4,7 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
+import { mockManhuas } from './src/data';
 
 async function startServer() {
   const app = express();
@@ -160,6 +161,48 @@ async function startServer() {
       }
       return res.status(500).json({ error: `خطأ أثناء جلب المحتوى الخارجي: ${err.message || 'خطأ غير معروف'}` });
     }
+  });
+
+  // Dynamic Sitemap Generator for Google Search Console
+  app.get('/sitemap.xml', (req, res) => {
+    const protocol = req.headers['x-forwarded-proto'] || 'https';
+    const host = req.headers.host || 'world.onrender.com';
+    const baseUrl = `${protocol}://${host}`;
+
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+    xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+
+    // 1. Homepage
+    xml += `  <url>\n`;
+    xml += `    <loc>${baseUrl}/</loc>\n`;
+    xml += `    <changefreq>daily</changefreq>\n`;
+    xml += `    <priority>1.0</priority>\n`;
+    xml += `  </url>\n`;
+
+    // 2. Manhua pages
+    for (const manhua of mockManhuas) {
+      xml += `  <url>\n`;
+      xml += `    <loc>${baseUrl}/?manga=${manhua.id}</loc>\n`;
+      xml += `    <changefreq>weekly</changefreq>\n`;
+      xml += `    <priority>0.8</priority>\n`;
+      xml += `  </url>\n`;
+
+      // 3. Chapter pages
+      if (manhua.chapters && Array.isArray(manhua.chapters)) {
+        for (const chapter of manhua.chapters) {
+          xml += `  <url>\n`;
+          xml += `    <loc>${baseUrl}/?manga=${manhua.id}&amp;chapter=${chapter.id}</loc>\n`;
+          xml += `    <changefreq>daily</changefreq>\n`;
+          xml += `    <priority>0.6</priority>\n`;
+          xml += `  </url>\n`;
+        }
+      }
+    }
+
+    xml += `</urlset>`;
+
+    res.header('Content-Type', 'application/xml; charset=utf-8');
+    res.send(xml);
   });
 
   // Vite integration

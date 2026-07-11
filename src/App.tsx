@@ -155,6 +155,77 @@ export default function App() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isBypassModalOpen, setIsBypassModalOpen] = useState(false);
 
+  // Parse URL query params on initial mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const mangaId = params.get('manga');
+    const chapterId = params.get('chapter');
+    const view = params.get('view');
+
+    if (mangaId && chapterId) {
+      setSelectedManhuaId(mangaId);
+      setSelectedChapterId(chapterId);
+      setCurrentView('reader');
+    } else if (mangaId) {
+      setSelectedManhuaId(mangaId);
+      setCurrentView('manhua');
+    } else if (view) {
+      const allowedViews: ('home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'admin' | 'mylists')[] = [
+        'home', 'manhua', 'reader', 'search', 'account', 'history', 'admin', 'mylists'
+      ];
+      if (allowedViews.includes(view as any)) {
+        setCurrentView(view as any);
+      }
+    }
+  }, []);
+
+  // Synchronize App state to browser URL query params
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (currentView === 'reader' && selectedManhuaId && selectedChapterId) {
+      params.set('manga', selectedManhuaId);
+      params.set('chapter', selectedChapterId);
+    } else if (currentView === 'manhua' && selectedManhuaId) {
+      params.set('manga', selectedManhuaId);
+    } else if (currentView !== 'home') {
+      params.set('view', currentView);
+    }
+
+    const newQuery = params.toString();
+    const newUrl = newQuery ? `${window.location.pathname}?${newQuery}` : window.location.pathname;
+    
+    // Check if the URL actually changed to prevent loops or extra history states
+    if (window.location.search !== `?${newQuery}` && (window.location.search || newQuery)) {
+      window.history.pushState(null, '', newUrl);
+    }
+  }, [currentView, selectedManhuaId, selectedChapterId]);
+
+  // Handle browser back/forward buttons (popstate)
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const mangaId = params.get('manga');
+      const chapterId = params.get('chapter');
+      const view = params.get('view');
+
+      if (mangaId && chapterId) {
+        setSelectedManhuaId(mangaId);
+        setSelectedChapterId(chapterId);
+        setCurrentView('reader');
+      } else if (mangaId) {
+        setSelectedManhuaId(mangaId);
+        setCurrentView('manhua');
+      } else if (view) {
+        setCurrentView(view as any);
+      } else {
+        setCurrentView('home');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   useEffect(() => {
     const handleOpenBypass = () => {
       setIsBypassModalOpen(true);
