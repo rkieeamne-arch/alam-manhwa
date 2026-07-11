@@ -260,30 +260,7 @@ export default function SearchView({
 
       {/* Grid of All Results Combined & Grouped like Mihon */}
       <div className="space-y-8">
-        {/* 1. Local Database Results */}
-        {filteredManhuas.length > 0 && (
-          <div className="space-y-4">
-            <div className="flex justify-between items-center border-r-4 border-red-500 pr-3">
-              <h2 className="text-lg font-bold text-zinc-100 font-display">مكتبة عالم المانهو ({filteredManhuas.length})</h2>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4">
-              {filteredManhuas.map((m) => (
-                <ManhuaCard 
-                  key={m.id} 
-                  manhua={m} 
-                  onSelect={onSelectManhua} 
-                  user={user}
-                  readingList={readingList}
-                  onAddToList={onAddToList}
-                  onRemoveFromList={onRemoveFromList}
-                  onNavigate={onNavigate}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* 2. External Sources Results Grouped */}
+        {/* External Sources Results Grouped */}
         {sources.map((source, index) => {
           const group = scrapedGroups[source.id];
           if (!group) return null;
@@ -377,8 +354,7 @@ export default function SearchView({
         })}
 
         {/* No results across all targets */}
-        {filteredManhuas.length === 0 && 
-         Object.values(scrapedGroups).every((g: any) => !g.loading && g.results.length === 0) && (
+        {Object.values(scrapedGroups).every((g: any) => !g.loading && g.results.length === 0) && (
           <div className="bg-zinc-900/10 border border-dashed border-zinc-800 rounded-2xl py-16 text-center space-y-3">
             <Compass className="w-12 h-12 mx-auto text-zinc-700 stroke-1 animate-pulse" />
             <h3 className="text-sm font-bold text-zinc-300">لم يتم العثور على أي نتائج مطابقة في أي مصدر!</h3>

@@ -67,17 +67,18 @@ export default function HomeView({
     try {
       let combinedList: any[] = [];
       
-      // Sequential fetching to avoid rate limiting
-      for (const source of sources) {
-        try {
-          const results = await scrapeMangaList(source, pageNum, query);
-          combinedList = [...combinedList, ...results];
-          // Slight delay between sources
-          await new Promise(resolve => setTimeout(resolve, 500));
-        } catch (err: any) {
-          console.error(`Error fetching from ${source.name}:`, err);
-          // If a source fails, we just skip it, but don't crash the whole process
-        }
+      // Parallel fetching to avoid blocking
+      const promises = sources.map(source => 
+        scrapeMangaList(source, pageNum, query)
+          .catch(err => {
+            console.error(`Error fetching from ${source.name}:`, err);
+            return [];
+          })
+      );
+      
+      const resultsArray = await Promise.all(promises);
+      for (const results of resultsArray) {
+        combinedList = [...combinedList, ...results];
       }
       
       // إذا لم يكن هناك بحث، نقوم بترتيب عشوائي بسيط للتنويع
