@@ -8,9 +8,12 @@ import { mockManhuas } from './src/data';
 import admin from 'firebase-admin';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
+import firebaseConfig from './firebase-applet-config.json';
 
-// Initialize Firebase Admin
-admin.initializeApp();
+// Initialize Firebase Admin with correct projectId
+admin.initializeApp({
+  projectId: firebaseConfig.projectId
+});
 const db = getFirestore();
 
 // Caching for dynamic sitemap generator
