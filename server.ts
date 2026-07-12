@@ -7,14 +7,11 @@ import { createServer as createViteServer } from 'vite';
 import { mockManhuas } from './src/data';
 import admin from 'firebase-admin';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import { createClient } from '@supabase/supabase-js';
+import { getAuth } from 'firebase-admin/auth';
 
 // Initialize Firebase Admin
 admin.initializeApp();
 const db = getFirestore();
-
-// Initialize Supabase Client
-const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
 
 // Caching for dynamic sitemap generator
 let sitemapSlugsCache: string[] = [];
@@ -90,11 +87,13 @@ async function startServer() {
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
 
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-    if (error || !user) return res.status(401).json({ error: 'Unauthorized' });
-    
-    (req as any).user = user;
-    next();
+    try {
+      const decodedToken = await getAuth().verifyIdToken(token);
+      (req as any).user = { id: decodedToken.uid };
+      next();
+    } catch (error) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
   }
 
   // XP route

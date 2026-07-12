@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { mockManhuas, defaultScraperSources } from './data';
 import { UserProfile, ReadingHistoryItem, ReaderSettings, Manhua, Chapter, ScraperSource, ReadingListItem } from './types';
-import { updateUserProfile, fetchUserReadingHistory, saveUserReadingHistory, deleteUserHistoryItem, clearUserReadingHistory, fetchUserReadingList, addManhuaToReadingList, removeManhuaFromReadingList } from './lib/supabase';
+import { updateUserProfile, fetchUserReadingHistory, saveUserReadingHistory, deleteUserHistoryItem, clearUserReadingHistory, fetchUserReadingList, addManhuaToReadingList, removeManhuaFromReadingList } from './lib/firebaseDb';
 import { subscribeToAuthChanges, logout, signInWithGoogle } from './lib/firebaseAuth';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './lib/firebaseAuth';

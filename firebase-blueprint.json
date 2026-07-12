@@ -1,0 +1,54 @@
+{
+  "entities": {
+    "user": {
+      "title": "User",
+      "description": "User profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "avatarUrl": { "type": "string" },
+        "role": { "type": "string" },
+        "joinedAt": { "type": "string" },
+        "bio": { "type": "string" },
+        "xp": { "type": "number" },
+        "totalXp": { "type": "number" }
+      },
+      "required": ["id"]
+    },
+    "historyItem": {
+      "title": "Reading History Item",
+      "description": "Item in reading history",
+      "type": "object",
+      "properties": {
+        "manhuaId": { "type": "string" },
+        "chapterId": { "type": "string" },
+        "lastReadTime": { "type": "string" }
+      }
+    },
+    "readingListItem": {
+      "title": "Reading List Item",
+      "description": "Item in reading list",
+      "type": "object",
+      "properties": {
+        "manhuaId": { "type": "string" },
+        "type": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "user",
+      "description": "User profile"
+    },
+    "/users/{userId}/history/{historyId}": {
+      "schema": "historyItem",
+      "description": "User reading history"
+    },
+    "/users/{userId}/readingList/{itemId}": {
+      "schema": "readingListItem",
+      "description": "User reading list"
+    }
+  }
+}
