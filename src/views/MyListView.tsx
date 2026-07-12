@@ -162,7 +162,7 @@ export default function MyListView({
                   className="relative aspect-[2/3] overflow-hidden bg-zinc-950 cursor-pointer"
                 >
                   <img 
-                    src={item.manhuaCover} 
+                    src={item.manhuaCover || undefined} 
                     alt={item.manhuaTitle}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     loading="lazy"

@@ -54,7 +54,7 @@ export default function LatestChapters({ manhuas, onSelectChapter }: LatestChapt
             {/* Thumbnail */}
             <div className="relative w-12 h-16 rounded overflow-hidden bg-zinc-950 shrink-0">
               <img 
-                src={ch.manhuaCover} 
+                src={ch.manhuaCover || undefined} 
                 alt={ch.manhuaTitle} 
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                 loading="lazy"

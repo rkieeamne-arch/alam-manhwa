@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import { mockManhuas, defaultScraperSources } from './data';
 import { UserProfile, ReadingHistoryItem, ReaderSettings, Manhua, Chapter, ScraperSource, ReadingListItem } from './types';
-import { signUpUser, signInUser, signOutUser, updateUserProfile, fetchUserReadingHistory, saveUserReadingHistory, deleteUserHistoryItem, clearUserReadingHistory, fetchUserReadingList, addManhuaToReadingList, removeManhuaFromReadingList } from './lib/supabase';
+import { updateUserProfile, fetchUserReadingHistory, saveUserReadingHistory, deleteUserHistoryItem, clearUserReadingHistory, fetchUserReadingList, addManhuaToReadingList, removeManhuaFromReadingList } from './lib/supabase';
+import { subscribeToAuthChanges, logout, signInWithGoogle } from './lib/firebaseAuth';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from './lib/firebaseAuth';
 
 // Components
 import Header from './components/Header';
@@ -35,7 +38,7 @@ export default function App() {
       try {
         const parsed = JSON.parse(saved) as ScraperSource[];
         // Automatically filter out old removed default sources
-        const filtered = parsed.filter((s) => s.id !== 'mangafire' && s.id !== 'manganelo');
+        const filtered = parsed.filter((s) => s.id !== 'mangafire' && s.id !== 'manganelo' && s.id !== 'olympustaff');
         // Ensure new defaults are added if missing
         const finalSources = [...filtered];
         defaultScraperSources.forEach(defSource => {
@@ -56,20 +59,33 @@ export default function App() {
 
   // Core User Authentication State
   const [user, setUser] = useState<UserProfile | null>(() => {
-    const saved = localStorage.getItem('manhua_user_profile');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved) as UserProfile;
-        if (!parsed.id) {
-          parsed.id = 'usr_local_' + parsed.email.replace(/[^a-zA-Z0-9]/g, '_');
-        }
-        return parsed;
-      } catch (e) {
-        return null;
-      }
-    }
+    // We'll rely on onAuthStateChanged to set the user
     return null;
   });
+
+  // Auth listener
+  useEffect(() => {
+    const unsubscribe = subscribeToAuthChanges(async (firebaseUser) => {
+      if (firebaseUser) {
+        // Create or fetch profile
+        const profile: UserProfile = {
+          id: firebaseUser.uid,
+          email: firebaseUser.email || '',
+          displayName: firebaseUser.displayName || 'مستخدم جديد',
+          avatarUrl: firebaseUser.photoURL || '',
+          role: firebaseUser.email === 'rkieeamne@gmail.com' ? 'admin' : 'user',
+          joinedAt: new Date().toLocaleDateString('ar-EG'),
+          bio: '',
+          xp: 0,
+          totalXp: 0
+        };
+        setUser(profile);
+      } else {
+        setUser(null);
+      }
+    });
+    return unsubscribe;
+  }, []);
 
   // Reading History State
   const [history, setHistory] = useState<ReadingHistoryItem[]>(() => {
@@ -321,42 +337,8 @@ export default function App() {
   };
 
   // Auth Functions
-  const handleLogin = async (email: string, pass: string): Promise<{ success: boolean; error: string | null }> => {
-    const realPass = pass || 'dummy123';
-    const res = await signInUser(email, realPass);
-    if (res.user) {
-      setUser(res.user);
-      setIsDrawerOpen(false);
-      return { success: true, error: null };
-    } else {
-      // For quick-login compatibility, attempt registration if user does not exist
-      if (!pass) {
-        const name = email.split('@')[0];
-        const resReg = await signUpUser(email, realPass, name);
-        if (resReg.user) {
-          setUser(resReg.user);
-          setIsDrawerOpen(false);
-          return { success: true, error: null };
-        }
-        return { success: false, error: resReg.error };
-      }
-      return { success: false, error: res.error };
-    }
-  };
-
-  const handleRegister = async (email: string, pass: string, name: string): Promise<{ success: boolean; error: string | null }> => {
-    const res = await signUpUser(email, pass, name);
-    if (res.user) {
-      setUser(res.user);
-      setIsDrawerOpen(false);
-      return { success: true, error: null };
-    }
-    return { success: false, error: res.error };
-  };
-
   const handleLogout = async () => {
-    await signOutUser();
-    setUser(null);
+    await logout();
     setCurrentView('home');
     setIsDrawerOpen(false);
   };
@@ -526,7 +508,7 @@ export default function App() {
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         user={user}
-        onLogin={handleLogin}
+        onLogin={signInWithGoogle}
         onLogout={handleLogout}
         history={history}
         onClearHistory={handleClearHistory}
@@ -610,8 +592,7 @@ export default function App() {
         {currentView === 'account' && (
           <AccountView 
             user={user}
-            onLogin={handleLogin}
-            onRegister={handleRegister}
+            history={history}
             onLogout={handleLogout}
             onUpdateProfile={handleUpdateProfile}
           />

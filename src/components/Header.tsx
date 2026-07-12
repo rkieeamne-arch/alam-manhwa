@@ -29,7 +29,7 @@ export default function Header({
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-zinc-950/90 backdrop-blur-md border-b border-zinc-900 shadow-lg">
+    <header className="z-40 bg-zinc-950/90 backdrop-blur-md border-b border-zinc-900 shadow-lg">
       <div className="max-w-7xl mx-auto px-4 py-3 sm:px-6">
         
         {/* Main top row: Center title with Settings trigger, Left buttons, Right search (Responsive design) */}
@@ -98,7 +98,7 @@ export default function Header({
                 id="header-user-badge"
               >
                 <img 
-                  src={user.avatarUrl} 
+                  src={user.avatarUrl || undefined} 
                   alt={user.displayName}
                   className="w-6 h-6 rounded-full border border-red-500 object-cover"
                   referrerPolicy="no-referrer"

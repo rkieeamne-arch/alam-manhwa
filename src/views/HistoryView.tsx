@@ -71,7 +71,7 @@ export default function HistoryView({
                 {/* Cover thumbnail */}
                 <div className="w-16 h-24 rounded-lg overflow-hidden bg-zinc-950 shrink-0 border border-zinc-800">
                   <img 
-                    src={item.manhuaCover} 
+                    src={item.manhuaCover || undefined} 
                     alt={item.manhuaTitle} 
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                     referrerPolicy="no-referrer"

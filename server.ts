@@ -5,6 +5,78 @@ import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { mockManhuas } from './src/data';
+import admin from 'firebase-admin';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { createClient } from '@supabase/supabase-js';
+
+// Initialize Firebase Admin
+admin.initializeApp();
+const db = getFirestore();
+
+// Initialize Supabase Client
+const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
+
+// Caching for dynamic sitemap generator
+let sitemapSlugsCache: string[] = [];
+let lastSitemapFetchTime = 0;
+const SITEMAP_CACHE_TTL = 1800000; // 30 minutes
+
+const FALLBACK_SLUGS = [
+  'tears-on-a-withered-flower',
+  'love-junkie',
+  'my-disciples-are-all-villains',
+  'childhood-friend-complex',
+  'vengeance-named-love',
+  'beyond-the-walls-of-the-dukes-mansion',
+  'full-time-sword-cultivator',
+  'ex-husband-demands-reunion',
+  'almighty-daughter-runs-the-world-2',
+  'i-am-the-fated-villain',
+  'my-secret-cupid',
+  'perfect-seniors-hide',
+  'imperfect-cinderella-story',
+  'to-the-one-without-virtue',
+  'zomgan',
+  'unbeknownst-to-me-i-am-secretly-dating-the-emperor',
+  'the-apocalypse-needs-a-pro',
+  'marriage-situation'
+];
+
+async function fetchSitemapSlugs(): Promise<string[]> {
+  const targetUrl = 'https://mangatuk.com/sitemaps/series/0';
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9',
+    'Accept-Language': 'ar,en-US;q=0.9,en;q=0.8',
+    'Referer': 'https://www.google.com/'
+  };
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+    const res = await fetch(targetUrl, { headers, signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (res.ok) {
+      const xml = await res.text();
+      const slugs = new Set<string>();
+      const matches = xml.matchAll(/https:\/\/mangatuk\.com\/series\/([^\s<"'/]+)/g);
+      for (const match of matches) {
+        const slug = match[1].trim();
+        if (slug && !slug.includes('/') && slug !== 'series') {
+          slugs.add(slug);
+        }
+      }
+      const list = Array.from(slugs);
+      if (list.length > 0) {
+        return list;
+      }
+    }
+  } catch (e) {
+    console.warn('[Sitemap Dynamic Fetch] Failed:', e);
+  }
+  return [];
+}
 
 async function startServer() {
   const app = express();
@@ -12,6 +84,48 @@ async function startServer() {
 
   // Middleware
   app.use(express.json());
+
+  // Middleware for Auth
+  async function authenticate(req: express.Request, res: express.Response, next: express.NextFunction) {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error || !user) return res.status(401).json({ error: 'Unauthorized' });
+    
+    (req as any).user = user;
+    next();
+  }
+
+  // XP route
+  app.post('/api/xp/add', authenticate, async (req, res) => {
+    const user = (req as any).user;
+    const { amount } = req.body;
+    
+    // XP Logic
+    const userRef = db.collection('users').doc(user.id);
+    await userRef.set({ xp: FieldValue.increment(amount) }, { merge: true });
+    
+    res.json({ success: true });
+  });
+
+  // Comments route
+  app.post('/api/comments', authenticate, async (req, res) => {
+    const user = (req as any).user;
+    const { manhuaId, content } = req.body;
+    
+    await db.collection('comments').add({
+      manhuaId,
+      userId: user.id,
+      content,
+      createdAt: FieldValue.serverTimestamp()
+    });
+    
+    // Award XP for comment
+    await db.collection('users').doc(user.id).set({ xp: FieldValue.increment(3) }, { merge: true });
+    
+    res.json({ success: true });
+  });
 
   // CORS-bypassing proxy for dynamic scraper sources
   app.get('/api/proxy', async (req, res) => {
@@ -46,10 +160,10 @@ async function startServer() {
       const defaultUserAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
 
       const headers: Record<string, string> = {
-        'User-Agent': req.headers['x-proxy-user-agent'] as string || defaultUserAgent,
+        'User-Agent': defaultUserAgent,
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
         'Accept-Language': 'ar,en-US;q=0.9,en;q=0.8',
-        'Referer': isImage ? referer : 'https://www.google.com/', // التظاهر بأن الطلب قادم من بحث جوجل لتخفيف الحماية للصفحات
+        'Referer': isImage ? referer : 'https://www.google.com/', 
         'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
         'Sec-Ch-Ua-Mobile': '?0',
         'Sec-Ch-Ua-Platform': '"Windows"',
@@ -164,10 +278,35 @@ async function startServer() {
   });
 
   // Dynamic Sitemap Generator for Google Search Console
-  app.get('/sitemap.xml', (req, res) => {
+  app.get('/sitemap.xml', async (req, res) => {
     const protocol = req.headers['x-forwarded-proto'] || 'https';
-    const host = req.headers.host || 'world.onrender.com';
+    const host = req.headers.host || 'manhwa-world.onrender.com';
     const baseUrl = `${protocol}://${host}`;
+
+    const now = Date.now();
+    // If cache is empty or expired, trigger update
+    if (sitemapSlugsCache.length === 0) {
+      console.log('[Sitemap] Cache is empty, fetching synchronously...');
+      const fetched = await fetchSitemapSlugs();
+      if (fetched.length > 0) {
+        sitemapSlugsCache = fetched;
+        lastSitemapFetchTime = now;
+      }
+    } else if (now - lastSitemapFetchTime > SITEMAP_CACHE_TTL) {
+      console.log('[Sitemap] Cache expired, fetching in background...');
+      fetchSitemapSlugs().then(fetched => {
+        if (fetched.length > 0) {
+          sitemapSlugsCache = fetched;
+          lastSitemapFetchTime = Date.now();
+          console.log(`[Sitemap] Background cache updated with ${fetched.length} slugs.`);
+        }
+      }).catch(err => {
+        console.warn('[Sitemap] Background fetch error:', err);
+      });
+    }
+
+    // Prepare active slug list: use cache if available, otherwise fall back
+    const activeSlugs = sitemapSlugsCache.length > 0 ? sitemapSlugsCache : FALLBACK_SLUGS;
 
     let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
     xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
@@ -179,23 +318,33 @@ async function startServer() {
     xml += `    <priority>1.0</priority>\n`;
     xml += `  </url>\n`;
 
-    // 2. Manhua pages
-    for (const manhua of mockManhuas) {
+    // 2. Add static views
+    const staticViews = ['mylists', 'history', 'search'];
+    for (const view of staticViews) {
       xml += `  <url>\n`;
-      xml += `    <loc>${baseUrl}/?manga=${manhua.id}</loc>\n`;
+      xml += `    <loc>${baseUrl}/?view=${view}</loc>\n`;
       xml += `    <changefreq>weekly</changefreq>\n`;
+      xml += `    <priority>0.5</priority>\n`;
+      xml += `  </url>\n`;
+    }
+
+    // 3. Dynamic Manhua series pages
+    for (const slug of activeSlugs) {
+      xml += `  <url>\n`;
+      xml += `    <loc>${baseUrl}/?manga=${slug}</loc>\n`;
+      xml += `    <changefreq>daily</changefreq>\n`;
       xml += `    <priority>0.8</priority>\n`;
       xml += `  </url>\n`;
+    }
 
-      // 3. Chapter pages
-      if (manhua.chapters && Array.isArray(manhua.chapters)) {
-        for (const chapter of manhua.chapters) {
-          xml += `  <url>\n`;
-          xml += `    <loc>${baseUrl}/?manga=${manhua.id}&amp;chapter=${chapter.id}</loc>\n`;
-          xml += `    <changefreq>daily</changefreq>\n`;
-          xml += `    <priority>0.6</priority>\n`;
-          xml += `  </url>\n`;
-        }
+    // 4. Include Mock Manhuas if they aren't already included
+    for (const manhua of mockManhuas) {
+      if (!activeSlugs.includes(manhua.id)) {
+        xml += `  <url>\n`;
+        xml += `    <loc>${baseUrl}/?manga=${manhua.id}</loc>\n`;
+        xml += `    <changefreq>weekly</changefreq>\n`;
+        xml += `    <priority>0.7</priority>\n`;
+        xml += `  </url>\n`;
       }
     }
 
@@ -203,6 +352,16 @@ async function startServer() {
 
     res.header('Content-Type', 'application/xml; charset=utf-8');
     res.send(xml);
+  });
+
+  // Dynamic robots.txt serving
+  app.get('/robots.txt', (req, res) => {
+    const protocol = req.headers['x-forwarded-proto'] || 'https';
+    const host = req.headers.host || 'manhwa-world.onrender.com';
+    const baseUrl = `${protocol}://${host}`;
+    
+    res.type('text/plain');
+    res.send(`User-agent: *\nAllow: /\n\nSitemap: ${baseUrl}/sitemap.xml`);
   });
 
   // Vite integration

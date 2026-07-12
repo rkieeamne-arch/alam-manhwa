@@ -913,7 +913,7 @@ export default function AdminView({
                               <p className="text-[10px] text-zinc-500 mt-0.5">الكاتب: {m.author} | {m.categories.join('، ')}</p>
                             </div>
                             <img 
-                              src={m.coverUrl} 
+                              src={m.coverUrl || undefined} 
                               alt={m.title} 
                               className="w-8 h-10 object-cover rounded border border-zinc-800"
                               referrerPolicy="no-referrer"

@@ -255,6 +255,16 @@ export async function signOutUser(): Promise<void> {
   }
 }
 
+export async function resetPassword(email: string): Promise<{ error: string | null }> {
+  if (hasSupabase && supabase) {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/account`, // Redirect back to account page
+    });
+    return { error: error?.message || null };
+  }
+  return { error: 'Supabase غير مفعل' };
+}
+
 export async function updateUserProfile(userId: string, updatedData: Partial<UserProfile>): Promise<{ user: UserProfile | null; error: string | null }> {
   if (hasSupabase && supabase && !userId.startsWith('usr_local_')) {
     try {

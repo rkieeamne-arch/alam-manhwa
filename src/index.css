@@ -6,12 +6,39 @@
   --font-display: "Alexandria", "Cairo", sans-serif;
 }
 
+/* Enhanced animated background */
 body {
   font-family: var(--font-sans);
   background-color: #09090b; /* zinc-950 */
   color: #fafafa; /* zinc-50 */
   direction: rtl;
   overflow-x: hidden;
+  position: relative;
+  min-height: 100vh;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(185, 28, 28, 0.08) 0%, rgba(9, 9, 11, 0) 70%),
+              radial-gradient(circle at 80% 20%, rgba(153, 27, 27, 0.05) 0%, rgba(9, 9, 11, 0) 50%);
+  animation: breathe 15s ease-in-out infinite, flicker 4s infinite alternate;
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.05); opacity: 0.9; }
+}
+
+@keyframes flicker {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 0.8; }
 }
 
 /* Custom scrollbar matching dark/crimson theme */

@@ -294,7 +294,7 @@ export default function ManhuaDetailsView({
         {/* Background blur overlay */}
         <div className="absolute inset-0 z-0">
           <img 
-            src={displayManhua.coverUrl} 
+            src={displayManhua.coverUrl || undefined} 
             alt="Blur background" 
             className="w-full h-full object-cover filter blur-xl opacity-20 scale-110"
             referrerPolicy="no-referrer"
@@ -306,9 +306,9 @@ export default function ManhuaDetailsView({
         <div className="relative z-10 p-4 sm:p-6 grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
           
           {/* Cover Art - Column (4 cols on md) */}
-          <div className="md:col-span-4 lg:col-span-3 mx-auto md:mx-0 w-32 md:w-full max-w-[220px] aspect-[2/3] rounded-xl overflow-hidden border-2 border-red-500/30 shadow-2xl shrink-0 bg-zinc-900">
+          <div className="md:col-span-4 lg:col-span-3 mx-auto md:mx-0 w-full max-w-[280px] aspect-[2/3] rounded-2xl overflow-hidden border border-zinc-700 shadow-2xl shrink-0 bg-zinc-950 transition-transform duration-300 hover:scale-[1.02] hover:border-red-500/50">
             <img 
-              src={displayManhua.coverUrl} 
+              src={displayManhua.coverUrl || undefined} 
               alt={displayManhua.title} 
               className="w-full h-full object-cover"
               referrerPolicy="no-referrer"
@@ -466,8 +466,8 @@ export default function ManhuaDetailsView({
                     }`}>
                       {ch.title}
                       {ch.isLocked && (
-                        <span className="text-[9px] bg-amber-500/10 text-amber-500 border border-amber-500/20 px-1.5 py-0.25 rounded font-display font-medium">
-                          مدفوع 🪙
+                        <span className="text-[9px] bg-red-500/10 text-red-500 border border-red-500/20 px-1.5 py-0.25 rounded font-display font-medium">
+                          مغلق مؤقتاً 🔒
                         </span>
                       )}
                     </h4>
@@ -520,31 +520,22 @@ export default function ManhuaDetailsView({
       {showLockedDialog && selectedLockedChapter && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in" style={{ direction: 'rtl' }}>
           <div className="bg-zinc-950 border border-zinc-800/80 rounded-2xl max-w-md w-full p-6 text-center space-y-4 animate-in fade-in zoom-in-95 duration-200">
-            <div className="w-16 h-16 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-full flex items-center justify-center mx-auto">
-              <Lock className="w-8 h-8 animate-pulse" />
+            <div className="w-16 h-16 bg-red-500/10 text-red-500 border border-red-500/20 rounded-full flex items-center justify-center mx-auto animate-pulse">
+              <Lock className="w-8 h-8" />
             </div>
             <div className="space-y-2">
-              <h3 className="text-base font-black text-white font-display">هذا الفصل مقفل حالياً 🔒</h3>
+              <h3 className="text-base font-black text-white font-display">الفصل مغلق مؤقتاً 🔒</h3>
               <p className="text-xs text-zinc-400 leading-relaxed">
-                هذا الفصل مدفوع أو يتطلب نقاطاً/عملات في المصدر الأصلي ({displayManhua.id.includes('azorafly') ? 'مانجا أزورا' : displayManhua.id.includes('olympustaff') ? 'أوليمبوس سكان' : 'المصدر الأصلي'}). يمكنك فك قفله وقراءته مباشرة من هناك لدعم المترجمين والرسامين.
+                عذراً، هذا الفصل مغلق مؤقتًا حالياً ولا يمكن عرضه.
               </p>
             </div>
-            <div className="pt-2 flex flex-col gap-2">
-              <a
-                href={selectedLockedChapter.pages[0] || displayManhua.sourceUrl || '#'}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-black rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-amber-950/30 cursor-pointer"
-              >
-                <span>الذهاب للمصدر لفتح الفصل</span>
-                <ArrowRight className="w-3.5 h-3.5 rotate-180" />
-              </a>
+            <div className="pt-2">
               <button
                 onClick={() => {
                   setShowLockedDialog(false);
                   setSelectedLockedChapter(null);
                 }}
-                className="w-full py-2.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-xl text-xs font-bold transition-colors cursor-pointer border border-zinc-800"
+                className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer border border-transparent shadow-lg shadow-red-950/20"
               >
                 إغلاق النافذة
               </button>

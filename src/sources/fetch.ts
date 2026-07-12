@@ -9,6 +9,12 @@ export async function proxiedFetch(input: RequestInfo | URL, init?: RequestInit)
     url = getProxiedUrl(url);
   }
   
+  if (url.startsWith('/')) {
+    if (typeof window === 'undefined') {
+      url = `http://localhost:3000${url}`;
+    }
+  }
+  
   const headers = new Headers(init?.headers);
   if (typeof window !== 'undefined') {
     const bypassCookie = localStorage.getItem('manhua_bypass_cookie');

@@ -50,13 +50,13 @@ export default function ManhuaCard({
   return (
     <div 
       onClick={() => onSelect(manhua.id)}
-      className="group bg-zinc-900/60 rounded-xl overflow-hidden border border-zinc-800/80 hover:border-red-500/40 hover:shadow-lg hover:shadow-red-950/10 transition-all duration-300 cursor-pointer flex flex-col h-full"
+      className="group bg-zinc-900/60 rounded-xl overflow-hidden border border-zinc-800/80 hover:border-red-500/40 hover:shadow-lg hover:shadow-red-950/20 transition-all duration-300 cursor-pointer flex flex-col h-full hover:scale-[1.03] hover:rotate-1"
       id={`manhua-card-${manhua.id}`}
     >
       {/* Cover Image container with badges */}
       <div className="relative aspect-[2/3] overflow-hidden bg-zinc-950">
         <img 
-          src={manhua.coverUrl} 
+          src={manhua.coverUrl || undefined} 
           alt={manhua.title}
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           loading="lazy"
@@ -89,7 +89,7 @@ export default function ManhuaCard({
       {/* Details info */}
       <div className="p-3 flex-1 flex flex-col justify-between">
         <div className="space-y-1">
-          <h3 className="font-bold text-sm text-zinc-100 group-hover:text-red-500 transition-colors line-clamp-1">
+          <h3 className="font-bold text-sm text-zinc-100 group-hover:text-red-500 transition-colors line-clamp-2">
             {manhua.title}
           </h3>
           {manhua.englishTitle && (
@@ -115,10 +115,10 @@ export default function ManhuaCard({
         <div className="pt-2 border-t border-zinc-900 flex items-center justify-between text-[10px] text-zinc-400">
           <span className="flex items-center gap-0.5">
             <BookOpen className="w-3 h-3 text-zinc-600" />
-            <span>{manhua.chapters.length > 0 ? `${manhua.chapters.length} فصول` : (manhua as any).latestChapter ? (manhua as any).latestChapter : '? فصول'}</span>
+            <span>{manhua.chapters.length > 0 ? `${manhua.chapters.length} فصول` : (manhua.latestChapter || 'غير محدد')}</span>
           </span>
           <span className="text-zinc-500 font-mono">
-            {manhua.sourceId === 'azorafly' ? 'عزورا' : manhua.sourceId === 'olympustaff' ? 'أوليمبوس' : manhua.releaseYear === 2026 ? '' : manhua.releaseYear}
+            {manhua.sourceId === 'azorafly' ? 'عزورا' : manhua.sourceId === 'olympustaff' ? 'أوليمبوس' : manhua.releaseYear === 0 ? '' : manhua.releaseYear}
           </span>
         </div>
       </div>

@@ -28,6 +28,7 @@ export interface Manhua {
   isFeatured?: boolean;
   isTrending?: boolean;
   chapters: Chapter[];
+  latestChapter?: string;
   sourceUrl?: string;
   sourceId?: string;
 }
@@ -37,9 +38,12 @@ export interface UserProfile {
   email: string;
   displayName: string;
   avatarUrl: string;
+  bannerUrl?: string;
   bio?: string;
   role: 'admin' | 'user';
   joinedAt: string;
+  xp?: number;
+  totalXp?: number;
 }
 
 export interface ReadingListItem {
@@ -92,6 +96,8 @@ export interface ScraperSource {
   baseUrl: string;
   enabled?: boolean;
   popularPath: string;
+  lang?: string;
+  icon?: string;
   
   // 1. CSS Selectors for list page
   listCardSelector: string;

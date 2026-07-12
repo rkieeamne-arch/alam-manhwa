@@ -10,7 +10,7 @@ interface SettingsDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   user: UserProfile | null;
-  onLogin: (email: string, name: string) => void;
+  onLogin: () => void;
   onLogout: () => void;
   history: ReadingHistoryItem[];
   onClearHistory: () => void;
@@ -41,22 +41,7 @@ export default function SettingsDrawer({
   onNavigate,
   currentView
 }: SettingsDrawerProps) {
-  const [emailInput, setEmailInput] = useState('');
-  const [nameInput, setNameInput] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
-  const [showLoginError, setShowLoginError] = useState(false);
-
-  const handleLoginSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!emailInput) return;
-    
-    // Simulate user login
-    const displayName = nameInput.trim() || emailInput.split('@')[0];
-    onLogin(emailInput, displayName);
-    setEmailInput('');
-    setNameInput('');
-    setShowLoginError(false);
-  };
 
   const triggerSync = () => {
     setIsSyncing(true);
@@ -123,7 +108,7 @@ export default function SettingsDrawer({
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
                       <img 
-                        src={user.avatarUrl} 
+                        src={user.avatarUrl || undefined} 
                         alt={user.displayName}
                         className="w-12 h-12 rounded-full border-2 border-red-500 object-cover"
                         referrerPolicy="no-referrer"
@@ -179,42 +164,20 @@ export default function SettingsDrawer({
                     )}
                   </div>
                 ) : (
-                  <form onSubmit={handleLoginSubmit} className="space-y-3">
+                  <div className="space-y-3">
                     <p className="text-xs text-zinc-400 leading-relaxed">
                       سجل دخولك لتتمكن من حفظ وتخصيص حسابك ومزامنة سجل قراءتك تلقائياً عبر الأجهزة.
-                      <br/>
-                      <span className="text-red-400 font-semibold">تنويه:</span> استخدم بريدك الإلكتروني كمسؤول للدخول كمدير للموقع.
                     </p>
                     
-                    <div className="space-y-2">
-                      <input
-                        type="email"
-                        placeholder="البريد الإلكتروني (مثال: rkieeamne@gmail.com)"
-                        value={emailInput}
-                        onChange={(e) => setEmailInput(e.target.value)}
-                        required
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-red-500"
-                        id="login-email-input"
-                      />
-                      <input
-                        type="text"
-                        placeholder="الاسم المستعار (اختياري)"
-                        value={nameInput}
-                        onChange={(e) => setNameInput(e.target.value)}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-red-500"
-                        id="login-name-input"
-                      />
-                    </div>
-
                     <button
-                      type="submit"
-                      className="w-full py-2 px-4 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2"
-                      id="login-submit-btn"
+                      onClick={onLogin}
+                      className="w-full py-2 px-4 bg-white text-zinc-950 hover:bg-zinc-200 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2"
+                      id="login-google-btn"
                     >
                       <LogIn className="w-4 h-4" />
-                      تسجيل الدخول / إنشاء حساب
+                      تسجيل الدخول باستخدام جوجل
                     </button>
-                  </form>
+                  </div>
                 )}
               </div>
 
@@ -250,7 +213,7 @@ export default function SettingsDrawer({
                           }}
                         >
                           <img 
-                            src={item.manhuaCover} 
+                            src={item.manhuaCover || undefined} 
                             alt={item.manhuaTitle} 
                             className="w-10 h-14 rounded object-cover"
                             referrerPolicy="no-referrer"

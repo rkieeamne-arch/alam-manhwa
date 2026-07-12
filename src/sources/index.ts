@@ -1,11 +1,13 @@
 import { azoraflySourceHandler } from './azorafly';
-import { olympusStaffSource } from './olympustaff';
 import { genericSourceHandler } from './generic';
+import { rocksMangaSourceHandler } from './rocksmanga';
+import { mangatukSourceHandler } from './mangatuk';
 
 export const sources = {
   azorafly: azoraflySourceHandler,
-  olympustaff: olympusStaffSource,
   generic: genericSourceHandler,
+  rocksmanga: rocksMangaSourceHandler,
+  mangatuk: mangatukSourceHandler,
 };
 
 export type SourceId = keyof typeof sources;

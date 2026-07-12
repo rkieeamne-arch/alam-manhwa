@@ -22,8 +22,7 @@ export async function scrapeMangaList(source: ScraperSource, page: number = 1, q
     const handlerId = source.id as SourceId;
     let handler = sources[handlerId];
     if (!handler) {
-      if (source.baseUrl.includes('olympustaff.com')) handler = sources['olympustaff'];
-      else if (source.baseUrl.includes('azorafly.com')) handler = sources['azorafly'];
+      if (source.baseUrl.includes('azorafly.com')) handler = sources['azorafly'];
       else handler = sources['generic'];
     }
     
@@ -55,9 +54,9 @@ export async function scrapeMangaList(source: ScraperSource, page: number = 1, q
         views: 0,
         status: 'مستمر' as any,
         categories: [],
-        releaseYear: new Date().getFullYear(),
+        releaseYear: 0,
         chapters: chapters,
-        latestChapter: manga.latestChapter || 'عرض الفصول'
+        latestChapter: manga.latestChapter || ''
       };
     });
   } catch (err: any) {
@@ -83,9 +82,7 @@ export async function scrapeMangaDetails(source: ScraperSource, mangaUrl: string
     const handlerId = source.id as SourceId;
     let handler = sources[handlerId];
     if (!handler) {
-      if (mangaUrl.includes('olympustaff.com')) handler = sources['olympustaff'];
-      else if (mangaUrl.includes('azorafly.com')) handler = sources['azorafly'];
-      else if (source.baseUrl.includes('olympustaff.com')) handler = sources['olympustaff'];
+      if (mangaUrl.includes('azorafly.com')) handler = sources['azorafly'];
       else if (source.baseUrl.includes('azorafly.com')) handler = sources['azorafly'];
       else handler = sources['generic'];
     }
@@ -138,8 +135,7 @@ export async function scrapeMangaChapters(source: ScraperSource, mangaUrl: strin
     const handlerId = source.id as SourceId;
     let handler = sources[handlerId];
     if (!handler) {
-      if (mangaUrl.includes('olympustaff.com')) handler = sources['olympustaff'];
-      else if (mangaUrl.includes('azorafly.com')) handler = sources['azorafly'];
+      if (mangaUrl.includes('azorafly.com')) handler = sources['azorafly'];
       else handler = sources['generic'];
     }
     
@@ -180,9 +176,7 @@ export async function scrapeChapterPages(source: ScraperSource, chapterUrl: stri
     const handlerId = source.id as SourceId;
     let handler = sources[handlerId];
     if (!handler) {
-      if (chapterUrl.includes('olympustaff.com')) handler = sources['olympustaff'];
-      else if (chapterUrl.includes('azorafly.com')) handler = sources['azorafly'];
-      else if (source.baseUrl.includes('olympustaff.com')) handler = sources['olympustaff'];
+      if (chapterUrl.includes('azorafly.com')) handler = sources['azorafly'];
       else if (source.baseUrl.includes('azorafly.com')) handler = sources['azorafly'];
       else handler = sources['generic'];
     }
@@ -207,8 +201,7 @@ export async function scrapePopularList(source: ScraperSource, query?: string): 
     let handler = sources[handlerId];
     
     if (!handler) {
-      if (source.baseUrl.includes('olympustaff.com')) handler = sources['olympustaff'];
-      else if (source.baseUrl.includes('azorafly.com')) handler = sources['azorafly'];
+      if (source.baseUrl.includes('azorafly.com')) handler = sources['azorafly'];
       else handler = sources['generic'];
     }
     

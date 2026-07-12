@@ -497,7 +497,7 @@ export default function ReaderView({
             {displayPages.map((pageUrl, idx) => (
               <div key={idx} className="relative w-full overflow-hidden bg-black flex justify-center">
                 <img
-                  src={pageUrl}
+                  src={pageUrl || undefined}
                   alt={`صفحة ${idx + 1}`}
                   className="w-full max-w-full md:max-w-2xl lg:max-w-3xl xl:max-w-4xl h-auto object-contain block mx-auto"
                   loading="lazy"
@@ -513,7 +513,7 @@ export default function ReaderView({
           <div className="w-full flex flex-col items-center space-y-4">
             <div className="relative w-full max-w-3xl mx-auto overflow-hidden bg-black/10 flex justify-center">
               <img
-                src={displayPages[currentPageIndex]}
+                src={displayPages[currentPageIndex] || undefined}
                 alt={`الصفحة ${currentPageIndex + 1}`}
                 className="w-full h-auto object-contain mx-auto max-h-[90vh]"
                 referrerPolicy="no-referrer"
@@ -551,7 +551,7 @@ export default function ReaderView({
           <div className="w-full flex flex-col items-center space-y-4">
             <div className="relative w-full max-w-3xl mx-auto overflow-hidden bg-black/10 flex justify-center">
               <img
-                src={displayPages[currentPageIndex]}
+                src={displayPages[currentPageIndex] || undefined}
                 alt={`الصفحة ${currentPageIndex + 1}`}
                 className="w-full h-auto object-contain mx-auto max-h-[90vh]"
                 referrerPolicy="no-referrer"
@@ -837,7 +837,7 @@ export default function ReaderView({
             {/* Post comment input form */}
             <form onSubmit={handlePostComment} className="flex gap-3 bg-black/10 p-4 rounded-xl border border-zinc-800/10">
               <img 
-                src={user ? user.avatarUrl : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80'} 
+                src={(user && user.avatarUrl) ? user.avatarUrl : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80'} 
                 alt="Avatar"
                 className="w-10 h-10 rounded-full border border-red-500 object-cover shrink-0"
                 referrerPolicy="no-referrer"
@@ -880,7 +880,7 @@ export default function ReaderView({
                     }`}
                   >
                     <img 
-                      src={c.userAvatar} 
+                      src={c.userAvatar || undefined} 
                       alt={c.userName} 
                       className="w-9 h-9 rounded-full border border-zinc-800 object-cover shrink-0"
                       referrerPolicy="no-referrer"

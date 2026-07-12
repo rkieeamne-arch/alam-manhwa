@@ -75,10 +75,6 @@ export default function HomeView({
       const fetchWithRetry = async (source: any, pageNum: number, query: string, retryCount = 0): Promise<any[]> => {
         try {
           const results = await scrapeMangaList(source, pageNum, query);
-          // If results are empty on page 1 without a search query, it's likely a Cloudflare block or network error
-          if (results.length === 0 && !query && pageNum === 1 && retryCount < 5) {
-            throw new Error(`Empty results from ${source.name}, likely blocked.`);
-          }
           return results;
         } catch (err) {
           console.error(`Error fetching from ${source.name} (Attempt ${retryCount + 1}):`, err);

@@ -337,31 +337,6 @@ export const defaultScraperSources: ScraperSource[] = [
     pageImgAttr: 'src'
   },
   {
-    id: 'olympustaff',
-    name: 'Olympus Scanlation',
-    baseUrl: 'https://olympustaff.com',
-    popularPath: '/series',
-    listCardSelector: 'div.col-6.col-md-3.col-lg-2.mb-3',
-    listTitleSelector: 'h5.card-title a',
-    listLinkSelector: 'h5.card-title a',
-    listCoverSelector: 'img.card-img-top',
-    listCoverAttr: 'src',
-    
-    detailTitleSelector: 'h1.h3.text-white',
-    detailDescSelector: 'p.text-white.text-justify',
-    detailAuthorSelector: 'unknown',
-    detailArtistSelector: 'unknown',
-    detailStatusSelector: 'unknown',
-    detailGenreSelector: 'unknown',
-    
-    detailChapterItemSelector: 'div.chapter-list a, .chapter-list a',
-    detailChapterLinkSelector: 'a',
-    detailChapterTitleSelector: 'a',
-    
-    pageImgSelector: 'div.page-break.no-gaps img.manga-chapter-img, .page-break img',
-    pageImgAttr: 'src'
-  },
-  {
     id: 'despair',
     name: 'Despair Manga',
     baseUrl: 'https://despair-manga.net',
@@ -384,6 +359,59 @@ export const defaultScraperSources: ScraperSource[] = [
     detailChapterTitleSelector: 'a',
     
     pageImgSelector: '.page-break img, .wp-manga-chapter-img img, div.reading-content img',
+    pageImgAttr: 'src'
+  },
+  {
+    id: 'rocksmanga',
+    name: 'Rocks Manga',
+    baseUrl: 'https://rocksmanga.com',
+    lang: 'ar',
+    icon: 'https://rocksmanga.com/wp-content/uploads/2026/01/rocks-logo.png',
+    popularPath: '/',
+    listCardSelector: 'div.unit',
+    listTitleSelector: 'div.info > a, span',
+    listLinkSelector: 'div.info > a, a',
+    listCoverSelector: 'img',
+    listCoverAttr: 'src',
+    
+    detailTitleSelector: 'h1',
+    detailDescSelector: '.info > h6, .description-summary, .manga-about, .summary-content, .entry-content',
+    detailAuthorSelector: 'unknown',
+    detailArtistSelector: 'unknown',
+    detailStatusSelector: '.info > p, .summary-content',
+    detailGenreSelector: '.genres-content a',
+    
+    detailChapterItemSelector: 'li.item, li.wp-manga-chapter, ul.chapter-list li',
+    detailChapterLinkSelector: 'a',
+    detailChapterTitleSelector: 'zebi',
+    
+    pageImgSelector: 'img.preload-image, div.page img, .page-break img, .wp-manga-chapter-img img, div.reading-content img',
+    pageImgAttr: 'data-src'
+  },
+  {
+    id: 'mangatuk',
+    name: 'Mangatuk (مانجاتك)',
+    baseUrl: 'https://mangatuk.com',
+    lang: 'ar',
+    popularPath: '/',
+    listCardSelector: 'a[href^="/series/"]',
+    listTitleSelector: 'h3, .title',
+    listLinkSelector: 'a',
+    listCoverSelector: 'img',
+    listCoverAttr: 'src',
+    
+    detailTitleSelector: 'h1',
+    detailDescSelector: 'p',
+    detailAuthorSelector: 'unknown',
+    detailArtistSelector: 'unknown',
+    detailStatusSelector: 'unknown',
+    detailGenreSelector: 'unknown',
+    
+    detailChapterItemSelector: 'a[href*="/series/"]',
+    detailChapterLinkSelector: 'a',
+    detailChapterTitleSelector: 'span',
+    
+    pageImgSelector: 'img',
     pageImgAttr: 'src'
   }
 ];

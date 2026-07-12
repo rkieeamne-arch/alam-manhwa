@@ -77,8 +77,8 @@ export const azoraflySourceHandler: SourceHandler = {
         }
       }
 
-      if (apiData?.posts && Array.isArray(apiData.posts)) {
-        for (const post of apiData.posts) {
+      if (apiData?.data && Array.isArray(apiData.data)) {
+        for (const post of apiData.data) {
           const url = `${BASE_URL}/series/${post.slug}`;
           
           let latestChapter = '';
@@ -210,8 +210,8 @@ export const azoraflySourceHandler: SourceHandler = {
       try {
         const apiRes = await proxiedFetch(`https://api.azorafly.com/api/chapters?postId=${postId}`);
         const apiData = await apiRes.json();
-        if (apiData?.post?.chapters) {
-          for (const ch of apiData.post.chapters) {
+        if (apiData?.data && Array.isArray(apiData.data)) {
+          for (const ch of apiData.data) {
             const num = ch.number;
             const slug = ch.slug;
             const chapterTitle = ch.title;
@@ -299,8 +299,8 @@ export const azoraflySourceHandler: SourceHandler = {
       try {
         const apiRes = await proxiedFetch(`https://api.azorafly.com/api/chapters?postId=${postId}`);
         const apiData = await apiRes.json();
-        if (apiData?.post?.chapters) {
-          for (const ch of apiData.post.chapters) {
+        if (apiData?.data && Array.isArray(apiData.data)) {
+          for (const ch of apiData.data) {
             const num = ch.number;
             const slug = ch.slug;
             const chapterTitle = ch.title;

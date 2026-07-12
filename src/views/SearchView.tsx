@@ -113,9 +113,6 @@ export default function SearchView({
         const fetchSource = async (retryCount = 0) => {
           try {
             const results = await scrapeMangaList(source, 1, query);
-            if (results.length === 0 && !query && retryCount < 5) {
-                throw new Error(`Empty results from ${source.name}, likely blocked.`);
-            }
             setScrapedGroups(prev => ({
               ...prev,
               [source.id]: {
@@ -333,7 +330,7 @@ export default function SearchView({
                       >
                         <div className="aspect-[2/3] relative overflow-hidden">
                           <img 
-                            src={shell.coverUrl} 
+                            src={shell.coverUrl || undefined} 
                             alt={shell.title} 
                             className="w-full h-full object-cover group-hover/card:scale-105 transition-transform duration-300" 
                             referrerPolicy="no-referrer"
