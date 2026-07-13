@@ -1,70 +1,104 @@
-import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs, query, where, addDoc, writeBatch } from 'firebase/firestore';
-import firebaseConfig from '../../firebase-applet-config.json';
 import { UserProfile, ReadingHistoryItem, Manhua, ReadingListItem } from '../types';
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+// Helper to get local storage item safely
+const getLocal = <T>(key: string, fallback: T): T => {
+  const data = localStorage.getItem(key);
+  if (!data) return fallback;
+  try {
+    return JSON.parse(data) as T;
+  } catch (e) {
+    return fallback;
+  }
+};
+
+// Helper to set local storage item safely
+const setLocal = <T>(key: string, value: T) => {
+  localStorage.setItem(key, JSON.stringify(value));
+};
 
 export const updateUserProfile = async (userId: string, data: Partial<UserProfile>) => {
-    const userRef = doc(db, 'users', userId);
-    await setDoc(userRef, data, { merge: true });
-    return { user: { ...data, id: userId } as UserProfile, error: null };
+  const current = getLocal<UserProfile | null>('manhua_user_profile', null);
+  const updated = {
+    ...(current || {
+      id: 'local-user',
+      email: 'local@user.com',
+      displayName: 'قارئ مخلص',
+      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+      joinedAt: new Date().toLocaleDateString('ar-EG'),
+      bio: '',
+      xp: 0,
+      totalXp: 0
+    }),
+    ...data
+  } as UserProfile;
+  setLocal('manhua_user_profile', updated);
+  return { user: updated, error: null };
 };
 
 export const fetchUserReadingHistory = async (userId: string): Promise<ReadingHistoryItem[]> => {
-    const historyRef = collection(db, `users/${userId}/history`);
-    const snapshot = await getDocs(historyRef);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ReadingHistoryItem));
+  return getLocal<ReadingHistoryItem[]>('manhua_reading_history', []);
 };
 
 export const saveUserReadingHistory = async (userId: string, item: Omit<ReadingHistoryItem, 'id' | 'lastReadTime'>): Promise<ReadingHistoryItem> => {
-    const historyRef = collection(db, `users/${userId}/history`);
-    const docRef = await addDoc(historyRef, {
-        ...item,
-        lastReadTime: new Date().toISOString()
-    });
-    return { id: docRef.id, ...item, lastReadTime: new Date().toISOString() };
+  const history = getLocal<ReadingHistoryItem[]>('manhua_reading_history', []);
+  const existingIndex = history.findIndex(h => h.manhuaId === item.manhuaId);
+  const newItem: ReadingHistoryItem = {
+    ...item,
+    id: existingIndex >= 0 ? history[existingIndex].id : 'hist-' + Date.now(),
+    lastReadTime: new Date().toISOString()
+  };
+
+  let newHistory = [...history];
+  if (existingIndex >= 0) {
+    newHistory[existingIndex] = newItem;
+  } else {
+    newHistory.unshift(newItem);
+  }
+
+  setLocal('manhua_reading_history', newHistory);
+  return newItem;
 };
 
 export const deleteUserHistoryItem = async (userId: string, historyId: string) => {
-    const historyRef = doc(db, `users/${userId}/history`, historyId);
-    await deleteDoc(historyRef);
+  const history = getLocal<ReadingHistoryItem[]>('manhua_reading_history', []);
+  const updated = history.filter(h => h.id !== historyId);
+  setLocal('manhua_reading_history', updated);
 };
 
 export const clearUserReadingHistory = async (userId: string) => {
-    const historyRef = collection(db, `users/${userId}/history`);
-    const snapshot = await getDocs(historyRef);
-    const batch = writeBatch(db);
-    snapshot.docs.forEach(doc => batch.delete(doc.ref));
-    await batch.commit();
+  setLocal('manhua_reading_history', []);
 };
 
 export const fetchUserReadingList = async (userId: string): Promise<ReadingListItem[]> => {
-    const listRef = collection(db, `users/${userId}/readingList`);
-    const snapshot = await getDocs(listRef);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ReadingListItem));
+  return getLocal<ReadingListItem[]>('manhua_reading_list', []);
 };
 
 export const addManhuaToReadingList = async (userId: string, manhua: Manhua, type: 'favorite' | 'reading' | 'plan'): Promise<ReadingListItem> => {
-    const listRef = collection(db, `users/${userId}/readingList`);
-    const newItem = { 
-        userId,
-        manhuaId: manhua.id, 
-        manhuaTitle: manhua.title,
-        manhuaCover: manhua.coverUrl,
-        listType: type,
-        addedAt: new Date().toISOString() 
-    };
-    const docRef = await addDoc(listRef, newItem);
-    return { id: docRef.id, ...newItem };
+  const list = getLocal<ReadingListItem[]>('manhua_reading_list', []);
+  const existingIndex = list.findIndex(item => item.manhuaId === manhua.id);
+  const newItem: ReadingListItem = {
+    id: existingIndex >= 0 ? list[existingIndex].id : 'list-' + Date.now(),
+    userId,
+    manhuaId: manhua.id,
+    manhuaTitle: manhua.title,
+    manhuaCover: manhua.coverUrl,
+    listType: type,
+    addedAt: new Date().toISOString()
+  };
+
+  let newList = [...list];
+  if (existingIndex >= 0) {
+    newList[existingIndex] = newItem;
+  } else {
+    newList.unshift(newItem);
+  }
+
+  setLocal('manhua_reading_list', newList);
+  return newItem;
 };
 
 export const removeManhuaFromReadingList = async (userId: string, manhuaId: string) => {
-    const listRef = collection(db, `users/${userId}/readingList`);
-    const q = query(listRef, where('manhuaId', '==', manhuaId));
-    const snapshot = await getDocs(q);
-    const batch = writeBatch(db);
-    snapshot.docs.forEach(doc => batch.delete(doc.ref));
-    await batch.commit();
+  const list = getLocal<ReadingListItem[]>('manhua_reading_list', []);
+  const updated = list.filter(item => item.manhuaId !== manhuaId);
+  setLocal('manhua_reading_list', updated);
 };

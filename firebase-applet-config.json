@@ -1,9 +1,8 @@
 {
-  "projectId": "manhwa-world",
-  "appId": "1:909498082355:web:7e1516f6e771cf25b42f46",
-  "apiKey": "AIzaSyBeQpaqvK0D5EuJeGNZtmVIIlilicA8T3c",
-  "authDomain": "manhwa-world.firebaseapp.com",
-  "storageBucket": "manhwa-world.firebasestorage.app",
-  "messagingSenderId": "909498082355",
-  "measurementId": "G-82W892EG68"
+  "projectId": "gen-lang-client-0333552113",
+  "appId": "1:359607390664:web:aad72b066cec25382c70fd",
+  "apiKey": "AIzaSyAtJYQRc6d2rpx7KFbHjrQGbDLSY8RnawI",
+  "authDomain": "gen-lang-client-0333552113.firebaseapp.com",
+  "storageBucket": "gen-lang-client-0333552113.firebasestorage.app",
+  "messagingSenderId": "359607390664"
 }

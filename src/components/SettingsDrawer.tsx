@@ -10,13 +10,16 @@ interface SettingsDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   user: UserProfile | null;
-  onLogin: () => void;
+  onLogin: (email: string, password: string) => Promise<any>;
+  onSignup: (email: string, password: string) => Promise<any>;
+  onResetPassword: (email: string) => Promise<any>;
+  onLoginWithGoogle: () => Promise<any>;
   onLogout: () => void;
   history: ReadingHistoryItem[];
   onClearHistory: () => void;
   readerSettings: ReaderSettings;
   updateReaderSettings: (settings: Partial<ReaderSettings>) => void;
-  onNavigate: (view: 'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'admin') => void;
+  onNavigate: (view: 'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'admin' | 'mylists' | 'downloads') => void;
   currentView: string;
 }
 
@@ -33,6 +36,9 @@ export default function SettingsDrawer({
   onClose,
   user,
   onLogin,
+  onSignup,
+  onResetPassword,
+  onLoginWithGoogle,
   onLogout,
   history,
   onClearHistory,
@@ -42,6 +48,38 @@ export default function SettingsDrawer({
   currentView
 }: SettingsDrawerProps) {
   const [isSyncing, setIsSyncing] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSignup, setIsSignup] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleAuth = async () => {
+    setError(null);
+    try {
+      if (isSignup) {
+        await onSignup(email, password);
+      } else {
+        await onLogin(email, password);
+      }
+      onClose();
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!email) {
+      setError('يرجى إدخال البريد الإلكتروني في حقل البريد أولاً');
+      return;
+    }
+    setError(null);
+    try {
+      await onResetPassword(email);
+      setError('تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني');
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
 
   const triggerSync = () => {
     setIsSyncing(true);
@@ -95,7 +133,7 @@ export default function SettingsDrawer({
               <div className="bg-zinc-900/60 p-4 rounded-xl border border-zinc-800 space-y-4">
                 <div className="flex items-center gap-2 text-red-400 font-bold border-b border-zinc-800 pb-2">
                   <User className="w-5 h-5" />
-                  <span>1. حساب المستخدم</span>
+                  <span>1. الحساب المحلي للتطبيق</span>
                   {user && user.role === 'admin' && (
                     <span className="mr-auto text-xs bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full flex items-center gap-1">
                       <ShieldAlert className="w-3 h-3" />
@@ -115,39 +153,26 @@ export default function SettingsDrawer({
                       />
                       <div>
                         <h4 className="font-bold text-zinc-100">{user.displayName}</h4>
-                        <p className="text-xs text-zinc-400">{user.email}</p>
+                        <p className="text-[10px] text-zinc-400 font-mono bg-zinc-950 px-2 py-0.5 rounded border border-zinc-800 inline-block">تخزين محلي (Offline)</p>
                       </div>
                     </div>
                     {user.bio && (
-                      <p className="text-xs text-zinc-400 italic bg-zinc-900 p-2 rounded border border-zinc-800/50">
+                      <p className="text-xs text-zinc-400 italic bg-zinc-950 p-2 rounded border border-zinc-900 leading-relaxed">
                         {user.bio}
                       </p>
                     )}
                     
-                    <div className="grid grid-cols-2 gap-2 pt-2">
-                      <button
-                        onClick={() => {
-                          onNavigate('account');
-                          onClose();
-                        }}
-                        className="w-full text-center py-2 px-3 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1"
-                        id="go-profile-btn"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        تخصيص الحساب
-                      </button>
-                      
-                      <button
-                        onClick={() => {
-                          onLogout();
-                        }}
-                        className="w-full text-center py-2 px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1"
-                        id="logout-btn"
-                      >
-                        <LogOut className="w-3.5 h-3.5" />
-                        تسجيل الخروج
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => {
+                        onNavigate('account');
+                        onClose();
+                      }}
+                      className="w-full text-center py-2.5 px-3 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 active:scale-95 shadow-md shadow-red-950/20 cursor-pointer"
+                      id="go-profile-btn"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      <span>تخصيص الحساب والنسخ الاحتياطية</span>
+                    </button>
 
                     {user.role === 'admin' && (
                       <button
@@ -155,30 +180,15 @@ export default function SettingsDrawer({
                           onNavigate('admin');
                           onClose();
                         }}
-                        className="w-full py-2 bg-red-950/40 hover:bg-red-950/60 border border-red-800/40 text-red-400 rounded-lg text-xs font-semibold transition-all mt-2 flex items-center justify-center gap-1"
+                        className="w-full py-2 bg-red-950/40 hover:bg-red-950/60 border border-red-800/40 text-red-400 rounded-lg text-xs font-semibold transition-all mt-2 flex items-center justify-center gap-1 cursor-pointer"
                         id="go-admin-btn"
                       >
                         <ShieldAlert className="w-4 h-4" />
-                        لوحة الإدارة (مسؤول)
+                        <span>لوحة الإدارة (مسؤول)</span>
                       </button>
                     )}
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    <p className="text-xs text-zinc-400 leading-relaxed">
-                      سجل دخولك لتتمكن من حفظ وتخصيص حسابك ومزامنة سجل قراءتك تلقائياً عبر الأجهزة.
-                    </p>
-                    
-                    <button
-                      onClick={onLogin}
-                      className="w-full py-2 px-4 bg-white text-zinc-950 hover:bg-zinc-200 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2"
-                      id="login-google-btn"
-                    >
-                      <LogIn className="w-4 h-4" />
-                      تسجيل الدخول باستخدام جوجل
-                    </button>
-                  </div>
-                )}
+                ) : null}
               </div>
 
               {/* SECTION 2: READING HISTORY (سجل القراءة) */}

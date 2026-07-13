@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { mockManhuas, defaultScraperSources } from './data';
 import { UserProfile, ReadingHistoryItem, ReaderSettings, Manhua, Chapter, ScraperSource, ReadingListItem } from './types';
 import { updateUserProfile, fetchUserReadingHistory, saveUserReadingHistory, deleteUserHistoryItem, clearUserReadingHistory, fetchUserReadingList, addManhuaToReadingList, removeManhuaFromReadingList } from './lib/firebaseDb';
-import { subscribeToAuthChanges, logout, signInWithGoogle } from './lib/firebaseAuth';
-import { onAuthStateChanged } from 'firebase/auth';
+import { subscribeToAuthChanges, logout, loginWithEmail, signupWithEmail, resetPassword, signInWithGoogle } from './lib/firebaseAuth';
 import { auth } from './lib/firebaseAuth';
+import { Home, Search, Heart } from 'lucide-react';
 
 // Components
 import Header from './components/Header';
@@ -20,12 +20,17 @@ import AccountView from './views/AccountView';
 import HistoryView from './views/HistoryView';
 import AdminView from './views/AdminView';
 import MyListView from './views/MyListView';
+import DownloadsView from './views/DownloadsView';
 
 export default function App() {
   // Navigation Router state
-  const [currentView, setCurrentView] = useState<'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'admin' | 'mylists'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'admin' | 'mylists' | 'downloads'>('home');
   const [selectedManhuaId, setSelectedManhuaId] = useState<string | null>(null);
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
+  
+  // Offline reading states
+  const [offlineActiveManhua, setOfflineActiveManhua] = useState<Manhua | null>(null);
+  const [offlineActiveChapter, setOfflineActiveChapter] = useState<Chapter | null>(null);
   
   // Search parameters state passed to search view
   const [searchQuery, setSearchQuery] = useState('');
@@ -58,34 +63,28 @@ export default function App() {
   const [scrapedManhuaCache, setScrapedManhuaCache] = useState<Manhua | null>(null);
 
   // Core User Authentication State
-  const [user, setUser] = useState<UserProfile | null>(() => {
-    // We'll rely on onAuthStateChanged to set the user
-    return null;
+  const [user, setUser] = useState<UserProfile>(() => {
+    const saved = localStorage.getItem('manhua_user_profile');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    const defaultProfile: UserProfile = {
+      id: 'local-user',
+      email: 'local@user.com',
+      displayName: 'قارئ مخلص',
+      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+      bannerUrl: 'https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?w=1200&auto=format&fit=crop&q=80',
+      role: 'user',
+      joinedAt: new Date().toLocaleDateString('ar-EG'),
+      bio: 'عاشق للمانهو والمانجا',
+      xp: 15,
+      totalXp: 100
+    };
+    localStorage.setItem('manhua_user_profile', JSON.stringify(defaultProfile));
+    return defaultProfile;
   });
-
-  // Auth listener
-  useEffect(() => {
-    const unsubscribe = subscribeToAuthChanges(async (firebaseUser) => {
-      if (firebaseUser) {
-        // Create or fetch profile
-        const profile: UserProfile = {
-          id: firebaseUser.uid,
-          email: firebaseUser.email || '',
-          displayName: firebaseUser.displayName || 'مستخدم جديد',
-          avatarUrl: firebaseUser.photoURL || '',
-          role: firebaseUser.email === 'rkieeamne@gmail.com' ? 'admin' : 'user',
-          joinedAt: new Date().toLocaleDateString('ar-EG'),
-          bio: '',
-          xp: 0,
-          totalXp: 0
-        };
-        setUser(profile);
-      } else {
-        setUser(null);
-      }
-    });
-    return unsubscribe;
-  }, []);
 
   // Reading History State
   const [history, setHistory] = useState<ReadingHistoryItem[]>(() => {
@@ -103,46 +102,16 @@ export default function App() {
   // User Reading Lists (Favorites, Currently reading, Plan to read)
   const [readingList, setReadingList] = useState<ReadingListItem[]>([]);
 
-  // Load User Data (History & Lists) on login or change
+  // Load User Data (History & Lists) on startup or local user change
   useEffect(() => {
     const loadUserData = async () => {
-      if (user?.id) {
-        try {
-          const fetchedHistory = await fetchUserReadingHistory(user.id);
-          const fetchedList = await fetchUserReadingList(user.id);
-          setHistory(fetchedHistory);
-          setReadingList(fetchedList);
-        } catch (err) {
-          console.error("Failed to load user cloud data:", err);
-        }
-      } else {
-        // Fallback to anonymous local storage if user is not logged in
-        const savedHistory = localStorage.getItem('manhua_reading_history');
-        const savedManhuas = localStorage.getItem('manhua_list');
-        
-        let parsedHistory: ReadingHistoryItem[] = [];
-        if (savedHistory) {
-          try {
-            parsedHistory = JSON.parse(savedHistory);
-          } catch (e) {
-            parsedHistory = [];
-          }
-        }
-        
-        let parsedManhuas: Manhua[] = [];
-        if (savedManhuas) {
-          try {
-            parsedManhuas = JSON.parse(savedManhuas);
-          } catch (e) {
-            parsedManhuas = mockManhuas;
-          }
-        } else {
-          parsedManhuas = mockManhuas;
-        }
-
-        setHistory(parsedHistory);
-        setManhuas(parsedManhuas);
-        setReadingList([]);
+      try {
+        const fetchedHistory = await fetchUserReadingHistory(user.id);
+        const fetchedList = await fetchUserReadingList(user.id);
+        setHistory(fetchedHistory);
+        setReadingList(fetchedList);
+      } catch (err) {
+        console.error("Failed to load user local data:", err);
       }
     };
     loadUserData();
@@ -171,6 +140,17 @@ export default function App() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isBypassModalOpen, setIsBypassModalOpen] = useState(false);
 
+  // Home Layout State (Modern vs Classic)
+  const [homeLayout, setHomeLayout] = useState<'classic' | 'modern'>(() => {
+    return (localStorage.getItem('homeLayout') as any) || 'modern';
+  });
+
+  const handleToggleLayout = () => {
+    const next = homeLayout === 'modern' ? 'classic' : 'modern';
+    setHomeLayout(next);
+    localStorage.setItem('homeLayout', next);
+  };
+
   // Parse URL query params on initial mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -186,8 +166,8 @@ export default function App() {
       setSelectedManhuaId(mangaId);
       setCurrentView('manhua');
     } else if (view) {
-      const allowedViews: ('home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'admin' | 'mylists')[] = [
-        'home', 'manhua', 'reader', 'search', 'account', 'history', 'admin', 'mylists'
+      const allowedViews: ('home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'admin' | 'mylists' | 'downloads')[] = [
+        'home', 'manhua', 'reader', 'search', 'account', 'history', 'admin', 'mylists', 'downloads'
       ];
       if (allowedViews.includes(view as any)) {
         setCurrentView(view as any);
@@ -458,39 +438,58 @@ export default function App() {
   };
 
   // Navigation targets
-  const handleNavigate = (view: 'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'admin' | 'mylists') => {
+  const handleNavigate = (view: 'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'admin' | 'mylists' | 'downloads') => {
     setCurrentView(view);
   };
+
+  const handleSelectChapterOffline = (manhua: Manhua, chapter: Chapter) => {
+    setOfflineActiveManhua(manhua);
+    setOfflineActiveChapter(chapter);
+    setSelectedManhuaId(manhua.id);
+    setSelectedChapterId(chapter.id);
+    setCurrentView('reader');
+  };
+
+  useEffect(() => {
+    if (currentView !== 'reader') {
+      setOfflineActiveManhua(null);
+      setOfflineActiveChapter(null);
+    }
+  }, [currentView]);
 
   const updateReaderSettings = (settings: Partial<ReaderSettings>) => {
     setReaderSettings((prev) => ({ ...prev, ...settings }));
   };
 
   // Find active data objects for detail views safely
-  const activeManhua = (scrapedManhuaCache?.id === selectedManhuaId && scrapedManhuaCache)
-    ? scrapedManhuaCache 
-    : (manhuas.find((m) => m.id === selectedManhuaId) || (selectedManhuaId?.startsWith('scr-') ? ({
-        id: selectedManhuaId,
-        title: 'جاري التحميل...',
-        description: 'جاري جلب التفاصيل مباشرة من المصدر...',
-        author: 'غير معروف',
-        artist: 'غير معروف',
-        status: 'مستمر' as any,
-        rating: 4.8,
-        views: 0,
-        coverUrl: '',
-        categories: ['مانهوا'],
-        chapters: [],
-        releaseYear: 2026,
-      } as Manhua) : manhuas[0]));
-  const activeChapter = activeManhua?.chapters?.find((c) => c.id === selectedChapterId) || activeManhua?.chapters?.[0];
+  const activeManhua = (offlineActiveManhua && currentView === 'reader') 
+    ? offlineActiveManhua 
+    : (scrapedManhuaCache?.id === selectedManhuaId && scrapedManhuaCache)
+      ? scrapedManhuaCache 
+      : (manhuas.find((m) => m.id === selectedManhuaId) || (selectedManhuaId?.startsWith('scr-') ? ({
+          id: selectedManhuaId,
+          title: 'جاري التحميل...',
+          description: 'جاري جلب التفاصيل مباشرة من المصدر...',
+          author: 'غير معروف',
+          artist: 'غير معروف',
+          status: 'مستمر' as any,
+          rating: 4.8,
+          views: 0,
+          coverUrl: '',
+          categories: ['مانهوا'],
+          chapters: [],
+          releaseYear: 2026,
+        } as Manhua) : manhuas[0]));
+  const activeChapter = (offlineActiveChapter && currentView === 'reader') 
+    ? offlineActiveChapter 
+    : activeManhua?.chapters?.find((c) => c.id === selectedChapterId) || activeManhua?.chapters?.[0];
 
   const handleRestoreSources = () => {
     setSources(defaultScraperSources);
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col justify-between">
+    <div className={`min-h-screen bg-zinc-950 text-zinc-100 flex flex-col justify-between ${currentView !== 'reader' && homeLayout === 'modern' ? 'pb-20 md:pb-0' : ''}`}>
       
       {/* 1. TOP HEADER NAVIGATION BAR */}
       {currentView !== 'reader' && (
@@ -500,6 +499,7 @@ export default function App() {
           onNavigate={handleNavigate}
           currentView={currentView}
           onSearch={handleSearchTrigger}
+          homeLayout={homeLayout}
         />
       )}
 
@@ -508,7 +508,10 @@ export default function App() {
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         user={user}
-        onLogin={signInWithGoogle}
+        onLogin={loginWithEmail}
+        onSignup={signupWithEmail}
+        onResetPassword={resetPassword}
+        onLoginWithGoogle={signInWithGoogle}
         onLogout={handleLogout}
         history={history}
         onClearHistory={handleClearHistory}
@@ -534,6 +537,8 @@ export default function App() {
             onAddToList={handleAddToList}
             onRemoveFromList={handleRemoveFromList}
             onNavigate={handleNavigate}
+            homeLayout={homeLayout}
+            onToggleLayout={handleToggleLayout}
           />
         )}
 
@@ -595,6 +600,10 @@ export default function App() {
             history={history}
             onLogout={handleLogout}
             onUpdateProfile={handleUpdateProfile}
+            onLogin={loginWithEmail}
+            onSignup={signupWithEmail}
+            onResetPassword={resetPassword}
+            onLoginWithGoogle={signInWithGoogle}
           />
         )}
 
@@ -631,6 +640,13 @@ export default function App() {
             onRestoreSources={handleRestoreSources}
           />
         )}
+
+        {currentView === 'downloads' && (
+          <DownloadsView 
+            onSelectChapterOffline={handleSelectChapterOffline}
+            onNavigate={handleNavigate}
+          />
+        )}
       </main>
 
       {/* 4. FOOTER */}
@@ -652,6 +668,75 @@ export default function App() {
         isOpen={isBypassModalOpen} 
         onClose={() => setIsBypassModalOpen(false)} 
       />
+
+      {/* 5. MOBILE BOTTOM NAVIGATION BAR (Modern Interface Only) */}
+      {currentView !== 'reader' && homeLayout === 'modern' && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-zinc-950/95 backdrop-blur-md border-t border-zinc-900 px-6 pt-2 pb-safe shadow-2xl md:hidden">
+          <div className="grid grid-cols-3 items-center justify-items-center max-w-md mx-auto" dir="rtl">
+            
+            {/* Tab 1: الرئيسية */}
+            <button
+              onClick={() => handleNavigate('home')}
+              className="flex flex-col items-center justify-center py-1 focus:outline-none cursor-pointer group"
+              id="mobile-nav-home"
+            >
+              <div className={`w-14 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
+                currentView === 'home'
+                  ? 'bg-rose-600/90 text-white shadow-lg shadow-rose-600/20'
+                  : 'text-zinc-500 group-hover:text-zinc-300'
+              }`}>
+                <Home className="w-5 h-5" />
+              </div>
+              <span className={`text-[10px] font-bold mt-1.5 transition-colors duration-300 ${
+                currentView === 'home' ? 'text-rose-500' : 'text-zinc-500'
+              }`}>
+                الرئيسية
+              </span>
+            </button>
+
+            {/* Tab 2: قائمة المانهو */}
+            <button
+              onClick={() => handleNavigate('search')}
+              className="flex flex-col items-center justify-center py-1 focus:outline-none cursor-pointer group"
+              id="mobile-nav-search"
+            >
+              <div className={`w-14 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
+                currentView === 'search'
+                  ? 'bg-rose-600/90 text-white shadow-lg shadow-rose-600/20'
+                  : 'text-zinc-500 group-hover:text-zinc-300'
+              }`}>
+                <Search className="w-5 h-5" />
+              </div>
+              <span className={`text-[10px] font-bold mt-1.5 transition-colors duration-300 ${
+                currentView === 'search' ? 'text-rose-500' : 'text-zinc-500'
+              }`}>
+                قائمة المانهو
+              </span>
+            </button>
+
+            {/* Tab 3: قائمتي */}
+            <button
+              onClick={() => handleNavigate('mylists')}
+              className="flex flex-col items-center justify-center py-1 focus:outline-none cursor-pointer group"
+              id="mobile-nav-mylists"
+            >
+              <div className={`w-14 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
+                currentView === 'mylists'
+                  ? 'bg-rose-600/90 text-white shadow-lg shadow-rose-600/20'
+                  : 'text-zinc-500 group-hover:text-zinc-300'
+              }`}>
+                <Heart className="w-5 h-5" />
+              </div>
+              <span className={`text-[10px] font-bold mt-1.5 transition-colors duration-300 ${
+                currentView === 'mylists' ? 'text-rose-500' : 'text-zinc-500'
+              }`}>
+                قائمتي
+              </span>
+            </button>
+
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -1,268 +1,257 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
-  User, Mail, Calendar, Edit, Save, CheckCircle2, ShieldAlert, Sparkles, 
-  RefreshCw, LogIn, Award, Heart, Lock, LogOut, Upload, FileText, Check, Database, ArrowLeft, MoreVertical
+  Database, ArrowLeft, Download, FileJson, AlertCircle, Trash2, 
+  FileText, Check, ShieldAlert, Award, Clock, Upload
 } from 'lucide-react';
 import { UserProfile, ReadingHistoryItem } from '../types';
-import { signInWithGoogle } from '../lib/firebaseAuth';
 
 interface AccountViewProps {
   user: UserProfile | null;
   history: ReadingHistoryItem[];
-  onLogout: () => void;
+  onLogout?: () => void;
   onUpdateProfile: (updated: Partial<UserProfile>) => Promise<{ success: boolean; error: string | null }>;
+  onLogin?: (email: string, password: string) => Promise<any>;
+  onSignup?: (email: string, password: string) => Promise<any>;
+  onResetPassword?: (email: string) => Promise<any>;
+  onLoginWithGoogle?: () => Promise<any>;
 }
-
-// Preset cool anime/manhua avatar images
-const presetAvatars = [
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80', // cool girl
-  'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80', // cool guy
-  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80', // retro portrait
-  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80', // cartoon aesthetic
-  'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80', // dark jacket guy
-  'https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=150&auto=format&fit=crop&q=80', // outdoor portrait
-];
 
 export default function AccountView({
   user,
   history = [],
-  onLogout,
-  onUpdateProfile,
 }: AccountViewProps) {
-  const [editMode, setEditMode] = useState(false);
-  const [displayName, setDisplayName] = useState(user?.displayName || '');
-  const [bio, setBio] = useState(user?.bio || '');
-  const [selectedAvatar, setSelectedAvatar] = useState(user?.avatarUrl || presetAvatars[0]);
-  const [selectedBanner, setSelectedBanner] = useState(user?.bannerUrl || 'https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?w=1200&auto=format&fit=crop&q=80');
-  
-  const [showSavedToast, setShowSavedToast] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [importSuccess, setImportSuccess] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Sync state if user changes
-  useEffect(() => {
-    if (user) {
-      setDisplayName(user.displayName);
-      setBio(user.bio || '');
-      setSelectedAvatar(user.avatarUrl);
-      setSelectedBanner(user.bannerUrl || 'https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?w=1200&auto=format&fit=crop&q=80');
-    }
-  }, [user]);
-
-  const handleSaveProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-    setFormError(null);
-
+  // Export local storage databases
+  const handleExportData = () => {
     try {
-      const res = await onUpdateProfile({
-        displayName: displayName.trim(),
-        bio: bio.trim(),
-        avatarUrl: selectedAvatar,
-        bannerUrl: selectedBanner
-      });
+      const backupData = {
+        manhua_user_profile: localStorage.getItem('manhua_user_profile'),
+        manhua_reading_history: localStorage.getItem('manhua_reading_history'),
+        manhua_reading_list: localStorage.getItem('manhua_reading_list'),
+        manhua_scraper_sources: localStorage.getItem('manhua_scraper_sources'),
+        manhua_list: localStorage.getItem('manhua_list'),
+        manhua_reader_settings: localStorage.getItem('manhua_reader_settings'),
+        exportedAt: new Date().toISOString(),
+        version: '1.0'
+      };
 
-      if (res.success) {
-        setEditMode(false);
-        setShowSavedToast(true);
-        setTimeout(() => {
-          setShowSavedToast(false);
-        }, 3000);
-      } else {
-        setFormError(res.error);
-      }
+      const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
+        JSON.stringify(backupData, null, 2)
+      )}`;
+      
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute('href', jsonString);
+      
+      const dateStr = new Date().toISOString().split('T')[0];
+      downloadAnchor.setAttribute('download', `manhua_backup_${dateStr}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
     } catch (err: any) {
-      setFormError(err.message || 'حدث خطأ أثناء حفظ الملف الشخصي');
-    } finally {
-      setSubmitting(false);
+      setFormError('فشل تصدير البيانات: ' + err.message);
     }
   };
 
-  // Image upload handlers
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'avatar' | 'banner') => {
+  // Import local storage databases
+  const handleImportData = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      setFormError('حجم الصورة كبير جداً! يرجى اختيار صورة أقل من 2 ميغابايت.');
-      return;
-    }
-
     const reader = new FileReader();
     reader.onload = (event) => {
-      const base64String = event.target?.result as string;
-      if (type === 'avatar') setSelectedAvatar(base64String);
-      else setSelectedBanner(base64String);
-      setFormError(null);
+      try {
+        const text = event.target?.result as string;
+        const parsed = JSON.parse(text);
+
+        // Simple validation check
+        if (!parsed.exportedAt && !parsed.manhua_user_profile && !parsed.manhua_reading_history) {
+          throw new Error('ملف النسخة الاحتياطية غير صالح أو تالف.');
+        }
+
+        // Write loaded keys back to localStorage
+        if (parsed.manhua_user_profile) localStorage.setItem('manhua_user_profile', parsed.manhua_user_profile);
+        if (parsed.manhua_reading_history) localStorage.setItem('manhua_reading_history', parsed.manhua_reading_history);
+        if (parsed.manhua_reading_list) localStorage.setItem('manhua_reading_list', parsed.manhua_reading_list);
+        if (parsed.manhua_scraper_sources) localStorage.setItem('manhua_scraper_sources', parsed.manhua_scraper_sources);
+        if (parsed.manhua_list) localStorage.setItem('manhua_list', parsed.manhua_list);
+        if (parsed.manhua_reader_settings) localStorage.setItem('manhua_reader_settings', parsed.manhua_reader_settings);
+
+        setImportSuccess('تم استيراد واسترجاع جميع سجلاتك بنجاح! سيتم تحديث الصفحة لتطبيق التغييرات.');
+        setFormError(null);
+
+        // Reload the page to refresh all React states from localStorage
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      } catch (err: any) {
+        setFormError('فشل استيراد الملف: ' + err.message);
+      }
     };
-    reader.onerror = () => {
-      setFormError('حدث خطأ أثناء قراءة ملف الصورة');
-    };
-    reader.readAsDataURL(file);
+    reader.readAsText(file);
+  };
+
+  // Reset local storage database to clear everything
+  const handleResetLocalStorage = () => {
+    if (window.confirm('هل أنت متأكد من حذف كافة سجلات القراءة، المفضلة، والإعدادات نهائياً؟ لا يمكن التراجع عن هذا الإجراء.')) {
+      localStorage.clear();
+      window.location.reload();
+    }
   };
 
   return (
-    <div className="max-w-4xl mx-auto pb-12 px-4 sm:px-6" id="account-view-container">
+    <div className="max-w-3xl mx-auto pb-12 px-4 sm:px-6 animate-fade-in" id="account-view-container" dir="rtl">
       
-      {/* 1. NOT LOGGED IN STATE */}
-      {!user ? (
-        <div className="max-w-md mx-auto bg-zinc-900/40 border border-zinc-800 p-6 rounded-2xl shadow-xl space-y-6">
-          <div className="text-center space-y-2">
-            <div className="w-16 h-16 bg-red-600/10 border-2 border-red-500 rounded-full flex items-center justify-center mx-auto text-red-500 shadow-inner">
-              <User className="w-8 h-8" />
-            </div>
-            <h1 className="text-xl font-black text-zinc-100 font-display">
-              تسجيل الدخول
-            </h1>
-            <p className="text-xs text-zinc-400">
-              يرجى تسجيل الدخول باستخدام حساب جوجل للوصول إلى بروفايلك وسجل قراءاتك الشخصي.
-            </p>
+      {importSuccess && (
+        <div className="fixed bottom-6 left-6 bg-indigo-600 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 z-50 text-xs font-bold max-w-sm border border-indigo-500">
+          <Check className="w-5 h-5 text-indigo-200 animate-pulse" />
+          <span>{importSuccess}</span>
+        </div>
+      )}
+
+      {/* Header section with back button */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-red-600/10 text-red-500">
+            <Database className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-zinc-100 font-display">إدارة بيانات التطبيق والنسخ الاحتياطية</h1>
+            <p className="text-xs text-zinc-400">تحكم كامل بسجلاتك ومفضلتك المخزنة محلياً</p>
+          </div>
+        </div>
+        <button 
+          onClick={() => window.history.back()} 
+          className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition active:scale-95 cursor-pointer flex items-center justify-center"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+      </div>
+
+      <div className="bg-zinc-900/30 border border-zinc-800/60 rounded-2xl overflow-hidden shadow-xl p-6 space-y-6">
+        
+        {/* Error Alert */}
+        {formError && (
+          <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs font-bold flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{formError}</span>
+          </div>
+        )}
+
+        {/* Local Storage Instructions Block */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 text-red-500 font-black text-sm">
+            <ShieldAlert className="w-4 h-4" />
+            <span>تعليمات وإرشادات هامة حول تخزين البيانات</span>
           </div>
 
-          {formError && (
-            <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-xs font-bold">
-              {formError}
-            </div>
-          )}
-
-          <button
-            onClick={async () => {
-              setSubmitting(true);
-              setFormError(null);
-              try {
-                await signInWithGoogle();
-              } catch (err: any) {
-                setFormError(err.message || 'فشل تسجيل الدخول باستخدام جوجل');
-              } finally {
-                setSubmitting(false);
-              }
-            }}
-            disabled={submitting}
-            className="w-full py-3.5 bg-white text-zinc-950 hover:bg-zinc-200 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 active:scale-95 shadow-md disabled:opacity-50 cursor-pointer"
-          >
-            {submitting ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
-            ) : (
-              <LogIn className="w-4 h-4" />
-            )}
-            <span>تسجيل الدخول باستخدام جوجل</span>
-          </button>
+          <div className="bg-zinc-950/40 border border-zinc-800/40 rounded-xl p-5 text-xs text-zinc-300 leading-relaxed space-y-3">
+            <p>
+              • <strong className="text-zinc-100">خصوصية تامة:</strong> تطبيق "عالم المانهو" يحفظ كافة سجلات قراءتك، فصولك المفضلة، والمصادر المخصصة <span className="text-red-400 font-bold">محلياً وآمنة 100% داخل متصفح جهازك</span>. لا يتم إرسال أو مزامنة أي بيانات شخصية مع أي خوادم خارجية.
+            </p>
+            <p>
+              • <strong className="text-zinc-100">تجنب فقدان البيانات:</strong> عند حذف كاش المتصفح أو ملفات الكوكيز، قد يقوم المتصفح بمسح سجلاتك. لذا ننصح <span className="text-red-400 font-bold">بتصدير نسخة احتياطية بشكل دوري</span> وتنزيلها على جهازك.
+            </p>
+            <p>
+              • <strong className="text-zinc-100">التنقل بين الأجهزة:</strong> يمكنك بكل سهولة تحميل ملف النسخة الاحتياطية المصدرة ورفعه على أي هاتف آخر أو متصفح آخر لاستكمال القراءة من حيث توقفت فوراً وبشكل مجاني تماماً.
+            </p>
+          </div>
         </div>
-      ) : (
-        
-        // 2. LOGGED IN STATE (Profile Dashboard)
-        <div className="bg-zinc-950 min-h-screen text-zinc-100 pb-20">
-            {/* Banner & Header Actions */}
-          <div className="relative h-48 bg-zinc-800">
-            <img 
-              src={selectedBanner || undefined} 
-              alt="Banner" 
-              className="w-full h-full object-cover opacity-60"
-            />
-            {editMode && (
-              <label className="absolute inset-0 flex items-center justify-center bg-black/50 cursor-pointer">
-                <Upload className="w-8 h-8 text-white" />
-                <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'banner')} className="hidden" />
-              </label>
-            )}
-            <div className="absolute top-4 left-4 right-4 flex justify-between items-center">
-              <button onClick={() => window.history.back()} className="p-2 rounded-full bg-black/40 backdrop-blur-sm text-white">
-                <ArrowLeft className="w-5 h-5" />
+
+        {/* Quick Statistics Counter */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="p-4 bg-zinc-950/40 border border-zinc-800/40 rounded-xl flex items-center gap-3">
+            <div className="p-2.5 bg-red-500/10 text-red-400 rounded-lg">
+              <Clock className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-[10px] text-zinc-500 font-bold">فصول تمت قراءتها</p>
+              <p className="text-sm font-black text-zinc-100 font-mono mt-0.5">{history.length}</p>
+            </div>
+          </div>
+
+          <div className="p-4 bg-zinc-950/40 border border-zinc-800/40 rounded-xl flex items-center gap-3">
+            <div className="p-2.5 bg-indigo-500/10 text-indigo-400 rounded-lg">
+              <Award className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-[10px] text-zinc-500 font-bold">حالة الحساب المحلي</p>
+              <p className="text-xs font-black text-emerald-500 mt-1">نشط ومستقر (Offline)</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Export & Import Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+          {/* Export card */}
+          <div className="p-5 bg-zinc-950/60 border border-zinc-800 rounded-xl space-y-4 flex flex-col justify-between hover:border-zinc-700 transition">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-zinc-200 font-bold text-xs">
+                <Download className="w-4 h-4 text-red-500" />
+                <span>تصدير نسخة احتياطية</span>
+              </div>
+              <p className="text-[10px] text-zinc-500 leading-relaxed">
+                تنزيل ملف بصيغة JSON يحتوي على كافة المفضلات وسجلات الفصول والمصادر لحفظها بشكل آمن على جهازك.
+              </p>
+            </div>
+            <button
+              onClick={handleExportData}
+              className="w-full py-2.5 bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white border border-red-500/20 hover:border-red-600 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+            >
+              <FileJson className="w-4 h-4" />
+              <span>تحميل ملف النسخة الاحتياطية</span>
+            </button>
+          </div>
+
+          {/* Import card */}
+          <div className="p-5 bg-zinc-950/60 border border-zinc-800 rounded-xl space-y-4 flex flex-col justify-between hover:border-zinc-700 transition">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-zinc-200 font-bold text-xs">
+                <Upload className="w-4 h-4 text-indigo-400" />
+                <span>استيراد واستعادة السجلات</span>
+              </div>
+              <p className="text-[10px] text-zinc-500 leading-relaxed">
+                رفع ملف النسخة الاحتياطية (.json) المستخرج مسبقاً لاسترجاع كافة المفضلات وسجلات القراءة فوراً.
+              </p>
+            </div>
+            
+            <div>
+              <input
+                type="file"
+                accept=".json"
+                ref={fileInputRef}
+                onChange={handleImportData}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full py-2.5 bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white border border-indigo-500/20 hover:border-indigo-600 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+              >
+                <FileText className="w-4 h-4" />
+                <span>رفع واستعادة الملف الاحتياطي</span>
               </button>
             </div>
           </div>
-
-          {/* Avatar & Info Section */}
-          <div className="px-6 relative">
-            <div className="absolute -top-12 left-6">
-              <div className="relative">
-                <img 
-                  src={selectedAvatar || undefined} 
-                  alt={displayName}
-                  className="w-24 h-24 rounded-full border-4 border-zinc-950 shadow-xl object-cover"
-                />
-                {editMode && (
-                  <label className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full cursor-pointer">
-                    <Upload className="w-6 h-6 text-white" />
-                    <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'avatar')} className="hidden" />
-                  </label>
-                )}
-              </div>
-            </div>
-            
-            <div className="flex justify-end pt-20">
-               <button 
-                 type={editMode ? "submit" : "button"}
-                 form={editMode ? "profile-form" : undefined}
-                 onClick={() => !editMode && setEditMode(true)}
-                 className="px-6 py-2 bg-red-600 text-white rounded-full text-sm font-bold hover:bg-red-700 transition shadow-lg shadow-red-900/20"
-               >
-                  {editMode ? 'حفظ التعديلات' : 'تعديل الملف الشخصي'}
-               </button>
-               {editMode && (
-                 <button 
-                   type="button"
-                   onClick={() => setEditMode(false)}
-                   className="ml-2 px-6 py-2 bg-zinc-800 text-zinc-300 rounded-full text-sm font-bold hover:bg-zinc-700 transition"
-                 >
-                   إلغاء
-                 </button>
-               )}
-            </div>
-
-            <div className="pt-16">
-            {editMode ? (
-              <form id="profile-form" onSubmit={handleSaveProfile} className="mt-8 bg-zinc-900/50 p-6 rounded-2xl border border-zinc-800 space-y-4">
-                 <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-zinc-300">الاسم المستعار:</label>
-                    <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100" />
-                 </div>
-                 <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-zinc-300">السيرة الذاتية:</label>
-                    <textarea value={bio} onChange={(e) => setBio(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 h-24" />
-                 </div>
-              </form>
-            ) : (
-              <div className="mt-4 space-y-2">
-                <h2 className="text-2xl font-black flex items-center gap-2">
-                  {user.displayName}
-                </h2>
-                <div className="mt-4">
-                  <div className="flex justify-between text-xs text-zinc-400 mb-1">
-                    <span>الخبرة (XP)</span>
-                    <span>{user.xp ?? 0} / {user.totalXp ?? 0}</span>
-                  </div>
-                  <div className="w-full bg-zinc-800 rounded-full h-3 overflow-hidden border border-zinc-700 shadow-inner">
-                    <div
-                      className="bg-gradient-to-r from-red-600 via-orange-500 to-yellow-400 h-full rounded-full transition-all duration-700 ease-out"
-                      style={{ width: `${Math.min(100, ((user.xp ?? 0) / (user.totalXp || 1)) * 100)}%` }}
-                    />
-                  </div>
-                </div>
-                <p className="text-zinc-400 font-mono mt-4">@{user.displayName.replace(/\s+/g, '').toLowerCase()}</p>
-                <p className="text-zinc-200 mt-2 leading-relaxed">
-                  {user.bio || 'لم يتم إضافة سيرة ذاتية بعد.'}
-                </p>
-              </div>
-            )}
-            </div>
-
-            <div className="mt-6 flex gap-4 text-zinc-500 text-sm">
-              <div className="flex items-center gap-1">
-                <span className="text-zinc-400">👀</span> إجمالي سجل القراءات: {history.length}
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="text-zinc-400">🗓️</span> انضمّ في {user.joinedAt}
-              </div>
-            </div>
-          </div>
-
-          {/* Chart Section */}
-          <div className="px-6 mt-8">
-             <p className="text-center text-zinc-500 mt-4 text-sm">عدد سجلات القراءة: {history.length}</p>
-          </div>
         </div>
-      )}
+
+        {/* Destructive reset area */}
+        <div className="pt-6 border-t border-zinc-800/60 flex justify-between items-center flex-wrap gap-4">
+          <div className="space-y-1">
+            <h4 className="text-xs font-bold text-zinc-300">إعادة تعيين كامل التطبيق</h4>
+            <p className="text-[10px] text-zinc-500">سيتم مسح كافّة المفضلات، السجلات، والمصادر المخصصة والعودة كأنك تفتح التطبيق لأول مرة.</p>
+          </div>
+          <button
+            onClick={handleResetLocalStorage}
+            className="px-4 py-2.5 bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white border border-red-500/20 hover:border-red-600 rounded-xl text-[11px] font-bold transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>حذف ومسح كافة البيانات</span>
+          </button>
+        </div>
+
+      </div>
 
     </div>
   );

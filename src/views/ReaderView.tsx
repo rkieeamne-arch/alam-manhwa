@@ -55,6 +55,13 @@ export default function ReaderView({
 
   // Load scraped pages
   useEffect(() => {
+    // If the chapter already has pre-loaded pages (e.g. offline downloaded base64 pages), bypass scraping!
+    if (chapter.pages && chapter.pages.length > 1) {
+      setScrapedPages(chapter.pages);
+      setCurrentPageIndex(0);
+      return;
+    }
+
     if (!isScrapedChapter) {
       setScrapedPages([]);
       return;

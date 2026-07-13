@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Star, Eye, Calendar, User, Palette, Bookmark, BookOpen, Clock, Loader2, RefreshCw, Lock } from 'lucide-react';
+import { ArrowRight, Star, Eye, Calendar, User, Palette, Bookmark, BookOpen, Clock, Loader2, RefreshCw, Lock, Download, CheckCircle, DownloadCloud, Trash2, AlertCircle } from 'lucide-react';
 import { Manhua, Chapter, ScraperSource, UserProfile, ReadingListItem } from '../types';
-import { scrapeMangaDetails, scrapeMangaChapters } from '../utils/scraper';
+import { scrapeMangaDetails, scrapeMangaChapters, scrapeChapterPages } from '../utils/scraper';
 import AddToListPicker from '../components/AddToListPicker';
+import { saveManhuaOffline, saveChapterOffline, getOfflineChaptersForManhua, convertUrlToBase64, deleteChapterOffline } from '../utils/offlineDb';
 
 interface ManhuaDetailsViewProps {
   manhua: Manhua;
@@ -44,6 +45,168 @@ export default function ManhuaDetailsView({
   const [selectedLockedChapter, setSelectedLockedChapter] = useState<Chapter | null>(null);
 
   const isScraped = manhua.id.startsWith('scr-');
+  const displayManhua = scrapedManhua || manhua;
+
+  // Offline downloading states
+  const [downloadedChapterIds, setDownloadedChapterIds] = useState<Set<string>>(new Set());
+  const [downloadProgress, setDownloadProgress] = useState<Record<string, { current: number; total: number; status: 'downloading' | 'completed' | 'failed' }>>({});
+  const [downloadingAll, setDownloadingAll] = useState(false);
+
+  // Custom confirmation and alert states to bypass iframe restrictions
+  const [confirmOfflineAction, setConfirmOfflineAction] = useState<{
+    type: 'remove_chapter' | 'download_all';
+    chapterId?: string;
+    chapterTitle?: string;
+    count?: number;
+  } | null>(null);
+  const [offlineAlert, setOfflineAlert] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchOfflineChapters = async () => {
+      try {
+        const offlineChaps = await getOfflineChaptersForManhua(displayManhua.id);
+        setDownloadedChapterIds(new Set(offlineChaps.map(c => c.id)));
+      } catch (err) {
+        console.error('Failed to load offline chapters:', err);
+      }
+    };
+    fetchOfflineChapters();
+  }, [displayManhua.id, downloadProgress]);
+
+  const handleDownloadChapter = async (chapter: Chapter) => {
+    if (chapter.isLocked) return;
+    
+    setDownloadProgress(prev => ({
+      ...prev,
+      [chapter.id]: { current: 0, total: 1, status: 'downloading' }
+    }));
+
+    try {
+      const source = sources.find(s => displayManhua.id.startsWith(`scr-${s.id}-`));
+      if (!source && isScraped) {
+        throw new Error('المصدر غير متوفر.');
+      }
+
+      let pages: string[] = [];
+      if (isScraped) {
+        const pagesUrl = chapter.pages[0];
+        pages = await scrapeChapterPages(source!, pagesUrl);
+      } else {
+        pages = chapter.pages;
+      }
+
+      if (!pages || pages.length === 0) {
+        throw new Error('لا توجد صفحات في هذا الفصل.');
+      }
+
+      setDownloadProgress(prev => ({
+        ...prev,
+        [chapter.id]: { current: 0, total: pages.length, status: 'downloading' }
+      }));
+
+      const base64Pages: string[] = [];
+      for (let i = 0; i < pages.length; i++) {
+        const base64 = await convertUrlToBase64(pages[i]);
+        base64Pages.push(base64);
+        
+        setDownloadProgress(prev => ({
+          ...prev,
+          [chapter.id]: { current: i + 1, total: pages.length, status: 'downloading' }
+        }));
+      }
+
+      await saveManhuaOffline({
+        id: displayManhua.id,
+        title: displayManhua.title,
+        description: displayManhua.description,
+        coverUrl: displayManhua.coverUrl,
+        author: displayManhua.author,
+        artist: displayManhua.artist || 'غير معروف',
+        status: displayManhua.status,
+        categories: displayManhua.categories,
+        sourceId: displayManhua.id.startsWith('scr-') ? displayManhua.id.split('-')[1] : 'عام',
+        downloadedAt: Date.now()
+      });
+
+      await saveChapterOffline({
+        id: chapter.id,
+        manhuaId: displayManhua.id,
+        title: chapter.title,
+        chapterNumber: chapter.chapterNumber,
+        pages: base64Pages,
+        downloadedAt: Date.now()
+      });
+
+      setDownloadProgress(prev => ({
+        ...prev,
+        [chapter.id]: { current: pages.length, total: pages.length, status: 'completed' }
+      }));
+
+    } catch (err) {
+      console.error(`Failed to download chapter ${chapter.id}:`, err);
+      setDownloadProgress(prev => ({
+        ...prev,
+        [chapter.id]: { current: 0, total: 1, status: 'failed' }
+      }));
+    }
+  };
+
+  const executeRemoveChapter = async (chapterId: string) => {
+    try {
+      await deleteChapterOffline(chapterId, displayManhua.id);
+      setDownloadedChapterIds(prev => {
+        const next = new Set(prev);
+        next.delete(chapterId);
+        return next;
+      });
+      setDownloadProgress(prev => {
+        const next = { ...prev };
+        delete next[chapterId];
+        return next;
+      });
+    } catch (err) {
+      console.error('Failed to remove offline chapter:', err);
+    }
+  };
+
+  const executeDownloadAllChapters = async () => {
+    const unlockedChaps = displayManhua.chapters.filter(ch => !ch.isLocked && !downloadedChapterIds.has(ch.id));
+    if (unlockedChaps.length === 0) {
+      setOfflineAlert('جميع فصول هذه المانهو محملة بالفعل أو مغلقة!');
+      return;
+    }
+
+    setDownloadingAll(true);
+    for (const ch of unlockedChaps) {
+      try {
+        await handleDownloadChapter(ch);
+      } catch (err) {
+        console.error(`Failed during batch download of ${ch.id}:`, err);
+      }
+    }
+    setDownloadingAll(false);
+  };
+
+  const triggerDownloadAllChapters = () => {
+    const unlockedChaps = displayManhua.chapters.filter(ch => !ch.isLocked && !downloadedChapterIds.has(ch.id));
+    if (unlockedChaps.length === 0) {
+      setOfflineAlert('جميع فصول هذه المانهو محملة بالفعل أو مغلقة!');
+      return;
+    }
+    setConfirmOfflineAction({
+      type: 'download_all',
+      count: unlockedChaps.length
+    });
+  };
+
+  const triggerRemoveDownloadedChapter = (e: React.MouseEvent, chapterId: string, chapterTitle: string) => {
+    e.stopPropagation();
+    setConfirmOfflineAction({
+      type: 'remove_chapter',
+      chapterId,
+      chapterTitle
+    });
+  };
 
   useEffect(() => {
     if (!isScraped) {
@@ -167,8 +330,6 @@ export default function ManhuaDetailsView({
 
     autoUpdate();
   }, [manhua.id, manhua.sourceUrl, isScraped, sources]);
-
-  const displayManhua = scrapedManhua || manhua;
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -424,14 +585,33 @@ export default function ManhuaDetailsView({
       <div className="bg-zinc-900/30 rounded-2xl border border-zinc-800/80 p-4 sm:p-6 space-y-4">
         
         {/* Chapters count header */}
-        <div className="flex items-center justify-between border-b border-zinc-800 pb-3 flex-row-reverse">
+        <div className="flex flex-col sm:flex-row gap-3 items-center justify-between border-b border-zinc-800 pb-3 flex-row-reverse">
           <div className="flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-red-500" />
             <h2 className="text-base sm:text-lg font-bold text-zinc-100 font-display">قائمة الفصول المتوفرة</h2>
           </div>
-          <span className="text-xs text-zinc-400 font-bold font-mono bg-zinc-900 px-3 py-1 rounded-full border border-zinc-800">
-            {displayManhua.chapters.length} فصول مضافة
-          </span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-zinc-400 font-bold font-mono bg-zinc-900 px-3 py-1.5 rounded-full border border-zinc-800">
+              {displayManhua.chapters.length} فصول مضافة
+            </span>
+            <button
+              onClick={triggerDownloadAllChapters}
+              disabled={downloadingAll || displayManhua.chapters.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-600/15 hover:bg-red-600 text-red-500 hover:text-white border border-red-500/30 hover:border-red-600 font-extrabold text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              {downloadingAll ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>جاري تحميل الكل...</span>
+                </>
+              ) : (
+                <>
+                  <DownloadCloud className="w-3.5 h-3.5" />
+                  <span>تحميل كامل الفصول</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Chapters table/list */}
@@ -478,8 +658,55 @@ export default function ManhuaDetailsView({
                   </div>
                 </div>
 
-                <div className="text-[10px] text-zinc-400 font-mono bg-zinc-900 px-2 py-1 rounded border border-zinc-800/80">
-                  {ch.isLocked ? 'مقفل 🔒' : `${ch.views.toLocaleString()} قراءة`}
+                <div className="flex items-center gap-2">
+                  <div className="text-[10px] text-zinc-400 font-mono bg-zinc-900 px-2 py-1 rounded border border-zinc-800/80 hidden sm:block">
+                    {ch.isLocked ? 'مقفل 🔒' : `${ch.views.toLocaleString()} قراءة`}
+                  </div>
+
+                  {!ch.isLocked && (() => {
+                    const progress = downloadProgress[ch.id];
+                    const isDownloaded = downloadedChapterIds.has(ch.id);
+
+                    if (isDownloaded) {
+                      return (
+                        <div className="flex items-center gap-1">
+                          <span className="text-[9px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-1 rounded font-bold flex items-center gap-1">
+                            <CheckCircle className="w-2.5 h-2.5" />
+                            محمل
+                          </span>
+                          <button
+                            onClick={(e) => triggerRemoveDownloadedChapter(e, ch.id, ch.title)}
+                            className="p-1.5 bg-red-950/20 hover:bg-red-600 text-red-400 hover:text-white rounded border border-red-900/30 hover:border-red-500 transition-colors cursor-pointer"
+                            title="حذف من الجهاز"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      );
+                    }
+
+                    if (progress?.status === 'downloading') {
+                      return (
+                        <div className="flex items-center gap-1.5 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[9px] font-bold text-red-500">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          <span>{progress.current}/{progress.total}</span>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownloadChapter(ch);
+                        }}
+                        className="p-1.5 bg-zinc-900 hover:bg-red-600 text-zinc-400 hover:text-white rounded border border-zinc-800 hover:border-red-500 transition-all cursor-pointer"
+                        title="تحميل الفصل على الجهاز"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
             ))}
@@ -538,6 +765,73 @@ export default function ManhuaDetailsView({
                 className="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer border border-transparent shadow-lg shadow-red-950/20"
               >
                 إغلاق النافذة
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Offline Action Modal */}
+      {confirmOfflineAction && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in" style={{ direction: 'rtl' }}>
+          <div className="bg-zinc-950 border border-zinc-800 rounded-2xl max-w-md w-full p-6 text-center shadow-2xl space-y-4">
+            <div className="w-12 h-12 bg-red-500/10 text-red-500 border border-red-500/20 rounded-full flex items-center justify-center mx-auto">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-zinc-100 font-display">تأكيد الإجراء</h3>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                {confirmOfflineAction.type === 'remove_chapter'
+                  ? `هل تريد بالتأكيد إزالة الفصل المحمل "${confirmOfflineAction.chapterTitle}" من جهازك؟`
+                  : `هل ترغب في تحميل جميع الفصول المفتوحة المتبقية (${confirmOfflineAction.count} فصلاً)؟`
+                }
+              </p>
+            </div>
+            <div className="flex gap-2 justify-center pt-2">
+              <button
+                onClick={async () => {
+                  const action = confirmOfflineAction;
+                  setConfirmOfflineAction(null);
+                  if (action.type === 'remove_chapter' && action.chapterId) {
+                    await executeRemoveChapter(action.chapterId);
+                  } else if (action.type === 'download_all') {
+                    await executeDownloadAllChapters();
+                  }
+                }}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer"
+              >
+                تأكيد ومتابعة
+              </button>
+              <button
+                onClick={() => setConfirmOfflineAction(null)}
+                className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-bold rounded-xl border border-zinc-800 transition-all cursor-pointer"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Offline Alert Modal */}
+      {offlineAlert && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in" style={{ direction: 'rtl' }}>
+          <div className="bg-zinc-950 border border-zinc-800 rounded-2xl max-w-md w-full p-6 text-center shadow-2xl space-y-4">
+            <div className="w-12 h-12 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-full flex items-center justify-center mx-auto animate-bounce">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-base font-bold text-zinc-100 font-display">تنبيه</h3>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                {offlineAlert}
+              </p>
+            </div>
+            <div className="pt-2">
+              <button
+                onClick={() => setOfflineAlert(null)}
+                className="w-full py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-bold rounded-xl border border-zinc-800 transition-all cursor-pointer"
+              >
+                حسناً
               </button>
             </div>
           </div>

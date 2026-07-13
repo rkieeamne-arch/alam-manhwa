@@ -5,16 +5,6 @@ import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { mockManhuas } from './src/data';
-import admin from 'firebase-admin';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import { getAuth } from 'firebase-admin/auth';
-import firebaseConfig from './firebase-applet-config.json';
-
-// Initialize Firebase Admin with correct projectId
-admin.initializeApp({
-  projectId: firebaseConfig.projectId
-});
-const db = getFirestore();
 
 // Caching for dynamic sitemap generator
 let sitemapSlugsCache: string[] = [];
@@ -87,45 +77,18 @@ async function startServer() {
 
   // Middleware for Auth
   async function authenticate(req: express.Request, res: express.Response, next: express.NextFunction) {
-    const token = req.headers.authorization?.replace('Bearer ', '');
-    if (!token) return res.status(401).json({ error: 'Unauthorized' });
-
-    try {
-      const decodedToken = await getAuth().verifyIdToken(token);
-      (req as any).user = { id: decodedToken.uid };
-      next();
-    } catch (error) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+    // Return mock user immediately
+    (req as any).user = { id: 'local-user' };
+    next();
   }
 
   // XP route
   app.post('/api/xp/add', authenticate, async (req, res) => {
-    const user = (req as any).user;
-    const { amount } = req.body;
-    
-    // XP Logic
-    const userRef = db.collection('users').doc(user.id);
-    await userRef.set({ xp: FieldValue.increment(amount) }, { merge: true });
-    
     res.json({ success: true });
   });
 
   // Comments route
   app.post('/api/comments', authenticate, async (req, res) => {
-    const user = (req as any).user;
-    const { manhuaId, content } = req.body;
-    
-    await db.collection('comments').add({
-      manhuaId,
-      userId: user.id,
-      content,
-      createdAt: FieldValue.serverTimestamp()
-    });
-    
-    // Award XP for comment
-    await db.collection('users').doc(user.id).set({ xp: FieldValue.increment(3) }, { merge: true });
-    
     res.json({ success: true });
   });
 
@@ -243,6 +206,17 @@ async function startServer() {
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`[Proxy] Response not OK from ${targetUrl}: ${response.status} ${response.statusText}. Body: ${errorText.substring(0, 500)}`);
+        
+        // If the upstream site returns an error status (like 500) but still sends HTML content,
+        // we can still proxy it so the scraper has a chance to parse chapters/pages from it!
+        const contentType = response.headers.get('content-type') || '';
+        const isHtml = contentType.includes('text/html') || errorText.trim().startsWith('<');
+        if (isHtml && errorText.length > 300) {
+          console.log(`[Proxy] Upstream returned error status ${response.status} but sent valid HTML body. Proxying anyway...`);
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+          return res.send(errorText);
+        }
+
         return res.status(response.status).json({ 
           error: `الموقع المصدر (${parsedUrl.hostname}) أعاد خطأ (${response.status} ${response.statusText || 'طلب مرفوض'}). قد يكون الموقع محجوباً في هذه المنطقة أو يتطلب حماية Cloudflare.` 
         });

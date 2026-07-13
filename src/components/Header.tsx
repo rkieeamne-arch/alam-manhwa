@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { 
-  Search, BookOpen, User, ShieldAlert, History, Home, Sparkles, Heart 
+  Search, BookOpen, User, ShieldAlert, History, Home, Sparkles, Heart, FolderDown 
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import logoImg from '../assets/images/manhua_logo_1783758713519.jpg';
@@ -8,9 +8,10 @@ import logoImg from '../assets/images/manhua_logo_1783758713519.jpg';
 interface HeaderProps {
   onOpenSettings: () => void;
   user: UserProfile | null;
-  onNavigate: (view: 'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'admin' | 'mylists') => void;
-  currentView: 'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'admin' | 'mylists';
+  onNavigate: (view: 'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'admin' | 'mylists' | 'downloads') => void;
+  currentView: 'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'admin' | 'mylists' | 'downloads';
   onSearch: (query: string) => void;
+  homeLayout?: 'classic' | 'modern';
 }
 
 export default function Header({
@@ -18,7 +19,8 @@ export default function Header({
   user,
   onNavigate,
   currentView,
-  onSearch
+  onSearch,
+  homeLayout = 'modern'
 }: HeaderProps) {
   const [searchVal, setSearchVal] = useState('');
 
@@ -133,7 +135,7 @@ export default function Header({
         </div>
 
         {/* NAVIGATION BAR - Beautiful Bottom-Row Navigation Links */}
-        <nav className="mt-3.5 flex flex-wrap items-center justify-center gap-1.5 sm:gap-4 px-2 md:px-0 pb-1" dir="rtl">
+        <nav className={`mt-3.5 flex flex-wrap items-center justify-center gap-1.5 sm:gap-4 px-2 md:px-0 pb-1 ${homeLayout === 'modern' ? 'hidden md:flex' : 'flex'}`} dir="rtl">
           <button
             onClick={() => onNavigate('home')}
             className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
@@ -184,6 +186,19 @@ export default function Header({
           >
             <Heart className="w-3.5 h-3.5" />
             قائمتي
+          </button>
+
+          <button
+            onClick={() => onNavigate('downloads')}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              currentView === 'downloads'
+                ? 'bg-red-600 text-white shadow-md shadow-red-900/20'
+                : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900'
+            }`}
+            id="nav-downloads-btn"
+          >
+            <FolderDown className="w-3.5 h-3.5" />
+            التحميلات
           </button>
 
           <button
