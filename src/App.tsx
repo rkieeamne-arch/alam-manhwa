@@ -4,7 +4,7 @@ import { UserProfile, ReadingHistoryItem, ReaderSettings, Manhua, Chapter, Scrap
 import { updateUserProfile, fetchUserReadingHistory, saveUserReadingHistory, deleteUserHistoryItem, clearUserReadingHistory, fetchUserReadingList, addManhuaToReadingList, removeManhuaFromReadingList } from './lib/firebaseDb';
 import { subscribeToAuthChanges, logout, loginWithEmail, signupWithEmail, resetPassword, signInWithGoogle } from './lib/firebaseAuth';
 import { auth } from './lib/firebaseAuth';
-import { Home, Search, Heart } from 'lucide-react';
+import { Home, Search, Heart, History, FolderDown, User } from 'lucide-react';
 
 // Components
 import Header from './components/Header';
@@ -671,8 +671,8 @@ export default function App() {
 
       {/* 5. MOBILE BOTTOM NAVIGATION BAR (Modern Interface Only) */}
       {currentView !== 'reader' && homeLayout === 'modern' && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-zinc-950/95 backdrop-blur-md border-t border-zinc-900 px-6 pt-2 pb-safe shadow-2xl md:hidden">
-          <div className="grid grid-cols-3 items-center justify-items-center max-w-md mx-auto" dir="rtl">
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-zinc-950/95 backdrop-blur-md border-t border-zinc-900 px-2 pt-2 pb-safe shadow-2xl md:hidden">
+          <div className="grid grid-cols-6 items-center justify-items-center max-w-lg mx-auto" dir="rtl">
             
             {/* Tab 1: الرئيسية */}
             <button
@@ -680,14 +680,14 @@ export default function App() {
               className="flex flex-col items-center justify-center py-1 focus:outline-none cursor-pointer group"
               id="mobile-nav-home"
             >
-              <div className={`w-14 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
+              <div className={`w-11 h-7.5 rounded-full flex items-center justify-center transition-all duration-300 ${
                 currentView === 'home'
                   ? 'bg-rose-600/90 text-white shadow-lg shadow-rose-600/20'
                   : 'text-zinc-500 group-hover:text-zinc-300'
               }`}>
-                <Home className="w-5 h-5" />
+                <Home className="w-4.5 h-4.5" />
               </div>
-              <span className={`text-[10px] font-bold mt-1.5 transition-colors duration-300 ${
+              <span className={`text-[9px] font-bold mt-1 transition-colors duration-300 ${
                 currentView === 'home' ? 'text-rose-500' : 'text-zinc-500'
               }`}>
                 الرئيسية
@@ -700,37 +700,97 @@ export default function App() {
               className="flex flex-col items-center justify-center py-1 focus:outline-none cursor-pointer group"
               id="mobile-nav-search"
             >
-              <div className={`w-14 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
+              <div className={`w-11 h-7.5 rounded-full flex items-center justify-center transition-all duration-300 ${
                 currentView === 'search'
                   ? 'bg-rose-600/90 text-white shadow-lg shadow-rose-600/20'
                   : 'text-zinc-500 group-hover:text-zinc-300'
               }`}>
-                <Search className="w-5 h-5" />
+                <Search className="w-4.5 h-4.5" />
               </div>
-              <span className={`text-[10px] font-bold mt-1.5 transition-colors duration-300 ${
+              <span className={`text-[9px] font-bold mt-1 transition-colors duration-300 ${
                 currentView === 'search' ? 'text-rose-500' : 'text-zinc-500'
               }`}>
-                قائمة المانهو
+                المانهو
               </span>
             </button>
 
-            {/* Tab 3: قائمتي */}
+            {/* Tab 3: السجل */}
+            <button
+              onClick={() => handleNavigate('history')}
+              className="flex flex-col items-center justify-center py-1 focus:outline-none cursor-pointer group"
+              id="mobile-nav-history"
+            >
+              <div className={`w-11 h-7.5 rounded-full flex items-center justify-center transition-all duration-300 ${
+                currentView === 'history'
+                  ? 'bg-rose-600/90 text-white shadow-lg shadow-rose-600/20'
+                  : 'text-zinc-500 group-hover:text-zinc-300'
+              }`}>
+                <History className="w-4.5 h-4.5" />
+              </div>
+              <span className={`text-[9px] font-bold mt-1 transition-colors duration-300 ${
+                currentView === 'history' ? 'text-rose-500' : 'text-zinc-500'
+              }`}>
+                السجل
+              </span>
+            </button>
+
+            {/* Tab 4: قائمتي */}
             <button
               onClick={() => handleNavigate('mylists')}
               className="flex flex-col items-center justify-center py-1 focus:outline-none cursor-pointer group"
               id="mobile-nav-mylists"
             >
-              <div className={`w-14 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
+              <div className={`w-11 h-7.5 rounded-full flex items-center justify-center transition-all duration-300 ${
                 currentView === 'mylists'
                   ? 'bg-rose-600/90 text-white shadow-lg shadow-rose-600/20'
                   : 'text-zinc-500 group-hover:text-zinc-300'
               }`}>
-                <Heart className="w-5 h-5" />
+                <Heart className="w-4.5 h-4.5" />
               </div>
-              <span className={`text-[10px] font-bold mt-1.5 transition-colors duration-300 ${
+              <span className={`text-[9px] font-bold mt-1 transition-colors duration-300 ${
                 currentView === 'mylists' ? 'text-rose-500' : 'text-zinc-500'
               }`}>
                 قائمتي
+              </span>
+            </button>
+
+            {/* Tab 5: تحميل */}
+            <button
+              onClick={() => handleNavigate('downloads')}
+              className="flex flex-col items-center justify-center py-1 focus:outline-none cursor-pointer group"
+              id="mobile-nav-downloads"
+            >
+              <div className={`w-11 h-7.5 rounded-full flex items-center justify-center transition-all duration-300 ${
+                currentView === 'downloads'
+                  ? 'bg-rose-600/90 text-white shadow-lg shadow-rose-600/20'
+                  : 'text-zinc-500 group-hover:text-zinc-300'
+              }`}>
+                <FolderDown className="w-4.5 h-4.5" />
+              </div>
+              <span className={`text-[9px] font-bold mt-1 transition-colors duration-300 ${
+                currentView === 'downloads' ? 'text-rose-500' : 'text-zinc-500'
+              }`}>
+                تحميل
+              </span>
+            </button>
+
+            {/* Tab 6: حسابي */}
+            <button
+              onClick={() => handleNavigate('account')}
+              className="flex flex-col items-center justify-center py-1 focus:outline-none cursor-pointer group"
+              id="mobile-nav-account"
+            >
+              <div className={`w-11 h-7.5 rounded-full flex items-center justify-center transition-all duration-300 ${
+                currentView === 'account'
+                  ? 'bg-rose-600/90 text-white shadow-lg shadow-rose-600/20'
+                  : 'text-zinc-500 group-hover:text-zinc-300'
+              }`}>
+                <User className="w-4.5 h-4.5" />
+              </div>
+              <span className={`text-[9px] font-bold mt-1 transition-colors duration-300 ${
+                currentView === 'account' ? 'text-rose-500' : 'text-zinc-500'
+              }`}>
+                حسابي
               </span>
             </button>
 

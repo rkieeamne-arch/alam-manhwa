@@ -1,5 +1,5 @@
 import * as cheerio from 'cheerio';
-import { SourceHandler, Manga, Chapter, ChapterPage } from './types';
+import { SourceHandler, Manga, Chapter, ChapterPage, CATEGORY_ENGLISH_MAP } from './types';
 import { getUniqueId } from './generic';
 import { proxiedFetch } from './fetch';
 
@@ -27,29 +27,82 @@ export const rocksMangaSourceHandler: SourceHandler = {
   baseUrl: BASE_URL,
 
   async parsePopularList(page: number = 1, query?: string): Promise<Manga[]> {
+    const englishSlug = query && CATEGORY_ENGLISH_MAP[query] ? CATEGORY_ENGLISH_MAP[query][0] : '';
     let url = `${BASE_URL}/manga/`;
-    if (query) {
+    let isGenreSearch = false;
+
+    if (query && englishSlug) {
+      url = `${BASE_URL}/manga-genre/${englishSlug}/`;
+      isGenreSearch = true;
+    } else if (query) {
       url = `${BASE_URL}/?s=${encodeURIComponent(query)}&post_type=wp-manga`;
     } else if (page > 1) {
       url = `${BASE_URL}/manga/page/${page}/`;
     }
 
-    const response = await proxiedFetch(url);
-    const html = await response.text();
+    let response;
+    let html = '';
+    try {
+      response = await proxiedFetch(url);
+      if (!response.ok) {
+        throw new Error(`Response status ${response.status}`);
+      }
+      html = await response.text();
+    } catch (e) {
+      if (isGenreSearch && englishSlug) {
+        const altUrl = `${BASE_URL}/genre/${englishSlug}/`;
+        try {
+          response = await proxiedFetch(altUrl);
+          if (response.ok) {
+            html = await response.text();
+            url = altUrl;
+          } else {
+            throw new Error(`Alt genre page failed with status ${response.status}`);
+          }
+        } catch (altErr) {
+          const searchUrl = `${BASE_URL}/?s=${encodeURIComponent(englishSlug)}&post_type=wp-manga`;
+          try {
+            response = await proxiedFetch(searchUrl);
+            if (response.ok) {
+              html = await response.text();
+              url = searchUrl;
+            } else {
+              throw altErr;
+            }
+          } catch (searchErr) {
+            const origSearchUrl = `${BASE_URL}/?s=${encodeURIComponent(query || '')}&post_type=wp-manga`;
+            try {
+              response = await proxiedFetch(origSearchUrl);
+              if (response.ok) {
+                html = await response.text();
+                url = origSearchUrl;
+              } else {
+                throw searchErr;
+              }
+            } catch (origErr) {
+              throw e;
+            }
+          }
+        }
+      } else {
+        throw e;
+      }
+    }
+
     const $ = cheerio.load(html);
     const mangas: Manga[] = [];
 
-    $('div.unit').each((_idx, el) => {
+    const addMangaItem = (el: any) => {
       const linkEl = $(el).find('a').first();
-      const titleEl = $(el).find('span').first();
+      const titleEl = $(el).find('span, h3, h4, h5, .post-title, a, b').first();
       const coverEl = $(el).find('img').first();
 
       const rawLink = linkEl.attr('href');
       const rawCoverUrl = coverEl.attr('src') || coverEl.attr('data-src') || coverEl.attr('data-lazy-src') || '';
 
-      if (rawLink && rawCoverUrl) {
+      if (rawLink) {
         const sourceUrl = normalizeUrl(rawLink, BASE_URL);
-        const coverUrl = normalizeUrl(rawCoverUrl, BASE_URL);
+        const coverUrl = rawCoverUrl ? normalizeUrl(rawCoverUrl, BASE_URL) : 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=300';
         const title = titleEl.text().trim() || $(el).find('b').text().trim() || 'مانجا';
 
         const id = getUniqueId(sourceUrl);
@@ -62,7 +115,33 @@ export const rocksMangaSourceHandler: SourceHandler = {
           });
         }
       }
+    };
+
+    $('div.unit, .page-item-detail, .manga-entry, .col-6, div.col-md-6').each((_idx, el) => {
+      addMangaItem(el);
     });
+
+    if (mangas.length === 0) {
+      $('a[href*="/manga/"], a[href*="/series/"]').each((_idx, el) => {
+        const href = $(el).attr('href');
+        if (href) {
+          const sourceUrl = normalizeUrl(href, BASE_URL);
+          const titleText = $(el).attr('title') || $(el).text().trim();
+          if (titleText && titleText.length > 2) {
+            const id = getUniqueId(sourceUrl);
+            if (!mangas.some(m => m.id === id)) {
+              mangas.push({
+                id,
+                title: titleText,
+                cover: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=300',
+                url: sourceUrl
+              });
+            }
+          }
+        }
+      });
+    }
+
     return mangas;
   },
 

@@ -6,6 +6,122 @@ import AddToListPicker from '../components/AddToListPicker';
 import { categoriesList } from '../data';
 import { scrapeMangaList } from '../utils/scraper';
 
+const CATEGORY_KEYWORDS: { [key: string]: string[] } = {
+  'أكشن': ['أكشن', 'اكشن', 'قتال', 'حرب', 'حركة', 'معركة', 'قبضة', 'سيف', 'عمل', 'مبارزة', 'صراع', 'مواجهة'],
+  'مغامرة': ['مغامرة', 'مغامرات', 'استكشاف', 'رحلة', 'عالم', 'سفر', 'برية'],
+  'خيال': ['خيال', 'فانتازيا', 'سحر', 'تجسد', 'قدرات', 'خارقة', 'مخلوقات', 'تنين', 'وحوش', 'خيالي'],
+  'فنون قتالية': ['قتال', 'كونغ', 'فنون قتالية', 'نينجا', 'سيف', 'فنون القتال', 'تشي', 'طاقة', 'قبضة', 'سياف'],
+  'زراعة (Cultivation)': ['زراعة', 'خالد', 'روح', 'دان', 'مزارع', 'cultivation', 'ممارسة', 'تأمل'],
+  'إيسيكاي (Isekai)': ['انتقال', 'عالم آخر', 'تجسيد', 'إيسيكاي', 'ايسيكاي', 'بطل', 'إعادة ولادة', 'تناسخ', 'انتقلت'],
+  'نظام (System)': ['نظام', 'شاشة', 'مستوى', 'نقاط', 'مهارة', 'لوحة', 'تطوير', 'ترقية', 'system'],
+  'زمن (Regression)': ['زمن', 'عودة', 'ماضي', 'مستقبل', 'تراجع', 'انتقام', 'سفر عبر الزمن', 'إعادة زمن', 'سفر بالزمن'],
+  'كوميديا': ['كوميدي', 'مضحك', 'هزل', 'دعابة', 'ساخر', 'مرح', 'فكاهة'],
+  'دراما': ['دراما', 'مأساة', 'حزن', 'معاناة', 'عائلي', 'مأساوي', 'مشاعر'],
+  'رومنسي': ['رومنسي', 'رومانسية', 'حب', 'زواج', 'عشق', 'خطوبة', 'رومانس', 'حبيبة', 'حبيب'],
+  'إثارة': ['إثارة', 'غموض', 'رعب', 'تشويق', 'مثير', 'حماسي', 'إثاره'],
+  'غموض': ['غموض', 'لغز', 'تحقيق', 'أسرار', 'خفي', 'مجهول', 'لغز'],
+  'نفسي': ['نفسي', 'جنون', 'عقل', 'هوس', 'ظلام', 'ذكاء', 'تخطيط'],
+  'قوة خارقة': ['خارق', 'قوة خارقة', 'قدرة', 'طاقة', 'قوى', 'مهارات خارقة', 'قوى خارقة'],
+  'تاريخي': ['تاريخي', 'إمبراطور', 'قصر', 'ملكي', 'قديم', 'سلالة', 'أمير', 'ملكة'],
+  'خارق للطبيعة': ['خارق', 'أرواح', 'شياطين', 'وحوش', 'أشباح', 'موتى', 'مصاص دماء'],
+  'حياة مدرسية': ['مدرسة', 'طالب', 'مدرسي', 'فصل', 'أكاديمية', 'طلاب', 'ثانوية'],
+  'سحر': ['سحر', 'ساحر', 'تعويذة', 'عجائب', 'شعوذة', 'سحرة'],
+  'شياطين': ['شيطان', 'شياطين', 'ملك الشياطين', 'جهنم', 'أبالسة'],
+  'ويب تون': ['ويب تون', 'مانهوا', 'ملونة', 'فصل', 'شريط'],
+  'شريحة من الحياة': ['يومي', 'حياة يومية', 'شريحة من الحياة', 'واقعي', 'بسيط'],
+  'تشويق': ['تشويق', 'إثارة', 'شد', 'غموض', 'مثير', 'حماس'],
+  'رعب': ['رعب', 'مخيف', 'أشباح', 'ظلام', 'وحوش', 'دموي'],
+  'حريم': ['حريم', 'تعدد', 'زوجات', 'فتيات', 'harem'],
+  'إعادة تجسيد': ['تجسيد', 'ولادة', 'إعادة ولادة', 'حياة ثانية', 'مجدداً', 'reincarnation'],
+  'سفر عبر الزمن': ['زمن', 'ماضي', 'مستقبل', 'تراجع', 'عودة بالزمن', 'سفر عبر الزمن'],
+  'ألعاب': ['لعبة', 'ألعاب', 'افتراضي', 'نظام', 'لاعب', 'game', 'مستوى'],
+  'ميكا': ['آلي', 'روبوت', 'ميكا', 'mecha', 'آليات'],
+  'خيال علمي': ['علمي', 'تكنولوجيا', 'فضاء', 'مستقبل', 'خيال علمي', 'sci-fi'],
+  'رياضة': ['رياضة', 'كرة', 'سلة', 'قدم', 'سباق', 'رياضي', 'نادي'],
+  'شوجو': ['شوجو', 'فتيات', 'رومانسية', 'مدرسة', 'shoujo'],
+  'شونين': ['شونين', 'بطل', 'عزيمة', 'صداقة', 'shounen', 'قتال'],
+  'سينين': ['سينين', 'بالغين', 'نفسي', 'غموض', 'seinen', 'دموي'],
+  'مأساة': ['مأساة', 'حزن', 'موت', 'مأساوي', 'فقدان', 'tragedy'],
+  'حياة يومية': ['يومي', 'حياة يومية', 'بسيط', 'هادئ', 'أصدقاء']
+};
+
+function matchesCategory(item: any, selectedCat: string | null): boolean {
+  if (!selectedCat) return true;
+  
+  // If this is a scraped item and its categories are unpopulated, do not filter it out.
+  // The scraper was already queried with the category keyword (or the user's text query).
+  if (item.id && String(item.id).startsWith('scr-')) {
+    const isUnpopulated = !item.categories || item.categories.length === 0 || (item.categories.length === 1 && item.categories[0] === 'عام');
+    if (isUnpopulated) {
+      return true;
+    }
+  }
+  
+  const title = (item.title || '').toLowerCase();
+  const desc = (item.description || '').toLowerCase();
+  
+  // 1. Check if categories array includes it
+  if (item.categories && Array.isArray(item.categories)) {
+    if (item.categories.some((c: string) => c.toLowerCase().includes(selectedCat.toLowerCase()))) {
+      return true;
+    }
+  }
+
+  // 2. Fallback to keyword matching
+  const keywords = CATEGORY_KEYWORDS[selectedCat];
+  if (keywords) {
+    return keywords.some(keyword => {
+      const kw = keyword.toLowerCase();
+      return title.includes(kw) || desc.includes(kw);
+    });
+  }
+  
+  return title.includes(selectedCat.toLowerCase()) || desc.includes(selectedCat.toLowerCase());
+}
+
+function matchesStatus(item: any, selectedSt: string): boolean {
+  if (selectedSt === 'الكل') return true;
+  
+  const itemStatus = (item.status || 'مستمر').trim();
+  const title = (item.title || '').toLowerCase();
+  const latestChapter = (item.latestChapter || '').toLowerCase();
+  const desc = (item.description || '').toLowerCase();
+
+  if (selectedSt === 'مستمر') {
+    const isCompleted = title.includes('مكتمل') || 
+                        title.includes('منتهي') || 
+                        title.includes('النهاية') || 
+                        title.includes('الخاتمة') ||
+                        latestChapter.includes('مكتمل') ||
+                        latestChapter.includes('منتهي') ||
+                        latestChapter.includes('النهاية');
+    return itemStatus === 'مستمر' && !isCompleted;
+  }
+
+  if (selectedSt === 'مكتمل') {
+    return itemStatus === 'مكتمل' || 
+           title.includes('مكتمل') || 
+           title.includes('منتهي') || 
+           title.includes('النهاية') || 
+           title.includes('الخاتمة') ||
+           title.includes('النهايه') ||
+           latestChapter.includes('مكتمل') ||
+           latestChapter.includes('منتهي') ||
+           latestChapter.includes('النهاية') ||
+           latestChapter.includes('النهايه');
+  }
+
+  if (selectedSt === 'متوقف مؤقتاً') {
+    return itemStatus === 'متوقف مؤقتاً' || 
+           title.includes('متوقف') || 
+           title.includes('توقف') || 
+           desc.includes('توقف') ||
+           desc.includes('متوقف');
+  }
+
+  return true;
+}
+
 interface SearchViewProps {
   manhuas: Manhua[];
   initialQuery?: string;
@@ -92,7 +208,12 @@ export default function SearchView({
     const fetchFromSources = async () => {
       if (!sources || !Array.isArray(sources) || sources.length === 0) return;
 
-      const isSearching = query.trim() !== '';
+      // Send the text query if present, otherwise send the selected category as the search query.
+      // This allows the scraper to search for that category directly if the search box is empty.
+      const isSearching = query.trim() !== '' || selectedCategory !== null;
+      const scraperSearchQuery = query.trim() !== '' 
+        ? query.trim() 
+        : (selectedCategory ? selectedCategory : '');
       
       // Initialize groups
       const initialGroups: typeof scrapedGroups = {};
@@ -102,7 +223,7 @@ export default function SearchView({
         initialGroups[src.id] = {
           sourceName: displayName,
           results: [],
-          loading: true, // Always show loading as we fetch popular when not searching
+          loading: true, // Always show loading as we fetch popular/filtered when not searching
           error: null
         };
       });
@@ -112,12 +233,24 @@ export default function SearchView({
       sources.forEach((source) => {
         const fetchSource = async (retryCount = 0) => {
           try {
-            const results = await scrapeMangaList(source, 1, query);
+            const results = await scrapeMangaList(source, 1, scraperSearchQuery);
+            
+            // If the user selected a category, populate the categories array of results if unpopulated
+            const mappedResults = (results || []).map(item => {
+              if (selectedCategory && (!item.categories || item.categories.length === 0 || (item.categories.length === 1 && item.categories[0] === 'عام'))) {
+                return {
+                  ...item,
+                  categories: [selectedCategory]
+                };
+              }
+              return item;
+            });
+
             setScrapedGroups(prev => ({
               ...prev,
               [source.id]: {
                 ...prev[source.id],
-                results: results || [],
+                results: mappedResults,
                 loading: false,
                 error: null
               }
@@ -149,7 +282,7 @@ export default function SearchView({
     }, 500);
     
     return () => clearTimeout(timer);
-  }, [query, sources, bypassTrigger]);
+  }, [query, selectedCategory, selectedStatus, sources, bypassTrigger]);
 
   const handleSelectScrapedItem = (item: any) => {
     const shell: Manhua = {
@@ -281,11 +414,62 @@ export default function SearchView({
 
       {/* Grid of All Results Combined & Grouped like Mihon */}
       <div className="space-y-8">
+        
+        {/* Local Database Results (القصص المتوفرة بالتطبيق) */}
+        {filteredManhuas.length > 0 && (
+          <div className="space-y-4 bg-zinc-900/20 border border-zinc-800 p-5 rounded-2xl" id="local-results-section">
+            <div className="flex justify-between items-center border-r-4 border-rose-500 pr-3">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow shadow-rose-500/50"></span>
+                <h2 className="text-sm font-extrabold text-zinc-100 font-display">قاعدة البيانات المحلية للتطبيق ({filteredManhuas.length} مانهو)</h2>
+              </div>
+              <span className="text-[10px] bg-rose-600/20 text-rose-400 font-bold px-2 py-0.5 rounded-md border border-rose-500/30 font-mono">حفظ فوري</span>
+            </div>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4">
+              {filteredManhuas.map((manhua) => (
+                <div key={manhua.id} className="relative">
+                  <ManhuaCard
+                    manhua={manhua}
+                    onSelect={onSelectManhua}
+                    user={user}
+                    readingList={readingList}
+                    onAddToList={onAddToList}
+                    onRemoveFromList={onRemoveFromList}
+                    onNavigate={onNavigate}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* External Sources Results Grouped */}
         {sources.map((source, index) => {
           const group = scrapedGroups[source.id];
           if (!group) return null;
-          if (!group.loading && group.results.length === 0) return null;
+
+          // Apply matchesCategory and matchesStatus keyword filters on scraped results!
+          const displayedScrapedResults = (group.results || []).filter(item => {
+            const shell: Manhua = {
+              id: item.id,
+              title: item.title,
+              description: item.description || '',
+              author: 'مجهول',
+              artist: 'مجهول',
+              status: 'مستمر' as ManhuaStatus,
+              rating: item.rating || 4.8,
+              views: item.views || 1000,
+              coverUrl: item.coverUrl || item.cover,
+              categories: item.categories || [],
+              chapters: [],
+              releaseYear: 2026,
+              sourceUrl: item.sourceUrl || item.url,
+            };
+            return matchesCategory(shell, selectedCategory) && matchesStatus(shell, selectedStatus);
+          });
+
+          if (!group.loading && displayedScrapedResults.length === 0) return null;
 
           return (
             <div key={source.id} className="space-y-4 bg-zinc-900/10 border border-zinc-900 p-5 rounded-2xl">
@@ -297,16 +481,16 @@ export default function SearchView({
                 {group.loading && <Loader2 className="w-4 h-4 animate-spin text-red-500" />}
               </div>
 
-              {group.loading && group.results.length === 0 && (
+              {group.loading && displayedScrapedResults.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-8 gap-2">
                   <Loader2 className="w-6 h-6 animate-spin text-red-500" />
                   <span className="text-xs text-zinc-400">جاري {query.trim() === '' ? 'جلب الأشهر' : 'البحث وجلب النتائج'} من {group.sourceName}...</span>
                 </div>
               )}
 
-              {group.results.length > 0 && (
+              {displayedScrapedResults.length > 0 && (
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4">
-                  {group.results.map((item, idx) => {
+                  {displayedScrapedResults.map((item, idx) => {
                     const shell: Manhua = {
                       id: item.id,
                       title: item.title,
@@ -364,7 +548,27 @@ export default function SearchView({
         })}
 
         {/* No results across all targets */}
-        {Object.values(scrapedGroups).every((g: any) => !g.loading && g.results.length === 0) && (
+        {filteredManhuas.length === 0 && Object.values(scrapedGroups).every((group: any) => {
+          const displayed = (group.results || []).filter((item: any) => {
+            const shell: Manhua = {
+              id: item.id,
+              title: item.title,
+              description: item.description || '',
+              author: 'مجهول',
+              artist: 'مجهول',
+              status: 'مستمر' as ManhuaStatus,
+              rating: item.rating || 4.8,
+              views: item.views || 1000,
+              coverUrl: item.coverUrl || item.cover,
+              categories: item.categories || [],
+              chapters: [],
+              releaseYear: 2026,
+              sourceUrl: item.sourceUrl || item.url,
+            };
+            return matchesCategory(shell, selectedCategory) && matchesStatus(shell, selectedStatus);
+          });
+          return !group.loading && displayed.length === 0;
+        }) && (
           <div className="bg-zinc-900/10 border border-dashed border-zinc-800 rounded-2xl py-16 text-center space-y-3">
             <Compass className="w-12 h-12 mx-auto text-zinc-700 stroke-1 animate-pulse" />
             <h3 className="text-sm font-bold text-zinc-300">لم يتم العثور على أي نتائج مطابقة في أي مصدر!</h3>

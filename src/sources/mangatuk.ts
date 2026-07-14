@@ -1,5 +1,5 @@
 import * as cheerio from 'cheerio';
-import { SourceHandler, Manga, Chapter, ChapterPage } from './types';
+import { SourceHandler, Manga, Chapter, ChapterPage, CATEGORY_ENGLISH_MAP } from './types';
 import { proxiedFetch } from './fetch';
 import { getUniqueId } from './generic';
 
@@ -227,19 +227,35 @@ export const mangatukSourceHandler: SourceHandler = {
     if (query && query.trim() !== '') {
       const normalizedQuery = query.toLowerCase().trim();
       const transliteratedQuery = slugify(transliterateArabicToEnglish(query));
+      const englishTerms = CATEGORY_ENGLISH_MAP[query] || [];
       
       // Filter cached items first
-      let results = homepageCache.filter(m => 
-        m.title.toLowerCase().includes(normalizedQuery) ||
-        m.id.toLowerCase().includes(normalizedQuery) ||
-        m.id.toLowerCase().includes(transliteratedQuery)
-      );
+      let results = homepageCache.filter(m => {
+        const titleLower = m.title.toLowerCase();
+        const idLower = m.id.toLowerCase();
+        
+        const matchesArabic = titleLower.includes(normalizedQuery) || idLower.includes(normalizedQuery) || idLower.includes(transliteratedQuery);
+        if (matchesArabic) return true;
+        
+        if (englishTerms.some(term => idLower.includes(term))) {
+          return true;
+        }
+        return false;
+      });
 
       // Fetch sitemap to look for all matching series slugs
       const sitemapUrls = await fetchSitemapIfNeeded();
       const sitemapMatches = sitemapUrls.filter(u => {
         const slug = u.split('/').pop() || '';
-        return slug.includes(normalizedQuery) || slug.includes(transliteratedQuery);
+        const lowerSlug = slug.toLowerCase();
+        
+        const matchesArabic = lowerSlug.includes(normalizedQuery) || lowerSlug.includes(transliteratedQuery);
+        if (matchesArabic) return true;
+        
+        if (englishTerms.some(term => lowerSlug.includes(term))) {
+          return true;
+        }
+        return false;
       });
 
       // Add sitemap matches to search results
@@ -259,6 +275,10 @@ export const mangatukSourceHandler: SourceHandler = {
             });
           }
         }
+      }
+
+      if (results.length === 0) {
+        return homepageCache.slice(0, 20);
       }
 
       return results;
@@ -364,6 +384,43 @@ export const mangatukSourceHandler: SourceHandler = {
         });
       }
     });
+
+    // Fallback: If no chapters found via HTML anchor tags, extract them from hydrated JSON script state
+    if (chapters.length === 0) {
+      $('script').each((_, el) => {
+        const text = $(el).text();
+        if (text.includes('chapters') && text.includes('seriesId')) {
+          // Clean escaping slashes in next_f stream
+          const cleanText = text.replace(/\\"/g, '"').replace(/\\/g, '');
+          const regex = /\{"id":"([^"]+)","seriesId":"([^"]+)","number":"([^"]+)","title":"([^"]*)","slug":"([^"]+)"/g;
+          let match;
+          while ((match = regex.exec(cleanText)) !== null) {
+            const [_, chId, seriesId, number, title, chapterSlug] = match;
+            const fullUrl = `${BASE_URL}/series/${slug}/${chapterSlug}`;
+            const normalizedChUrl = fullUrl.replace(/\/$/, '');
+            
+            if (seenUrls.has(normalizedChUrl)) continue;
+            seenUrls.add(normalizedChUrl);
+            
+            // Clean title string in case of unicode escapes
+            let cleanedTitle = title;
+            try {
+              if (cleanedTitle.includes('\\u')) {
+                cleanedTitle = JSON.parse(`"${cleanedTitle}"`);
+              }
+            } catch (_) {}
+            
+            const name = cleanedTitle ? `الفصل ${number}: ${cleanedTitle}` : `الفصل ${number}`;
+            chapters.push({
+              id: chapterSlug,
+              name,
+              url: fullUrl,
+              isLocked: false
+            });
+          }
+        }
+      });
+    }
 
     chapters.reverse();
 

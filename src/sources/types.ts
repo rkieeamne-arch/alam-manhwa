@@ -30,3 +30,43 @@ export interface SourceHandler {
   parseChapterPages(chapterUrl: string, source?: any): Promise<ChapterPage[]>;
   parseMangaChapters?(mangaUrl: string, page: number, source?: any): Promise<Chapter[]>;
 }
+
+export const CATEGORY_ENGLISH_MAP: Record<string, string[]> = {
+  'أكشن': ['action'],
+  'مغامرة': ['adventure'],
+  'خيال': ['fantasy', 'fiction'],
+  'فنون قتالية': ['martial', 'cultivation'],
+  'زراعة (Cultivation)': ['cultivation', 'martial'],
+  'إيسيكاي (Isekai)': ['isekai'],
+  'نظام (System)': ['system'],
+  'زمن (Regression)': ['regression', 'regress'],
+  'كوميديا': ['comedy'],
+  'دراما': ['drama'],
+  'رومنسي': ['romance', 'romantic'],
+  'إثارة': ['thriller'],
+  'غموض': ['mystery'],
+  'نفسي': ['psychological'],
+  'قوة خارقة': ['supernatural', 'superpower'],
+  'تاريخي': ['historical', 'history'],
+  'خارق للطبيعة': ['supernatural'],
+  'حياة مدرسية': ['school'],
+  'سحر': ['magic'],
+  'شياطين': ['demon', 'demons'],
+  'ويب تون': ['webtoon'],
+  'شريحة من الحياة': ['slice'],
+  'تشويق': ['suspense'],
+  'رعب': ['horror'],
+  'حريم': ['harem'],
+  'إعادة تجسيد': ['reincarnation', 'reincarnated'],
+  'سفر عبر الزمن': ['time-travel', 'time'],
+  'ألعاب': ['game', 'gamer'],
+  'ميكا': ['mecha', 'mech'],
+  'خيال علمي': ['sci-fi', 'science'],
+  'رياضة': ['sports', 'sport'],
+  'شوجو': ['shoujo'],
+  'شونين': ['shounen'],
+  'سينين': ['seinen'],
+  'مأساة': ['tragedy'],
+  'حياة يومية': ['slice', 'daily']
+};
+

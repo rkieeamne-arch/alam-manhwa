@@ -1,5 +1,5 @@
 import * as cheerio from 'cheerio';
-import { Manga, Chapter, ChapterPage, SourceHandler } from './types';
+import { Manga, Chapter, ChapterPage, SourceHandler, CATEGORY_ENGLISH_MAP } from './types';
 import { proxiedFetch } from './fetch';
 import { ScraperSource } from '../types';
 
@@ -65,9 +65,18 @@ export const genericSourceHandler: SourceHandler = {
 
     // Attempt to build URL
     const baseUrl = source.baseUrl.replace(/\/$/, '');
-    let url = query 
-      ? `${baseUrl}/?s=${encodeURIComponent(query)}` // common search format
-      : `${baseUrl}${source.popularPath?.startsWith('/') ? source.popularPath : '/' + (source.popularPath || '')}`;
+    const englishSlug = query && CATEGORY_ENGLISH_MAP[query] ? CATEGORY_ENGLISH_MAP[query][0] : '';
+    let url = '';
+    let isGenreSearch = false;
+
+    if (query && englishSlug) {
+      url = `${baseUrl}/manga-genre/${englishSlug}/`;
+      isGenreSearch = true;
+    } else if (query) {
+      url = `${baseUrl}/?s=${encodeURIComponent(query)}`;
+    } else {
+      url = `${baseUrl}${source.popularPath?.startsWith('/') ? source.popularPath : '/' + (source.popularPath || '')}`;
+    }
     
     // Add page if > 1 with multiple patterns (some sites use ?paged=X, some use /page/X/)
     if (page > 1) {
@@ -87,17 +96,57 @@ export const genericSourceHandler: SourceHandler = {
       }
       html = await response.text();
     } catch (e) {
-      // Automatic Fallback: If popular path is blocked (403/503) or fails, try the home page baseUrl directly!
-      console.warn(`[Scraper] Failed fetching ${url}, falling back to homepage ${baseUrl} due to:`, e);
-      try {
-        const response = await proxiedFetch(baseUrl);
-        if (response.ok) {
-          html = await response.text();
-        } else {
-          throw new Error(`Homepage also failed with status ${response.status}`);
+      if (isGenreSearch && englishSlug) {
+        const altUrl = `${baseUrl}/genre/${englishSlug}/`;
+        console.log(`[Scraper] Retrying with alternative genre URL: ${altUrl}`);
+        try {
+          const response = await proxiedFetch(altUrl);
+          if (response.ok) {
+            html = await response.text();
+            url = altUrl;
+          } else {
+            throw new Error(`Alt genre page failed with status ${response.status}`);
+          }
+        } catch (altErr) {
+          const searchUrl = `${baseUrl}/?s=${encodeURIComponent(englishSlug)}&post_type=wp-manga`;
+          console.log(`[Scraper] Retrying with search URL: ${searchUrl}`);
+          try {
+            const response = await proxiedFetch(searchUrl);
+            if (response.ok) {
+              html = await response.text();
+              url = searchUrl;
+            } else {
+              throw altErr;
+            }
+          } catch (searchErr) {
+            const origSearchUrl = `${baseUrl}/?s=${encodeURIComponent(query || '')}&post_type=wp-manga`;
+            console.log(`[Scraper] Last resort search URL: ${origSearchUrl}`);
+            try {
+              const response = await proxiedFetch(origSearchUrl);
+              if (response.ok) {
+                html = await response.text();
+                url = origSearchUrl;
+              } else {
+                throw searchErr;
+              }
+            } catch (origErr) {
+              throw e; // throw original error if everything fails
+            }
+          }
         }
-      } catch (homeErr) {
-        throw e; // throw original error if homepage fails too
+      } else {
+        // Automatic Fallback: If popular path is blocked (403/503) or fails, try the home page baseUrl directly!
+        console.warn(`[Scraper] Failed fetching ${url}, falling back to homepage ${baseUrl} due to:`, e);
+        try {
+          const response = await proxiedFetch(baseUrl);
+          if (response.ok) {
+            html = await response.text();
+          } else {
+            throw new Error(`Homepage also failed with status ${response.status}`);
+          }
+        } catch (homeErr) {
+          throw e; // throw original error if homepage fails too
+        }
       }
     }
 

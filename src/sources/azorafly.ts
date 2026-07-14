@@ -1,4 +1,4 @@
-import { SourceHandler, Manga, Chapter, ChapterPage } from './types';
+import { SourceHandler, Manga, Chapter, ChapterPage, CATEGORY_ENGLISH_MAP } from './types';
 import { getUniqueId } from './generic';
 import * as cheerio from 'cheerio';
 import { proxiedFetch } from './fetch';
@@ -173,17 +173,20 @@ export const azoraflySourceHandler: SourceHandler = {
     const validList = list.filter(m => m.title && m.title.length >= 2 && m.title !== 'بدون عنوان' && m.title !== 'عمل مجهول');
 
     if (query && query.trim() !== '') {
-      const normalizedQuery = normalizeArabic(query);
-      return validList.filter(m => {
-        const normalizedTitle = normalizeArabic(m.title);
-        if (normalizedTitle.includes(normalizedQuery)) return true;
-        
-        const queryWords = normalizedQuery.split(/\s+/).filter(w => w.length > 1);
-        if (queryWords.length > 0 && queryWords.every(word => normalizedTitle.includes(word))) {
-          return true;
-        }
-        return false;
-      });
+      const isCategory = CATEGORY_ENGLISH_MAP[query] !== undefined;
+      if (!isCategory) {
+        const normalizedQuery = normalizeArabic(query);
+        return validList.filter(m => {
+          const normalizedTitle = normalizeArabic(m.title);
+          if (normalizedTitle.includes(normalizedQuery)) return true;
+          
+          const queryWords = normalizedQuery.split(/\s+/).filter(w => w.length > 1);
+          if (queryWords.length > 0 && queryWords.every(word => normalizedTitle.includes(word))) {
+            return true;
+          }
+          return false;
+        });
+      }
     }
 
     return validList;

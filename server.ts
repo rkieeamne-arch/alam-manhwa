@@ -211,7 +211,7 @@ async function startServer() {
         // we can still proxy it so the scraper has a chance to parse chapters/pages from it!
         const contentType = response.headers.get('content-type') || '';
         const isHtml = contentType.includes('text/html') || errorText.trim().startsWith('<');
-        if (isHtml && errorText.length > 300) {
+        if (response.status !== 404 && isHtml && errorText.length > 300) {
           console.log(`[Proxy] Upstream returned error status ${response.status} but sent valid HTML body. Proxying anyway...`);
           res.setHeader('Content-Type', 'text/html; charset=utf-8');
           return res.send(errorText);
