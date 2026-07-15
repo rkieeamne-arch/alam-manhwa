@@ -123,9 +123,15 @@ async function startServer() {
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0'
       ];
       const defaultUserAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+      let userAgent = defaultUserAgent;
+      if (req.headers['x-proxy-user-agent']) {
+        userAgent = req.headers['x-proxy-user-agent'] as string;
+      } else if (req.headers['user-agent']) {
+        userAgent = req.headers['user-agent'] as string;
+      }
 
       const headers: Record<string, string> = {
-        'User-Agent': defaultUserAgent,
+        'User-Agent': userAgent,
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
         'Accept-Language': 'ar,en-US;q=0.9,en;q=0.8',
         'Referer': isImage ? referer : 'https://www.google.com/', 

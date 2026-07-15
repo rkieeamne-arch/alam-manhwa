@@ -20,6 +20,18 @@ export default function AnimePlayer({ url }: AnimePlayerProps) {
   useEffect(() => {
     setIsLoading(true);
     setHasError(false);
+
+    // Prevent top-level redirect ads from hijacking the page
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = 'هل أنت متأكد من مغادرة هذه الصفحة الرائعة لمشاهدة الأنمي؟';
+      return 'هل أنت متأكد من مغادرة هذه الصفحة الرائعة لمشاهدة الأنمي؟';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
   }, [url]);
 
   const handleRefresh = () => {
@@ -127,7 +139,6 @@ export default function AnimePlayer({ url }: AnimePlayerProps) {
           id="anime-iframe"
           src={cleanUrl}
           className="w-full h-full border-0"
-          sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
           allowFullScreen
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           referrerPolicy="no-referrer"
