@@ -24,6 +24,8 @@ interface HomeViewProps {
   onNavigate: (view: any) => void;
   homeLayout?: 'classic' | 'modern';
   onToggleLayout?: () => void;
+  appMode?: 'manga' | 'anime';
+  onToggleAppMode: () => void;
 }
 
 // Deterministic pseudo-random scattering variants generator for explosive transition
@@ -86,7 +88,9 @@ export default function HomeView({
   onRemoveFromList,
   onNavigate,
   homeLayout: homeLayoutProp,
-  onToggleLayout
+  onToggleLayout,
+  appMode = 'manga',
+  onToggleAppMode
 }: HomeViewProps) {
   // Layout state (Modern vs Classic) - Fallback to local if props aren't provided
   const [localLayout, setLocalLayout] = useState<'classic' | 'modern'>(() => {
@@ -122,7 +126,8 @@ export default function HomeView({
 
   // 1. دالة الجلب المدمجة (Global Fetch)
   const handleFetchAllSources = async (pageNum: number = 1, query?: string, isLoadMore: boolean = false) => {
-    if (sources.length === 0) return;
+    const activeSources = sources.filter(s => appMode === 'anime' ? s.type === 'anime' : s.type !== 'anime');
+    if (activeSources.length === 0) return;
 
     const currentFetchId = ++fetchIdRef.current;
 
@@ -154,7 +159,7 @@ export default function HomeView({
         }
       };
 
-      sources.forEach(source => {
+      activeSources.forEach(source => {
         fetchWithRetry(source, pageNum, query).then(results => {
           if (currentFetchId !== fetchIdRef.current) return;
           
@@ -178,7 +183,7 @@ export default function HomeView({
             }
           }
 
-          if (completedSources === sources.length) {
+          if (completedSources === activeSources.length) {
             setLoadingScraped(false);
             setLoadingMore(false);
             
@@ -231,8 +236,13 @@ export default function HomeView({
     };
   }, [sources]);
 
-  // Combine mock manhuas and scraped manhuas for the display list
-  const displayManhuas = [...manhuas, ...scrapedList];
+  // Combine filtered local manhuas and scraped manhuas for the display list
+  const filteredLocalManhuas = manhuas.filter(m => {
+    const isAnime = m.categories.some(c => c.toLowerCase().includes('أنمي') || c.toLowerCase().includes('anime'));
+    return appMode === 'anime' ? isAnime : !isAnime;
+  });
+
+  const displayManhuas = [...filteredLocalManhuas, ...scrapedList];
 
   // دالة البحث الموحد
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -283,13 +293,26 @@ export default function HomeView({
       <div className="flex items-center justify-between border-b border-zinc-900 pb-4 flex-row-reverse">
         <h1 className="text-xl sm:text-2xl font-black text-white font-display flex items-center gap-2 flex-row-reverse">
           <Sparkles className="w-5 h-5 text-red-500 animate-pulse" />
-          <span>الرئيسية</span>
+          <span className={appMode === 'anime' ? 'text-amber-500' : 'text-red-500'}>{appMode === 'anime' ? 'مكتبة الأنمي' : 'الرئيسية'}</span>
         </h1>
         
-        <button
-          onClick={toggleLayout}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-950 hover:bg-zinc-900 text-[11px] font-bold text-zinc-300 border border-zinc-850 hover:border-red-500/30 transition-all cursor-pointer flex-row-reverse"
-        >
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onToggleAppMode}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer flex-row-reverse border ${
+              appMode === 'anime' 
+                ? 'bg-amber-500/15 text-amber-500 border-amber-500/30 hover:bg-amber-500/25' 
+                : 'bg-rose-600/15 text-rose-500 border-rose-600/30 hover:bg-rose-600/25'
+            }`}
+          >
+            {appMode === 'anime' ? <Zap className="w-3.5 h-3.5" /> : <BookOpen className="w-3.5 h-3.5" />}
+            <span>{appMode === 'anime' ? 'وضعية المانهو' : 'وضعية الأنمي'}</span>
+          </button>
+          
+          <button
+            onClick={toggleLayout}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-950 hover:bg-zinc-900 text-[11px] font-bold text-zinc-300 border border-zinc-850 hover:border-red-500/30 transition-all cursor-pointer flex-row-reverse"
+          >
           {homeLayout === 'modern' ? (
             <>
               <Layers className="w-3.5 h-3.5 text-zinc-400" />
@@ -302,6 +325,7 @@ export default function HomeView({
             </>
           )}
         </button>
+        </div>
       </div>
 
       <AnimatePresence mode="wait">
@@ -354,7 +378,7 @@ export default function HomeView({
                       <span>🔥</span>
                     </span>
                     <span className="px-2.5 py-1 bg-zinc-950/90 border border-zinc-850 text-zinc-100 text-[10px] font-extrabold rounded-lg shadow-lg">
-                      مانهوا مميزة
+                      {appMode === 'anime' ? 'أنمي مميز' : 'مانهوا مميزة'}
                     </span>
                   </div>
 
@@ -380,10 +404,10 @@ export default function HomeView({
                           handleSelectScrapedItem(featuredManhua);
                         }
                       }}
-                      className="mt-1.5 px-5 py-2.5 bg-gradient-to-r from-red-600 to-rose-600 hover:opacity-95 text-white text-xs font-black rounded-xl flex items-center gap-2 shadow-lg shadow-red-950/40 transition-all active:scale-95 cursor-pointer font-display"
+                      className={`mt-1.5 px-5 py-2.5 ${appMode === 'anime' ? 'bg-gradient-to-r from-amber-500 to-amber-600 shadow-amber-950/40' : 'bg-gradient-to-r from-red-600 to-rose-600 shadow-red-950/40'} hover:opacity-95 text-white text-xs font-black rounded-xl flex items-center gap-2 shadow-lg transition-all active:scale-95 cursor-pointer font-display`}
                     >
                       <Play className="w-3.5 h-3.5 fill-white text-white" />
-                      <span>ابدأ القراءة الآن</span>
+                      <span>{appMode === 'anime' ? 'ابدأ المشاهدة الآن' : 'ابدأ القراءة الآن'}</span>
                     </button>
                   </div>
                 </div>
@@ -626,6 +650,22 @@ export default function HomeView({
                 >
                   <Sparkles className="w-4 h-4 animate-pulse" />
                   تفعيل مساعد تخطي الكابتشا والاتصال المباشر
+                </button>
+              </div>
+            ) : !loadingScraped && displayManhuas.length === 0 ? (
+              <div className="bg-zinc-950/50 border border-zinc-900 rounded-3xl p-12 text-center max-w-lg mx-auto space-y-4">
+                <div className="p-3 bg-zinc-900/50 rounded-full w-12 h-12 flex items-center justify-center mx-auto text-zinc-600">
+                  <Search className="w-6 h-6" />
+                </div>
+                <p className="text-zinc-400 text-sm font-bold leading-relaxed">
+                  {searchQuery ? `لم نتمكن من العثور على نتائج للبحث عن "${searchQuery}"` : `لا توجد ${appMode === 'anime' ? 'أنميات' : 'مانهوات'} متاحة حالياً في هذا النمط.`}
+                </p>
+                <button
+                  onClick={() => handleFetchAllSources(1, searchQuery)}
+                  className="px-6 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded-xl text-xs font-black transition-all flex items-center gap-2 mx-auto border border-zinc-800 cursor-pointer"
+                >
+                  <RefreshCw className="w-4 h-4 text-red-500" />
+                  إعادة تحديث القائمة
                 </button>
               </div>
             ) : (

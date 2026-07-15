@@ -33,16 +33,21 @@ export async function proxiedFetch(input: RequestInfo | URL, init?: RequestInit)
   });
   
   if (!response.ok) {
-    let errorMessage = `خطأ في الاتصال (${response.status})`;
-    try {
-      const errData = await response.json();
-      if (errData && errData.error) {
-        errorMessage = errData.error;
-      }
-    } catch {
-      // Not JSON or empty body
+    // If we received 403, try to read the body anyway, as some sites return useful HTML even with 403.
+    // The server-side proxy handles the actual body return, so we just need to avoid throwing here
+    // if the response body is HTML and the caller is expecting it.
+    if (response.status !== 403) {
+        let errorMessage = `خطأ في الاتصال (${response.status})`;
+        try {
+            const errData = await response.json();
+            if (errData && errData.error) {
+                errorMessage = errData.error;
+            }
+        } catch {
+            // Not JSON or empty body
+        }
+        throw new Error(errorMessage);
     }
-    throw new Error(errorMessage);
   }
   
   return response;

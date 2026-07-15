@@ -69,6 +69,24 @@ function slugify(text: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
+function getChapterNumber(name: string, id: string): number {
+  // Try matching numerical values in Chapter title/name (e.g., "الفصل 65: بدون حجب" -> 65)
+  const match = name.match(/الفصل\s*([\d.]+)/i) || name.match(/[\d.]+/);
+  if (match) {
+    const num = parseFloat(match[1] || match[0]);
+    if (!isNaN(num)) return num;
+  }
+  
+  // Try matching numerical values in Chapter ID/slug (e.g., "alfsl-65" or "chapter-65" -> 65)
+  const idMatch = id.match(/[\d.]+/);
+  if (idMatch) {
+    const num = parseFloat(idMatch[0]);
+    if (!isNaN(num)) return num;
+  }
+  
+  return 0;
+}
+
 async function fetchSitemapIfNeeded(): Promise<string[]> {
   const now = Date.now();
   if (sitemapCache.length > 0 && (now - cacheTimestamp < CACHE_TTL)) {
@@ -350,7 +368,7 @@ export const mangatukSourceHandler: SourceHandler = {
       description = $('meta[property="og:description"]').attr('content') || 'لا يوجد وصف متاح.';
     }
 
-    const chapters: Chapter[] = [];
+    const htmlChapters: Chapter[] = [];
     const seenUrls = new Set<string>();
     
     const urlParts = mangaUrl.replace(/\/$/, '').split('/');
@@ -376,7 +394,7 @@ export const mangatukSourceHandler: SourceHandler = {
         
         const isLocked = $(el).find('.app-chapter-pill--coin').length > 0 || text.includes('مقفل') || text.includes('عملات');
 
-        chapters.push({
+        htmlChapters.push({
           id,
           name: name || `الفصل ${id}`,
           url: fullUrl,
@@ -385,44 +403,102 @@ export const mangatukSourceHandler: SourceHandler = {
       }
     });
 
-    // Fallback: If no chapters found via HTML anchor tags, extract them from hydrated JSON script state
-    if (chapters.length === 0) {
-      $('script').each((_, el) => {
-        const text = $(el).text();
-        if (text.includes('chapters') && text.includes('seriesId')) {
-          // Clean escaping slashes in next_f stream
-          const cleanText = text.replace(/\\"/g, '"').replace(/\\/g, '');
-          const regex = /\{"id":"([^"]+)","seriesId":"([^"]+)","number":"([^"]+)","title":"([^"]*)","slug":"([^"]+)"/g;
-          let match;
-          while ((match = regex.exec(cleanText)) !== null) {
-            const [_, chId, seriesId, number, title, chapterSlug] = match;
-            const fullUrl = `${BASE_URL}/series/${slug}/${chapterSlug}`;
-            const normalizedChUrl = fullUrl.replace(/\/$/, '');
-            
-            if (seenUrls.has(normalizedChUrl)) continue;
-            seenUrls.add(normalizedChUrl);
-            
-            // Clean title string in case of unicode escapes
-            let cleanedTitle = title;
-            try {
-              if (cleanedTitle.includes('\\u')) {
-                cleanedTitle = JSON.parse(`"${cleanedTitle}"`);
-              }
-            } catch (_) {}
-            
-            const name = cleanedTitle ? `الفصل ${number}: ${cleanedTitle}` : `الفصل ${number}`;
-            chapters.push({
-              id: chapterSlug,
-              name,
-              url: fullUrl,
-              isLocked: false
-            });
+    // Always attempt to parse all chapters from hydrated JSON/RSC state scripts to merge with HTML
+    const jsonChapters: Chapter[] = [];
+    let combinedScriptText = '';
+    $('script').each((_, el) => {
+      const text = $(el).text();
+      if (text.includes('__next_f') || text.includes('dehydratedAt') || text.includes('chapters')) {
+        combinedScriptText += text;
+      }
+    });
+
+    if (combinedScriptText.length > 0) {
+      const cleanText = combinedScriptText
+        .replace(/\\{1,5}"/g, '"')
+        .replace(/\\{1,5}\//g, '/')
+        .replace(/\\+/g, '');
+
+      const seriesIdRegex = /"seriesId":"([^"]+)"/g;
+      let match;
+      
+      while ((match = seriesIdRegex.exec(cleanText)) !== null) {
+        const seriesId = match[1];
+        const matchIndex = match.index;
+        
+        const startIdx = Math.max(0, matchIndex - 150);
+        const chunk = cleanText.substring(startIdx, startIdx + 1000);
+        
+        const idMatch = chunk.match(/"id":"([^"]+)"/);
+        const numMatch = chunk.match(/"number":"([^"]+)"/);
+        const slugMatch = chunk.match(/"slug":"([^"]+)"/);
+        const titleMatch = chunk.match(/"title":("([^"]*)"|null)/);
+        const coinMatch = chunk.match(/"coinValue":(\d+)/);
+        
+        if (slugMatch && numMatch && idMatch) {
+          const chapterSlug = slugMatch[1];
+          const number = numMatch[1];
+          const chId = idMatch[1];
+          
+          if (chId === seriesId || chId.includes('wpser_') || chapterSlug.includes('/') || !chapterSlug) {
+            continue;
           }
+          
+          let title = null;
+          if (titleMatch) {
+            title = titleMatch[1] === 'null' ? null : titleMatch[2];
+          }
+          
+          let cleanedTitle = title;
+          try {
+            if (cleanedTitle && cleanedTitle.includes('\\u')) {
+              cleanedTitle = JSON.parse(`"${cleanedTitle}"`);
+            }
+          } catch (_) {}
+
+          const coinValue = coinMatch ? parseInt(coinMatch[1], 10) : 0;
+          const isLocked = coinValue > 0;
+          
+          const name = cleanedTitle ? `الفصل ${number}: ${cleanedTitle}` : `الفصل ${number}`;
+          const fullUrl = `${BASE_URL}/series/${slug}/${chapterSlug}`;
+
+          jsonChapters.push({
+            id: chapterSlug,
+            name,
+            url: fullUrl,
+            isLocked
+          });
         }
-      });
+      }
     }
 
-    chapters.reverse();
+    // Merge HTML chapters and JSON chapters, prioritizing JSON data for details and HTML for locking status
+    const uniqueChapters = new Map<string, Chapter>();
+    
+    // Add HTML chapters first
+    for (const ch of htmlChapters) {
+      uniqueChapters.set(ch.id, ch);
+    }
+    
+    // Merge JSON chapters
+    for (const ch of jsonChapters) {
+      const existing = uniqueChapters.get(ch.id);
+      if (existing) {
+        if (ch.isLocked) {
+          existing.isLocked = true;
+        }
+        if (ch.name && ch.name.length > existing.name.length) {
+          existing.name = ch.name;
+        }
+      } else {
+        uniqueChapters.set(ch.id, ch);
+      }
+    }
+    
+    const chapters = Array.from(uniqueChapters.values());
+    
+    // Sort oldest-to-newest numerically
+    chapters.sort((a, b) => getChapterNumber(a.name, a.id) - getChapterNumber(b.name, b.id));
 
     return {
       id: slug,

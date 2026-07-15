@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Star, Eye, Calendar, User, Palette, Bookmark, BookOpen, Clock, Loader2, RefreshCw, Lock, Download, CheckCircle, DownloadCloud, Trash2, AlertCircle } from 'lucide-react';
+import { ArrowRight, Star, Eye, Calendar, User, Palette, Bookmark, BookOpen, Clock, Loader2, RefreshCw, Lock, Download, CheckCircle, DownloadCloud, Trash2, AlertCircle, Play } from 'lucide-react';
 import { Manhua, Chapter, ScraperSource, UserProfile, ReadingListItem } from '../types';
 import { scrapeMangaDetails, scrapeMangaChapters, scrapeChapterPages } from '../utils/scraper';
 import AddToListPicker from '../components/AddToListPicker';
-import { saveManhuaOffline, saveChapterOffline, getOfflineChaptersForManhua, convertUrlToBase64, deleteChapterOffline } from '../utils/offlineDb';
+import { saveManhuaOffline, saveChapterOffline, getOfflineChaptersForManhua, convertUrlToBase64, deleteChapterOffline, fetchAsBlob } from '../utils/offlineDb';
 
 interface ManhuaDetailsViewProps {
   manhua: Manhua;
@@ -47,6 +47,14 @@ export default function ManhuaDetailsView({
   const isScraped = manhua.id.startsWith('scr-');
   const displayManhua = scrapedManhua || manhua;
 
+  const currentSource = sources.find(s => displayManhua.id.startsWith(`scr-${s.id}-`));
+  const isAnime = currentSource?.type === 'anime' || manhua.id.includes('witanime');
+  
+  const contentTypeName = isAnime ? 'أنمي' : 'مانهو';
+  const actionName = isAnime ? 'مشاهدة' : 'قراءة';
+  const chapterName = isAnime ? 'حلقة' : 'فصل';
+  const chaptersName = isAnime ? 'حلقات' : 'فصول';
+
   // Offline downloading states
   const [downloadedChapterIds, setDownloadedChapterIds] = useState<Set<string>>(new Set());
   const [downloadProgress, setDownloadProgress] = useState<Record<string, { current: number; total: number; status: 'downloading' | 'completed' | 'failed' }>>({});
@@ -87,10 +95,10 @@ export default function ManhuaDetailsView({
         throw new Error('المصدر غير متوفر.');
       }
 
-      let pages: string[] = [];
+      let pages: (string | Blob)[] = [];
       if (isScraped) {
         const pagesUrl = chapter.pages[0];
-        pages = await scrapeChapterPages(source!, pagesUrl);
+        pages = await scrapeChapterPages(source!, pagesUrl as string);
       } else {
         pages = chapter.pages;
       }
@@ -104,10 +112,23 @@ export default function ManhuaDetailsView({
         [chapter.id]: { current: 0, total: pages.length, status: 'downloading' }
       }));
 
-      const base64Pages: string[] = [];
+      const downloadedPages: (string | Blob)[] = [];
+      const isAnime = source?.type === 'anime';
+
       for (let i = 0; i < pages.length; i++) {
-        const base64 = await convertUrlToBase64(pages[i]);
-        base64Pages.push(base64);
+        if (isAnime) {
+          // For anime, attempt to download the video as a Blob via proxy or directly
+          try {
+            const blob = await fetchAsBlob(pages[i] as string);
+            downloadedPages.push(blob);
+          } catch (e) {
+            console.warn('[Download] Failed to download anime blob, falling back to URL:', e);
+            downloadedPages.push(pages[i]);
+          }
+        } else {
+          const base64 = await convertUrlToBase64(pages[i] as string);
+          downloadedPages.push(base64);
+        }
         
         setDownloadProgress(prev => ({
           ...prev,
@@ -133,7 +154,7 @@ export default function ManhuaDetailsView({
         manhuaId: displayManhua.id,
         title: chapter.title,
         chapterNumber: chapter.chapterNumber,
-        pages: base64Pages,
+        pages: downloadedPages,
         downloadedAt: Date.now()
       });
 
@@ -220,7 +241,7 @@ export default function ManhuaDetailsView({
       setChapterPage(1);
       setHasMoreChapters(true);
       try {
-        const source = sources.find(s => manhua.id.startsWith(`scr-${s.id}-`));
+        const source = sources.find(s => manhua.id.startsWith(`scr-${s.id}-`) || manhua.sourceUrl?.includes(s.baseUrl));
         
         if (!source) {
           throw new Error('المصدر البرمجي أو الإضافة المسؤولة عن هذا العمل غير متوفرة حالياً.');
@@ -396,7 +417,7 @@ export default function ManhuaDetailsView({
           <button
             onClick={() => {
               setLoading(true);
-              const source = sources.find(s => manhua.id.startsWith(`scr-${s.id}-`));
+              const source = sources.find(s => manhua.id.startsWith(`scr-${s.id}-`) || manhua.sourceUrl?.includes(s.baseUrl));
               if (source) {
                 scrapeMangaDetails(source, manhua.sourceUrl || '')
                   .then(details => {
@@ -513,7 +534,8 @@ export default function ManhuaDetailsView({
             {/* Action Buttons */}
             <div className="flex flex-wrap gap-3 items-center">
                <button className="px-5 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-red-950/20 transition-all flex items-center gap-2">
-                 <span>بدء القراءة</span>
+                 <Play className="w-4 h-4 fill-white" />
+                 <span>بدء {actionName}</span>
                </button>
                <div className="flex items-center gap-2">
                  <AddToListPicker
@@ -571,7 +593,7 @@ export default function ManhuaDetailsView({
 
             {/* Description / Story */}
             <div className="space-y-2 pt-2 text-right">
-              <h3 className="text-xs font-extrabold text-red-500 border-r-2 border-red-500 pr-2">قصة المانهو</h3>
+              <h3 className="text-xs font-extrabold text-red-500 border-r-2 border-red-500 pr-2">قصة {contentTypeName}</h3>
               <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed max-w-4xl text-justify">
                 {displayManhua.description}
               </p>
@@ -588,11 +610,11 @@ export default function ManhuaDetailsView({
         <div className="flex flex-col sm:flex-row gap-3 items-center justify-between border-b border-zinc-800 pb-3 flex-row-reverse">
           <div className="flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-red-500" />
-            <h2 className="text-base sm:text-lg font-bold text-zinc-100 font-display">قائمة الفصول المتوفرة</h2>
+            <h2 className="text-base sm:text-lg font-bold text-zinc-100 font-display">قائمة ال{chaptersName} المتوفرة</h2>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-zinc-400 font-bold font-mono bg-zinc-900 px-3 py-1.5 rounded-full border border-zinc-800">
-              {displayManhua.chapters.length} فصول مضافة
+              {displayManhua.chapters.length} {chaptersName} مضافة
             </span>
             <button
               onClick={triggerDownloadAllChapters}
@@ -660,7 +682,7 @@ export default function ManhuaDetailsView({
 
                 <div className="flex items-center gap-2">
                   <div className="text-[10px] text-zinc-400 font-mono bg-zinc-900 px-2 py-1 rounded border border-zinc-800/80 hidden sm:block">
-                    {ch.isLocked ? 'مقفل 🔒' : `${ch.views.toLocaleString()} قراءة`}
+                    {ch.isLocked ? 'مقفل 🔒' : `${ch.views.toLocaleString()} ${isAnime ? 'مشاهدة' : 'قراءة'}`}
                   </div>
 
                   {!ch.isLocked && (() => {
@@ -701,7 +723,7 @@ export default function ManhuaDetailsView({
                           handleDownloadChapter(ch);
                         }}
                         className="p-1.5 bg-zinc-900 hover:bg-red-600 text-zinc-400 hover:text-white rounded border border-zinc-800 hover:border-red-500 transition-all cursor-pointer"
-                        title="تحميل الفصل على الجهاز"
+                        title={`تحميل ال${chapterName} على الجهاز`}
                       >
                         <Download className="w-3.5 h-3.5" />
                       </button>
@@ -714,7 +736,7 @@ export default function ManhuaDetailsView({
         ) : (
           <div className="text-center py-10 text-zinc-500">
             <BookOpen className="w-12 h-12 mx-auto text-zinc-800 mb-2" />
-            <p className="text-sm">لا توجد فصول متوفرة حالياً.</p>
+            <p className="text-sm">لا توجد {chaptersName} متوفرة حالياً.</p>
           </div>
         )}
 
@@ -734,7 +756,7 @@ export default function ManhuaDetailsView({
               ) : (
                 <>
                   <RefreshCw className="w-4 h-4 text-red-500" />
-                  <span>مزيد من الفصول</span>
+                  <span>مزيد من ال{chaptersName}</span>
                 </>
               )}
             </button>

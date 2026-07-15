@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { 
-  Search, BookOpen, User, ShieldAlert, History, Home, Sparkles, Heart, FolderDown 
+  Search, BookOpen, User, ShieldAlert, History, Home, Sparkles, Heart, FolderDown, Tv 
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import logoImg from '../assets/images/manhua_logo_1783758713519.jpg';
@@ -12,6 +12,8 @@ interface HeaderProps {
   currentView: 'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'admin' | 'mylists' | 'downloads';
   onSearch: (query: string) => void;
   homeLayout?: 'classic' | 'modern';
+  appMode?: 'manga' | 'anime';
+  onToggleAppMode?: () => void;
 }
 
 export default function Header({
@@ -20,7 +22,9 @@ export default function Header({
   onNavigate,
   currentView,
   onSearch,
-  homeLayout = 'modern'
+  homeLayout = 'modern',
+  appMode = 'manga',
+  onToggleAppMode
 }: HeaderProps) {
   const [searchVal, setSearchVal] = useState('');
 
@@ -29,6 +33,8 @@ export default function Header({
     onSearch(searchVal);
     onNavigate('search');
   };
+
+  const isAnime = appMode === 'anime';
 
   return (
     <header className="z-40 bg-zinc-950/90 backdrop-blur-md border-b border-zinc-900 shadow-lg">
@@ -41,15 +47,15 @@ export default function Header({
           <form onSubmit={handleSearchSubmit} className="order-2 md:order-1 flex items-center relative w-full max-w-sm">
             <input
               type="text"
-              placeholder="ابحث عن مانهو بالاسم أو الكاتب..."
+              placeholder={isAnime ? "ابحث عن أنمي بالاسم أو التصنيف..." : "ابحث عن مانهو بالاسم أو الكاتب..."}
               value={searchVal}
               onChange={(e) => setSearchVal(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 text-xs text-zinc-100 placeholder-zinc-500 rounded-full py-2 px-4 pl-10 focus:outline-none focus:border-red-600 transition-colors"
+              className={`w-full bg-zinc-900 border border-zinc-800 text-xs text-zinc-100 placeholder-zinc-500 rounded-full py-2 px-4 pl-10 focus:outline-none transition-colors ${isAnime ? 'focus:border-amber-500' : 'focus:border-red-600'}`}
               id="header-search-input"
             />
             <button
               type="submit"
-              className="absolute left-3 p-1 text-zinc-400 hover:text-red-500 transition-colors"
+              className={`absolute left-3 p-1 text-zinc-400 transition-colors ${isAnime ? 'hover:text-amber-500' : 'hover:text-red-500'}`}
               id="header-search-submit-btn"
             >
               <Search className="w-4 h-4" />
@@ -64,11 +70,11 @@ export default function Header({
                 onClick={() => onNavigate('home')} 
                 className="cursor-pointer flex items-center gap-2 group select-none"
               >
-                <div className="w-9 h-9 rounded-full overflow-hidden border border-red-500 flex items-center justify-center shadow-md shadow-red-900/30 group-hover:scale-105 transition-all">
+                <div className={`w-9 h-9 rounded-full overflow-hidden border flex items-center justify-center shadow-md group-hover:scale-105 transition-all ${isAnime ? 'border-amber-500 shadow-amber-900/30' : 'border-red-500 shadow-red-900/30'}`}>
                   <img src={logoImg} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 </div>
-                <h1 className="text-xl md:text-2xl font-black text-white tracking-tight font-display transition-colors group-hover:text-red-500">
-                  عالم <span className="text-red-500 font-extrabold">المانهو</span>
+                <h1 className={`text-xl md:text-2xl font-black text-white tracking-tight font-display transition-colors ${isAnime ? 'group-hover:text-amber-500' : 'group-hover:text-red-500'}`}>
+                  عالم <span className={`${isAnime ? 'text-amber-500' : 'text-red-500'} font-extrabold`}>{isAnime ? 'الأنمي' : 'المانهو'}</span>
                 </h1>
               </div>
 
@@ -83,11 +89,27 @@ export default function Header({
                 >
                   <span>ديسكورد</span>
                 </a>
+
+                {/* Global Desktop AppMode Switcher Button */}
+                {onToggleAppMode && (
+                  <button
+                    onClick={onToggleAppMode}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full font-bold text-[10px] sm:text-xs transition-all active:scale-95 cursor-pointer shadow-sm ${
+                      isAnime
+                        ? 'bg-amber-500/15 hover:bg-amber-500 text-amber-500 hover:text-zinc-950 border border-amber-500/30 hover:border-amber-500'
+                        : 'bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white border border-red-500/30 hover:border-red-600'
+                    }`}
+                    title={isAnime ? "تبديل إلى واجهة المانجا" : "تبديل إلى واجهة الأنمي"}
+                  >
+                    {isAnime ? <BookOpen className="w-3.5 h-3.5" /> : <Tv className="w-3.5 h-3.5 animate-pulse" />}
+                    <span>{isAnime ? 'واجهة المانهو 📖' : 'واجهة الأنمي 🎬'}</span>
+                  </button>
+                )}
               </div>
             </div>
             
             <span className="text-[9px] text-zinc-500 font-medium tracking-widest hidden md:block">
-              عش شغف المانهو • بجودة فائقة السرعة
+              {isAnime ? 'عش شغف الأنمي والكرتون • بجودة فائقة السرعة' : 'عش شغف المانهو والمانجا • بجودة فائقة السرعة'}
             </span>
           </div>
 
@@ -96,13 +118,13 @@ export default function Header({
             {user ? (
               <div 
                 onClick={() => onNavigate('account')}
-                className="flex items-center gap-2 p-1.5 px-3 rounded-full bg-zinc-900 border border-zinc-800 hover:border-red-500/50 cursor-pointer transition-all"
+                className={`flex items-center gap-2 p-1.5 px-3 rounded-full bg-zinc-900 border hover:border-opacity-100 cursor-pointer transition-all ${isAnime ? 'border-zinc-800 hover:border-amber-500' : 'border-zinc-800 hover:border-red-500'}`}
                 id="header-user-badge"
               >
                 <img 
                   src={user.avatarUrl || undefined} 
                   alt={user.displayName}
-                  className="w-6 h-6 rounded-full border border-red-500 object-cover"
+                  className={`w-6 h-6 rounded-full border object-cover ${isAnime ? 'border-amber-500' : 'border-red-500'}`}
                   referrerPolicy="no-referrer"
                 />
                 <span className="text-xs font-bold text-zinc-300 truncate max-w-[120px]">
@@ -115,7 +137,7 @@ export default function Header({
                 className="text-xs bg-zinc-900 hover:bg-zinc-800 text-zinc-300 px-4 py-2 border border-zinc-800 hover:border-zinc-700 rounded-full transition-colors flex items-center gap-1"
                 id="header-login-quick"
               >
-                <User className="w-3.5 h-3.5 text-red-500" />
+                <User className={`w-3.5 h-3.5 ${isAnime ? 'text-amber-500' : 'text-red-500'}`} />
                 دخول السريع
               </button>
             )}
@@ -123,7 +145,7 @@ export default function Header({
             {user && user.role === 'admin' && (
               <button
                 onClick={() => onNavigate('admin')}
-                className="p-2 bg-red-950/20 hover:bg-red-950/50 text-red-400 hover:text-red-300 border border-red-900/30 rounded-full transition-colors"
+                className={`p-2 rounded-full transition-colors ${isAnime ? 'bg-amber-950/20 hover:bg-amber-950/50 text-amber-400 hover:text-amber-300 border border-amber-900/30' : 'p-2 bg-red-950/20 hover:bg-red-950/50 text-red-400 hover:text-red-300 border border-red-900/30'}`}
                 title="لوحة الإدارة"
                 id="header-admin-quick"
               >
@@ -140,7 +162,9 @@ export default function Header({
             onClick={() => onNavigate('home')}
             className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
               currentView === 'home'
-                ? 'bg-red-600 text-white shadow-md shadow-red-900/20'
+                ? isAnime
+                  ? 'bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20'
+                  : 'bg-red-600 text-white shadow-md shadow-red-900/20'
                 : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900'
             }`}
             id="nav-home-btn"
@@ -153,33 +177,39 @@ export default function Header({
             onClick={() => onNavigate('search')}
             className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
               currentView === 'search'
-                ? 'bg-red-600 text-white shadow-md shadow-red-900/20'
+                ? isAnime
+                  ? 'bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20'
+                  : 'bg-red-600 text-white shadow-md shadow-red-900/20'
                 : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900'
             }`}
             id="nav-explore-btn"
           >
             <Search className="w-3.5 h-3.5" />
-            قائمة المانهو
+            {isAnime ? 'قائمة الأنمي' : 'قائمة المانهو'}
           </button>
 
           <button
             onClick={() => onNavigate('history')}
             className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
               currentView === 'history'
-                ? 'bg-red-600 text-white shadow-md shadow-red-900/20'
+                ? isAnime
+                  ? 'bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20'
+                  : 'bg-red-600 text-white shadow-md shadow-red-900/20'
                 : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900'
             }`}
             id="nav-history-btn"
           >
             <History className="w-3.5 h-3.5" />
-            سجل القراءة
+            {isAnime ? 'سجل المشاهدة' : 'سجل القراءة'}
           </button>
 
           <button
             onClick={() => onNavigate('mylists')}
             className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
               currentView === 'mylists'
-                ? 'bg-red-600 text-white shadow-md shadow-red-900/20'
+                ? isAnime
+                  ? 'bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20'
+                  : 'bg-red-600 text-white shadow-md shadow-red-900/20'
                 : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900'
             }`}
             id="nav-mylists-btn"
@@ -192,7 +222,9 @@ export default function Header({
             onClick={() => onNavigate('downloads')}
             className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
               currentView === 'downloads'
-                ? 'bg-red-600 text-white shadow-md shadow-red-900/20'
+                ? isAnime
+                  ? 'bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20'
+                  : 'bg-red-600 text-white shadow-md shadow-red-900/20'
                 : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900'
             }`}
             id="nav-downloads-btn"
@@ -205,7 +237,9 @@ export default function Header({
             onClick={() => onNavigate('account')}
             className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
               currentView === 'account'
-                ? 'bg-red-600 text-white shadow-md shadow-red-900/20'
+                ? isAnime
+                  ? 'bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20'
+                  : 'bg-red-600 text-white shadow-md shadow-red-900/20'
                 : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900'
             }`}
             id="nav-account-btn"
@@ -219,7 +253,9 @@ export default function Header({
               onClick={() => onNavigate('admin')}
               className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 currentView === 'admin'
-                  ? 'bg-red-600 text-white shadow-md shadow-red-900/20'
+                  ? isAnime
+                    ? 'bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20'
+                    : 'bg-red-600 text-white shadow-md shadow-red-900/20'
                   : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900'
               }`}
               id="nav-admin-btn"

@@ -133,6 +133,7 @@ interface SearchViewProps {
   onAddToList: (manhua: Manhua, type: 'favorite' | 'reading' | 'plan') => Promise<void>;
   onRemoveFromList: (manhuaId: string) => Promise<void>;
   onNavigate: (view: any) => void;
+  appMode?: 'manga' | 'anime';
 }
 
 export default function SearchView({
@@ -145,7 +146,8 @@ export default function SearchView({
   readingList,
   onAddToList,
   onRemoveFromList,
-  onNavigate
+  onNavigate,
+  appMode = 'manga'
 }: SearchViewProps) {
   const [query, setQuery] = useState(initialQuery);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(initialCategory);
@@ -158,6 +160,8 @@ export default function SearchView({
       results: any[];
       loading: boolean;
       error: string | null;
+      page: number;
+      hasMore: boolean;
     }
   }>({});
 
@@ -172,6 +176,12 @@ export default function SearchView({
 
   useEffect(() => {
     let result = manhuas;
+
+    // Filter by appMode first
+    result = result.filter(m => {
+      const isAnime = m.categories.some(c => c.toLowerCase().includes('أنمي') || c.toLowerCase().includes('anime'));
+      return appMode === 'anime' ? isAnime : !isAnime;
+    });
 
     if (query.trim() !== '') {
       result = result.filter((m) =>
@@ -204,85 +214,102 @@ export default function SearchView({
     };
   }, []);
 
-  useEffect(() => {
-    const fetchFromSources = async () => {
-      if (!sources || !Array.isArray(sources) || sources.length === 0) return;
+  const fetchFromSource = async (source: ScraperSource, page: number = 1, isLoadMore: boolean = false) => {
+    const scraperSearchQuery = query.trim() !== '' 
+      ? query.trim() 
+      : (selectedCategory ? selectedCategory : '');
+    
+    setScrapedGroups(prev => ({
+      ...prev,
+      [source.id]: {
+        ...prev[source.id],
+        loading: true,
+        error: null
+      }
+    }));
 
-      // Send the text query if present, otherwise send the selected category as the search query.
-      // This allows the scraper to search for that category directly if the search box is empty.
-      const isSearching = query.trim() !== '' || selectedCategory !== null;
-      const scraperSearchQuery = query.trim() !== '' 
-        ? query.trim() 
-        : (selectedCategory ? selectedCategory : '');
+    try {
+      const results = await scrapeMangaList(source, page, scraperSearchQuery);
       
-      // Initialize groups
-      const initialGroups: typeof scrapedGroups = {};
-      sources.forEach((src, idx) => {
-        if (!src) return;
-        const displayName = `نتيجة ${idx + 1}`;
-        initialGroups[src.id] = {
-          sourceName: displayName,
-          results: [],
-          loading: true, // Always show loading as we fetch popular/filtered when not searching
-          error: null
-        };
+      const mappedResults = (results || []).map(item => {
+        if (selectedCategory && (!item.categories || item.categories.length === 0 || (item.categories.length === 1 && item.categories[0] === 'عام'))) {
+          return {
+            ...item,
+            categories: [selectedCategory]
+          };
+        }
+        return item;
       });
-      setScrapedGroups(initialGroups);
 
-      // Start fetching from each source in parallel
-      sources.forEach((source) => {
-        const fetchSource = async (retryCount = 0) => {
-          try {
-            const results = await scrapeMangaList(source, 1, scraperSearchQuery);
-            
-            // If the user selected a category, populate the categories array of results if unpopulated
-            const mappedResults = (results || []).map(item => {
-              if (selectedCategory && (!item.categories || item.categories.length === 0 || (item.categories.length === 1 && item.categories[0] === 'عام'))) {
-                return {
-                  ...item,
-                  categories: [selectedCategory]
-                };
-              }
-              return item;
-            });
-
-            setScrapedGroups(prev => ({
-              ...prev,
-              [source.id]: {
-                ...prev[source.id],
-                results: mappedResults,
-                loading: false,
-                error: null
-              }
-            }));
-          } catch (err: any) {
-            console.error(`Search failed for source ${source.name} (Attempt ${retryCount + 1}):`, err);
-            if (retryCount < 5) { // Retry up to 5 times
-              setTimeout(() => fetchSource(retryCount + 1), 4000);
-            } else {
-              setScrapedGroups(prev => ({
-                ...prev,
-                [source.id]: {
-                  ...prev[source.id],
-                  results: [],
-                  loading: false,
-                  error: null // Hide the error so it doesn't annoy the user
-                }
-              }));
-            }
+      setScrapedGroups(prev => {
+        const existing = prev[source.id]?.results || [];
+        const existingIds = new Set(existing.map(r => r.id));
+        const uniqueNew = mappedResults.filter(r => !existingIds.has(r.id));
+        
+        return {
+          ...prev,
+          [source.id]: {
+            ...prev[source.id],
+            results: isLoadMore ? [...existing, ...uniqueNew] : mappedResults,
+            loading: false,
+            error: null,
+            page: page,
+            hasMore: results.length > 0
           }
         };
-        fetchSource();
       });
-    };
-    
+    } catch (err: any) {
+      console.error(`Search failed for source ${source.name}:`, err);
+      setScrapedGroups(prev => ({
+        ...prev,
+        [source.id]: {
+          ...prev[source.id],
+          loading: false,
+          error: null,
+          hasMore: false
+        }
+      }));
+    }
+  };
+
+  useEffect(() => {
+    if (!sources || !Array.isArray(sources) || sources.length === 0) return;
+
+    const activeSources = sources.filter(s => appMode === 'anime' ? s.type === 'anime' : s.type !== 'anime');
+    if (activeSources.length === 0) {
+      setScrapedGroups({});
+      return;
+    }
+
+    // Initialize groups
+    const initialGroups: typeof scrapedGroups = {};
+    activeSources.forEach((src) => {
+      if (!src) return;
+      initialGroups[src.id] = {
+        sourceName: src.name,
+        results: [],
+        loading: true,
+        error: null,
+        page: 1,
+        hasMore: true
+      };
+    });
+    setScrapedGroups(initialGroups);
+
     // debounce fetching
     const timer = setTimeout(() => {
-      fetchFromSources();
+      activeSources.forEach(source => fetchFromSource(source, 1));
     }, 500);
     
     return () => clearTimeout(timer);
-  }, [query, selectedCategory, selectedStatus, sources, bypassTrigger]);
+  }, [query, selectedCategory, selectedStatus, sources, bypassTrigger, appMode]);
+
+  const handleLoadMore = (source: ScraperSource) => {
+    const currentGroup = scrapedGroups[source.id];
+    if (currentGroup && !currentGroup.loading && currentGroup.hasMore) {
+      fetchFromSource(source, currentGroup.page + 1, true);
+    }
+  };
 
   const handleSelectScrapedItem = (item: any) => {
     const shell: Manhua = {
@@ -541,6 +568,28 @@ export default function SearchView({
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {group.hasMore && group.results.length > 0 && (
+                <div className="flex justify-center pt-6">
+                  <button
+                    onClick={() => handleLoadMore(source)}
+                    disabled={group.loading}
+                    className="px-6 py-2 bg-zinc-950 hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200 text-[10px] font-bold rounded-lg border border-zinc-800 transition-all flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {group.loading ? (
+                      <>
+                        <Loader2 className="w-3 h-3 animate-spin text-red-500" />
+                        <span>جاري التحميل...</span>
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="w-3 h-3 text-red-500" />
+                        <span>عرض المزيد من {source.name}</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               )}
             </div>

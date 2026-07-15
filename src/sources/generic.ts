@@ -611,13 +611,29 @@ export const genericSourceHandler: SourceHandler = {
         }
 
         if (rawImgUrl) {
-          const cleanUrl = normalizeUrl(rawImgUrl, baseUrl);
+          let cleanUrl = normalizeUrl(rawImgUrl, baseUrl);
           if (cleanUrl.startsWith('http') && 
               !cleanUrl.includes('logo') && 
               !cleanUrl.includes('avatar') && 
               !cleanUrl.endsWith('.gif') &&
               !cleanUrl.includes('banner') &&
-              !pages.some(p => p.url === cleanUrl)) {
+              !pages.some(p => p.url.split('#')[0] === cleanUrl.split('#')[0])) {
+            
+            if (source.type === 'anime') {
+              let text = $(el).text().trim();
+              if (!text && $(el).attr('title')) {
+                text = $(el).attr('title') || '';
+              }
+              if (!text) {
+                text = $(el).parent().text().trim();
+              }
+              // Clean up text
+              text = text.replace(/[\s\n]+/g, ' ').trim();
+              if (text && text.length > 0 && text.length < 40) {
+                cleanUrl = `${cleanUrl}#${encodeURIComponent(text)}`;
+              }
+            }
+
             pages.push({
               url: cleanUrl,
             });
@@ -633,7 +649,15 @@ export const genericSourceHandler: SourceHandler = {
 
     // 2. Self-healing fallback selectors if no pages found
     if (pages.length === 0) {
-      const fallbackSelectors = [
+      const fallbackSelectors = source.type === 'anime' ? [
+        { sel: 'iframe', attr: 'src' },
+        { sel: 'iframe', attr: 'data-src' },
+        { sel: '.server-list li a', attr: 'data-src' },
+        { sel: '.server-list li a', attr: 'data-ep-url' },
+        { sel: '.episodes-links li a', attr: 'data-src' },
+        { sel: '#episode-servers li a', attr: 'data-src' },
+        { sel: 'ul.servers li a', attr: 'data-src' }
+      ] : [
         { sel: '.page-break img', attr: 'src' },
         { sel: '.page-break img', attr: 'data-src' },
         { sel: '#readerarea img', attr: 'src' },

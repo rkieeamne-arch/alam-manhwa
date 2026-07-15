@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   ArrowRight, ChevronRight, ChevronLeft, ZoomIn, ZoomOut, 
-  Settings, MessageSquare, RefreshCw, Send, ThumbsUp, Layers, Eye, Loader2, X
+  Settings, MessageSquare, RefreshCw, Send, ThumbsUp, Layers, Eye, Loader2, X, Maximize2
 } from 'lucide-react';
 import { Manhua, Chapter, ReaderSettings, ManhuaComment, ReadingHistoryItem, ScraperSource } from '../types';
 import { mockComments } from '../data';
 import { scrapeChapterPages } from '../utils/scraper';
+import AnimePlayer from '../components/AnimePlayer';
 
 interface ReaderViewProps {
   manhua: Manhua;
@@ -17,6 +18,7 @@ interface ReaderViewProps {
   onAddHistory: (item: Omit<ReadingHistoryItem, 'id' | 'lastReadTime'>) => void;
   user: any;
   sources?: ScraperSource[];
+  appMode?: 'manga' | 'anime';
 }
 
 export default function ReaderView({
@@ -28,7 +30,8 @@ export default function ReaderView({
   onSelectChapter,
   onAddHistory,
   user,
-  sources = []
+  sources = [],
+  appMode = 'manga'
 }: ReaderViewProps) {
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [comments, setComments] = useState<ManhuaComment[]>([]);
@@ -45,13 +48,15 @@ export default function ReaderView({
   });
 
   // Dynamic scraped pages state
-  const [scrapedPages, setScrapedPages] = useState<string[]>([]);
+  const [scrapedPages, setScrapedPages] = useState<(string | Blob)[]>([]);
   const [loadingPages, setLoadingPages] = useState(false);
   const [pagesError, setPagesError] = useState<string | null>(null);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const isScrapedChapter = chapter.id.startsWith('ch-');
+  const chapterSource = sources?.find(s => chapter.id.startsWith(`ch-${s.id}-`));
+  const isAnime = appMode === 'anime' || chapterSource?.type === 'anime';
 
   // Load scraped pages
   useEffect(() => {
@@ -77,7 +82,7 @@ export default function ReaderView({
         }
 
         const pagesUrl = chapter.pages[0]; // stored raw URL
-        const pages = await scrapeChapterPages(source, pagesUrl);
+        const pages = await scrapeChapterPages(source, pagesUrl as string);
         if (pages.length === 0) {
           throw new Error('فشل جلب الصفحات المصورة. قد تكون الصور محمية خلف جدار ناري أو نظام عرض تفاعلي خاص.');
         }
@@ -94,7 +99,13 @@ export default function ReaderView({
     fetchPages();
   }, [chapter.id, isScrapedChapter, sources]);
 
-  const displayPages = isScrapedChapter ? scrapedPages : chapter.pages;
+  const displayPages = isScrapedChapter ? scrapedPages : (chapter.pages || []);
+
+  const getAnimeServerName = (page: any, idx: number) => {
+    if (typeof page !== 'string') return `سيرفر محمل ${idx + 1}`;
+    const [, name] = page.split('#');
+    return decodeURIComponent(name || `سيرفر ${idx + 1}`);
+  };
 
   // Sync scrolling progress in Webtoon continuous scrolling mode
   useEffect(() => {
@@ -124,15 +135,16 @@ export default function ReaderView({
       const nextIndices = [currentPageIndex + 1, currentPageIndex + 2];
       nextIndices.forEach(idx => {
         if (idx < displayPages.length) {
+          const page = displayPages[idx];
           const img = new Image();
-          img.src = displayPages[idx];
+          img.src = typeof page === 'string' ? page : URL.createObjectURL(page);
         }
       });
     } else {
       // Preload first 5 images in Webtoon mode
-      displayPages.slice(0, 5).forEach(url => {
+      displayPages.slice(0, 5).forEach(page => {
         const img = new Image();
-        img.src = url;
+        img.src = typeof page === 'string' ? page : URL.createObjectURL(page);
       });
     }
   }, [currentPageIndex, displayPages, readerSettings.readingMode]);
@@ -480,7 +492,7 @@ export default function ReaderView({
                 setPagesError(null);
                 const source = sources.find(s => chapter.id.startsWith(`ch-${s.id}-`));
                 if (source) {
-                  scrapeChapterPages(source, chapter.pages[0])
+                  scrapeChapterPages(source, chapter.pages[0] as string)
                     .then(pages => {
                       setScrapedPages(pages);
                       setCurrentPageIndex(0);
@@ -498,97 +510,136 @@ export default function ReaderView({
           </div>
         )}
 
-        {/* WEBTOON MODE (Continuous Scrolling of pages - Zero border, fully immersive width) */}
-        {!loadingPages && !pagesError && readerSettings.readingMode === 'webtoon' && (
-          <div className="w-full space-y-0">
-            {displayPages.map((pageUrl, idx) => (
-              <div key={idx} className="relative w-full overflow-hidden bg-black flex justify-center">
-                <img
-                  src={pageUrl || undefined}
-                  alt={`صفحة ${idx + 1}`}
-                  className="w-full max-w-full md:max-w-2xl lg:max-w-3xl xl:max-w-4xl h-auto object-contain block mx-auto"
-                  loading="lazy"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-            ))}
-          </div>
-        )}
+        {/* MAIN CONTENT AREA */}
+        {!loadingPages && !pagesError && (
+          isAnime ? (
+            <div className="w-full py-10 flex flex-col items-center gap-8">
+              {displayPages.length > 0 ? (
+                <div className="w-full flex flex-col items-center gap-6">
+                  <AnimePlayer url={typeof displayPages[currentPageIndex] === 'string' ? displayPages[currentPageIndex] : URL.createObjectURL(displayPages[currentPageIndex])} />
+                  
+                  {/* Small tip alert */}
+                  <div className="w-full max-w-5xl bg-zinc-900/50 border border-zinc-800/80 rounded-xl py-3 px-4 flex items-center justify-center gap-2 text-zinc-400">
+                    <span className="text-red-500 font-bold">💡 تنبيه:</span>
+                    <span className="text-xs">إذا لم يشتغل السيرفر الأول، يرجى تجربة السيرفرات الأخرى المتاحة بالأسفل.</span>
+                  </div>
 
-        {/* VERTICAL MODE (Single page, page controls) */}
-        {!loadingPages && !pagesError && readerSettings.readingMode === 'vertical' && displayPages.length > 0 && (
-          <div className="w-full flex flex-col items-center space-y-4">
-            <div className="relative w-full max-w-3xl mx-auto overflow-hidden bg-black/10 flex justify-center">
-              <img
-                src={displayPages[currentPageIndex] || undefined}
-                alt={`الصفحة ${currentPageIndex + 1}`}
-                className="w-full h-auto object-contain mx-auto max-h-[90vh]"
-                referrerPolicy="no-referrer"
-              />
-              <div className="absolute top-2 left-2 px-2.5 py-1 bg-black/85 rounded-lg text-xs font-bold text-red-500 border border-zinc-800 shadow-md">
-                صفحة {currentPageIndex + 1} / {displayPages.length}
-              </div>
+                  {displayPages.length > 1 && (
+                    <div className="flex flex-wrap justify-center gap-2 max-w-4xl px-4">
+                      {displayPages.map((page, idx) => {
+                        const decodedName = getAnimeServerName(page, idx);
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => setCurrentPageIndex(idx)}
+                            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all border ${
+                              currentPageIndex === idx 
+                                ? 'bg-red-600 text-white border-red-500 shadow-lg shadow-red-600/20' 
+                                : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-700'
+                            }`}
+                          >
+                            {decodedName}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-20 text-zinc-500">
+                  <RefreshCw className="w-12 h-12 mx-auto mb-4 animate-pulse opacity-20" />
+                  <p>عذراً، لم نتمكن من جلب سيرفرات المشاهدة لهذا العمل.</p>
+                </div>
+              )}
             </div>
+          ) : (
+            <>
+              {/* WEBTOON MODE */}
+              {readerSettings.readingMode === 'webtoon' && (
+                <div className="w-full space-y-0">
+                  {displayPages.map((pageUrl, idx) => (
+                    <div key={idx} className="relative w-full overflow-hidden bg-black flex justify-center">
+                      <img
+                        src={pageUrl || undefined}
+                        alt={`صفحة ${idx + 1}`}
+                        className="w-full max-w-full md:max-w-2xl lg:max-w-3xl xl:max-w-4xl h-auto object-contain block mx-auto"
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
 
-            {/* Paging Buttons */}
-            <div className="flex items-center gap-3 w-full max-w-md px-4 pt-3">
-              <button
-                onClick={handlePrevPage}
-                className="flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all text-white active:scale-95 cursor-pointer bg-red-600 hover:bg-red-700 shadow-md"
-                id="page-prev-btn"
-              >
-                <ChevronRight className="w-4 h-4" />
-                <span>الصفحة السابقة</span>
-              </button>
-              
-              <button
-                onClick={handleNextPage}
-                className="flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all text-white active:scale-95 cursor-pointer bg-red-600 hover:bg-red-700 shadow-md"
-                id="page-next-btn"
-              >
-                <span>الصفحة التالية</span>
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
+              {/* VERTICAL MODE */}
+              {readerSettings.readingMode === 'vertical' && displayPages.length > 0 && (
+                <div className="w-full flex flex-col items-center space-y-4">
+                  <div className="relative w-full max-w-3xl mx-auto overflow-hidden bg-black/10 flex justify-center">
+                    <img
+                      src={displayPages[currentPageIndex] || undefined}
+                      alt={`الصفحة ${currentPageIndex + 1}`}
+                      className="w-full h-auto object-contain mx-auto max-h-[90vh]"
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="absolute top-2 left-2 px-2.5 py-1 bg-black/85 rounded-lg text-xs font-bold text-red-500 border border-zinc-800 shadow-md">
+                      صفحة {currentPageIndex + 1} / {displayPages.length}
+                    </div>
+                  </div>
 
-        {/* HORIZONTAL MODE (Single page, RTL book flips) */}
-        {!loadingPages && !pagesError && readerSettings.readingMode === 'horizontal' && displayPages.length > 0 && (
-          <div className="w-full flex flex-col items-center space-y-4">
-            <div className="relative w-full max-w-3xl mx-auto overflow-hidden bg-black/10 flex justify-center">
-              <img
-                src={displayPages[currentPageIndex] || undefined}
-                alt={`الصفحة ${currentPageIndex + 1}`}
-                className="w-full h-auto object-contain mx-auto max-h-[90vh]"
-                referrerPolicy="no-referrer"
-              />
-              <div className="absolute top-2 left-2 px-2.5 py-1 bg-black/85 rounded-lg text-xs font-bold text-red-500 border border-zinc-800 shadow-md">
-                صفحة {currentPageIndex + 1} / {displayPages.length}
-              </div>
-            </div>
+                  <div className="flex items-center gap-3 w-full max-w-md px-4 pt-3">
+                    <button
+                      onClick={handlePrevPage}
+                      className="flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all text-white active:scale-95 cursor-pointer bg-red-600 hover:bg-red-700 shadow-md"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                      <span>الصفحة السابقة</span>
+                    </button>
+                    <button
+                      onClick={handleNextPage}
+                      className="flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all text-white active:scale-95 cursor-pointer bg-red-600 hover:bg-red-700 shadow-md"
+                    >
+                      <span>الصفحة التالية</span>
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
 
-            {/* Paging Buttons */}
-            <div className="flex items-center gap-3 w-full max-w-md px-4 pt-3">
-              <button
-                onClick={handleNextPage} // forward RTL
-                className="flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all text-white active:scale-95 cursor-pointer bg-red-600 hover:bg-red-700 shadow-md"
-                id="horiz-prev-btn"
-              >
-                <ChevronRight className="w-4 h-4" />
-                <span>الصفحة التالية</span>
-              </button>
-              
-              <button
-                onClick={handlePrevPage} // backward RTL
-                className="flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all text-white active:scale-95 cursor-pointer bg-red-600 hover:bg-red-700 shadow-md"
-                id="horiz-next-btn"
-              >
-                <span>الصفحة السابقة</span>
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
+              {/* HORIZONTAL MODE */}
+              {readerSettings.readingMode === 'horizontal' && displayPages.length > 0 && (
+                <div className="w-full flex flex-col items-center space-y-4">
+                  <div className="relative w-full max-w-3xl mx-auto overflow-hidden bg-black/10 flex justify-center">
+                    <img
+                      src={displayPages[currentPageIndex] || undefined}
+                      alt={`الصفحة ${currentPageIndex + 1}`}
+                      className="w-full h-auto object-contain mx-auto max-h-[90vh]"
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="absolute top-2 left-2 px-2.5 py-1 bg-black/85 rounded-lg text-xs font-bold text-red-500 border border-zinc-800 shadow-md">
+                      صفحة {currentPageIndex + 1} / {displayPages.length}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 w-full max-w-md px-4 pt-3">
+                    <button
+                      onClick={handleNextPage}
+                      className="flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all text-white active:scale-95 cursor-pointer bg-red-600 hover:bg-red-700 shadow-md"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                      <span>الصفحة التالية</span>
+                    </button>
+                    <button
+                      onClick={handlePrevPage}
+                      className="flex-1 py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all text-white active:scale-95 cursor-pointer bg-red-600 hover:bg-red-700 shadow-md"
+                    >
+                      <span>الصفحة السابقة</span>
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )
         )}
       </div>
 

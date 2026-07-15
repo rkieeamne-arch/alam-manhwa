@@ -21,7 +21,7 @@ export interface OfflineChapter {
   manhuaId: string;
   title: string;
   chapterNumber: number;
-  pages: string[]; // Base64 data strings representing downloaded pages
+  pages: (string | Blob)[]; // Support both base64 strings and direct Blobs
   downloadedAt: number;
 }
 
@@ -200,11 +200,36 @@ export async function deleteManhuaOffline(manhuaId: string): Promise<void> {
   });
 }
 
+// Fetch a URL and return as Blob for offline storage
+export async function fetchAsBlob(url: string): Promise<Blob> {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+  return await response.blob();
+}
+
 // Convert any image URL (proxied) to base64 data string
 export async function convertUrlToBase64(url: string): Promise<string> {
+  if (!url || url.startsWith('data:')) return url;
+  
   try {
+    // Check if the URL looks like it might be an iframe/stream instead of an image
+    // If it's an anime stream URL, we probably shouldn't try to download it as a blob
+    if (url.includes('embed') || url.includes('player') || url.includes('.m3u8') || url.includes('google.com/e/')) {
+       return url;
+    }
+
     const response = await fetch(url);
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    if (!response.ok) {
+       console.warn(`[OfflineDb] Could not fetch ${url} for conversion: ${response.status}`);
+       return url;
+    }
+    
+    const contentType = response.headers.get('content-type');
+    if (contentType && !contentType.includes('image')) {
+        // Not an image, just return URL
+        return url;
+    }
+
     const blob = await response.blob();
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -213,8 +238,8 @@ export async function convertUrlToBase64(url: string): Promise<string> {
       reader.readAsDataURL(blob);
     });
   } catch (err) {
-    console.error('Error converting URL to Base64:', url, err);
-    // If conversion fails (due to network or CORS), return the original URL as a fallback
+    // console.error is too noisy here for transient network errors, just return original URL as fallback
+    console.debug('Error converting URL to Base64 (falling back to original URL):', url);
     return url;
   }
 }

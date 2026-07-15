@@ -205,14 +205,23 @@ async function startServer() {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`[Proxy] Response not OK from ${targetUrl}: ${response.status} ${response.statusText}. Body: ${errorText.substring(0, 500)}`);
+        
+        // Don't log 403 as an error if we are likely to proxy it
+        if (response.status !== 403) {
+            console.error(`[Proxy] Response not OK from ${targetUrl}: ${response.status} ${response.statusText}. Body: ${errorText.substring(0, 500)}`);
+        }
         
         // If the upstream site returns an error status (like 500) but still sends HTML content,
         // we can still proxy it so the scraper has a chance to parse chapters/pages from it!
         const contentType = response.headers.get('content-type') || '';
         const isHtml = contentType.includes('text/html') || errorText.trim().startsWith('<');
         if (response.status !== 404 && isHtml && errorText.length > 300) {
-          console.log(`[Proxy] Upstream returned error status ${response.status} but sent valid HTML body. Proxying anyway...`);
+          // If 403, just log as info to avoid triggering error alerts
+          if (response.status === 403) {
+            console.log(`[Proxy] Upstream returned 403, but body is valid HTML. Proxying...`);
+          } else {
+            console.warn(`[Proxy] Upstream returned error status ${response.status} but sent valid HTML body. Proxying anyway...`);
+          }
           res.setHeader('Content-Type', 'text/html; charset=utf-8');
           return res.send(errorText);
         }
@@ -222,13 +231,11 @@ async function startServer() {
         });
       }
 
-      // Check if the response is an image or document
+      // Check if the response is an image, video, or generic binary data
       const contentType = response.headers.get('content-type') || '';
       
-      if (contentType.includes('image')) {
-        // If it is an image, we can pipe or proxy the buffer directly!
-        // This is extremely critical because external manga sites often block images if requested from raw external HTML.
-        // Proxying the image bytes via our backend with the correct Referer is a 100% bulletproof solution for hotlinked pages!
+      if (contentType.includes('image') || contentType.includes('video') || contentType.includes('application/octet-stream')) {
+        // Pipe binary content directly
         const arrayBuffer = await response.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
         res.setHeader('Content-Type', contentType);

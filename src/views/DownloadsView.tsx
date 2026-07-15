@@ -256,7 +256,7 @@ export default function DownloadsView({
                                   {ch.title}
                                 </h4>
                                 <span className="text-[9px] text-zinc-500 font-mono">
-                                  سعة التحميل: {ch.pages.length} صورة متوفرة
+                                  {ch.pages.some(p => p instanceof Blob) ? 'محتوى فيديو (جاهز للمشاهدة بدون نت)' : `سعة التحميل: ${ch.pages.length} صورة متوفرة`}
                                 </span>
                               </div>
                             </div>

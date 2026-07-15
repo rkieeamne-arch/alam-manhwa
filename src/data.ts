@@ -360,7 +360,8 @@ export const defaultScraperSources: ScraperSource[] = [
     detailChapterTitleSelector: 'span.font-medium, span',
     
     pageImgSelector: 'img[data-reader-page-image]',
-    pageImgAttr: 'src'
+    pageImgAttr: 'src',
+    type: 'manga'
   },
   {
     id: 'despair',
@@ -385,7 +386,8 @@ export const defaultScraperSources: ScraperSource[] = [
     detailChapterTitleSelector: 'a',
     
     pageImgSelector: '.page-break img, .wp-manga-chapter-img img, div.reading-content img',
-    pageImgAttr: 'src'
+    pageImgAttr: 'src',
+    type: 'manga'
   },
   {
     id: 'rocksmanga',
@@ -412,7 +414,8 @@ export const defaultScraperSources: ScraperSource[] = [
     detailChapterTitleSelector: 'zebi',
     
     pageImgSelector: 'img.preload-image, div.page img, .page-break img, .wp-manga-chapter-img img, div.reading-content img',
-    pageImgAttr: 'data-src'
+    pageImgAttr: 'data-src',
+    type: 'manga'
   },
   {
     id: 'mangatuk',
@@ -438,6 +441,32 @@ export const defaultScraperSources: ScraperSource[] = [
     detailChapterTitleSelector: 'span',
     
     pageImgSelector: 'img',
-    pageImgAttr: 'src'
+    pageImgAttr: 'src',
+    type: 'manga'
+  },
+  {
+    id: 'witanime',
+    name: 'وايت أنمي (WitAnime)',
+    baseUrl: 'https://witanime.cam',
+    type: 'anime',
+    lang: 'ar',
+    popularPath: '/',
+    listCardSelector: '.anime-card-container',
+    listTitleSelector: '.anime-card-title',
+    listLinkSelector: 'a',
+    listCoverSelector: 'img',
+    listCoverAttr: 'src',
+    detailTitleSelector: 'h1',
+    detailDescSelector: '.anime-story',
+    detailAuthorSelector: 'unknown',
+    detailArtistSelector: 'unknown',
+    detailStatusSelector: 'unknown',
+    detailGenreSelector: 'unknown',
+    detailChapterItemSelector: 'a[href*="/episode/"]',
+    detailChapterLinkSelector: 'a',
+    detailChapterTitleSelector: 'span',
+    pageImgSelector: 'iframe',
+    pageImgAttr: 'src',
+    type: 'anime'
   }
 ];

@@ -66,15 +66,35 @@ export async function scrapeMangaList(source: ScraperSource, page: number = 1, q
 }
 
 function extractChapterNumber(title: string, index: number, totalChapters: number): number {
-  const match = title.match(/(?:الفصل|Chapter)\s*([\d.]+)/i);
+  if (!title) return index + 1;
+
+  // 1. Try matching with explicit keywords (الفصل, الحلقة, Chapter, Episode, etc.)
+  const match = title.match(/(?:الفصل|Chapter|الحلقة|Episode|OVA|Special|الاوفا|الخاصة|ch\.|ep\.|ch|ep)[^\d]*([\d.]+)/i);
   if (match) {
     return parseFloat(match[1]);
   }
-  const numMatch = title.match(/^[\d.]+$/);
-  if (numMatch) {
-     return parseFloat(numMatch[0]);
+
+  // 2. Try matching with hyphen/hash/colon separators followed by number, e.g., "- 6" or "#6" or ": 6"
+  const sepMatch = title.match(/(?:-|\s|#|:)\s*([\d.]+)(?:\s|$)/);
+  if (sepMatch) {
+    const num = parseFloat(sepMatch[1]);
+    if (!isNaN(num)) return num;
   }
-  return totalChapters - index; 
+
+  // 3. Extract all numbers from the title to find the most likely chapter/episode number.
+  // Season/year numbers like "4th", "2026", "3" usually come first, and the episode/chapter number comes last.
+  // E.g., "Re:Zero 4th Season - 06" -> numbers are [4, 6]. The last one is 6!
+  // E.g., "Solo Leveling Season 2 Chapter 150" -> numbers are [2, 150]. The last one is 150!
+  const numbers = title.match(/[\d.]+/g);
+  if (numbers && numbers.length > 0) {
+    const lastNum = parseFloat(numbers[numbers.length - 1]);
+    if (!isNaN(lastNum)) {
+      return lastNum;
+    }
+  }
+
+  // 4. Default fallback: use a standard index offset
+  return index + 1;
 }
 
 export async function scrapeMangaDetails(source: ScraperSource, mangaUrl: string): Promise<Manhua> {
@@ -182,6 +202,12 @@ export async function scrapeChapterPages(source: ScraperSource, chapterUrl: stri
     }
     
     const pages = await handler.parseChapterPages(chapterUrl, source);
+    
+    // For anime, we don't want to proxy the server URLs because they are often iframes 
+    // that need to load their own assets and scripts correctly.
+    if (source.type === 'anime') {
+      return pages.map(p => p.url);
+    }
     
     return pages.map(p => getProxiedUrl(p.url));
   } catch (err: any) {

@@ -6,7 +6,7 @@ export interface Chapter {
   title: string;
   chapterNumber: number;
   releaseDate: string;
-  pages: string[];
+  pages: (string | Blob)[];
   views: number;
   isLocked?: boolean;
 }
@@ -27,6 +27,7 @@ export interface Manhua {
   releaseYear: number;
   isFeatured?: boolean;
   isTrending?: boolean;
+  type?: 'manga' | 'anime';
   chapters: Chapter[];
   latestChapter?: string;
   sourceUrl?: string;
@@ -98,6 +99,7 @@ export interface ScraperSource {
   popularPath: string;
   lang?: string;
   icon?: string;
+  type?: 'manga' | 'anime'; // Added
   
   // 1. CSS Selectors for list page
   listCardSelector: string;

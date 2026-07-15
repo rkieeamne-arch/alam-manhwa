@@ -39,6 +39,7 @@ export default function App() {
   // Dynamic Scraper Sources State
   const [sources, setSources] = useState<ScraperSource[]>(() => {
     const saved = localStorage.getItem('manhua_scraper_sources');
+    let sourcesToUse = defaultScraperSources;
     if (saved) {
       try {
         const parsed = JSON.parse(saved) as ScraperSource[];
@@ -47,16 +48,24 @@ export default function App() {
         // Ensure new defaults are added if missing
         const finalSources = [...filtered];
         defaultScraperSources.forEach(defSource => {
-          if (!finalSources.some(s => s.id === defSource.id)) {
+          const index = finalSources.findIndex(s => s.id === defSource.id);
+          if (index === -1) {
             finalSources.push(defSource);
+          } else {
+            // Force update existing default sources to get new baseUrl/type/selectors/etc
+            finalSources[index] = { ...finalSources[index], ...defSource };
           }
         });
-        return finalSources.length > 0 ? finalSources : defaultScraperSources;
+        sourcesToUse = finalSources.length > 0 ? finalSources : defaultScraperSources;
       } catch (e) {
         // Fallback
       }
     }
-    return defaultScraperSources;
+    // Ensure 'type' is present for all sources
+    return sourcesToUse.map(s => ({
+        ...s,
+        type: s.type || (s.id === 'witanime' ? 'anime' : 'manga')
+    }));
   });
 
   // Scraped Manhua caching mechanism to support seamless reader navigation on dynamic chapters
@@ -150,6 +159,25 @@ export default function App() {
     setHomeLayout(next);
     localStorage.setItem('homeLayout', next);
   };
+
+  // App Mode State (manga vs anime)
+  const [appMode, setAppMode] = useState<'manga' | 'anime'>(() => {
+    return (localStorage.getItem('appMode') as any) || 'manga';
+  });
+
+  const handleToggleAppMode = () => {
+    const next = appMode === 'manga' ? 'anime' : 'manga';
+    setAppMode(next);
+    localStorage.setItem('appMode', next);
+  };
+
+  useEffect(() => {
+    if (appMode === 'anime') {
+      document.body.style.setProperty('--primary-color', '#f59e0b');
+    } else {
+      document.body.style.setProperty('--primary-color', '#ef4444');
+    }
+  }, [appMode]);
 
   // Parse URL query params on initial mount
   useEffect(() => {
@@ -488,6 +516,9 @@ export default function App() {
     setSources(defaultScraperSources);
   };
 
+  // Filter sources based on appMode
+  const filteredSources = sources.filter((s) => s.type === appMode);
+
   return (
     <div className={`min-h-screen bg-zinc-950 text-zinc-100 flex flex-col justify-between ${currentView !== 'reader' && homeLayout === 'modern' ? 'pb-20 md:pb-0' : ''}`}>
       
@@ -500,6 +531,8 @@ export default function App() {
           currentView={currentView}
           onSearch={handleSearchTrigger}
           homeLayout={homeLayout}
+          appMode={appMode}
+          onToggleAppMode={handleToggleAppMode}
         />
       )}
 
@@ -529,7 +562,7 @@ export default function App() {
             onSelectManhua={handleSelectManhua}
             onSelectChapter={handleSelectChapter}
             onSelectCategory={handleSelectCategory}
-            sources={sources}
+            sources={filteredSources}
             onAddSource={handleAddSource}
             onDeleteSource={handleDeleteSource}
             user={user}
@@ -539,6 +572,8 @@ export default function App() {
             onNavigate={handleNavigate}
             homeLayout={homeLayout}
             onToggleLayout={handleToggleLayout}
+            appMode={appMode}
+            onToggleAppMode={handleToggleAppMode}
           />
         )}
 
@@ -576,6 +611,7 @@ export default function App() {
             onAddHistory={handleAddHistory}
             user={user}
             sources={sources}
+            appMode={appMode}
           />
         )}
 
@@ -585,12 +621,13 @@ export default function App() {
             initialQuery={searchQuery}
             initialCategory={searchCategory}
             onSelectManhua={handleSelectManhua}
-            sources={sources}
+            sources={filteredSources}
             user={user}
             readingList={readingList}
             onAddToList={handleAddToList}
             onRemoveFromList={handleRemoveFromList}
             onNavigate={handleNavigate}
+            appMode={appMode}
           />
         )}
 
@@ -654,11 +691,18 @@ export default function App() {
         <footer className="border-t border-zinc-900 bg-zinc-950 py-6 text-center text-xs text-zinc-500">
           <div className="max-w-7xl mx-auto px-4 space-y-2">
             <p className="font-display font-bold text-zinc-400 text-sm">
-              عالم المانهو •
+              {appMode === 'anime' ? (
+                <>عالم <span className="text-amber-500">الأنمي</span> •</>
+              ) : (
+                <>عالم <span className="text-rose-500">المانهو</span> •</>
+              )}
             </p>
             <p className="font-sans">
-              منصة تجمع عشاق المانهو والمانجا في تجربة قراءة مريحة وممتعة.
-              جميع الحقوق محفوظة © 2026.
+              {appMode === 'anime' ? (
+                <>منصة تجمع عشاق الأنمي في تجربة مشاهدة مريحة وممتعة لآخر الحلقات المترجمة. جميع الحقوق محفوظة © 2026.</>
+              ) : (
+                <>منصة تجمع عشاق المانهو والمانجا في تجربة قراءة مريحة وممتعة. جميع الحقوق محفوظة © 2026.</>
+              )}
             </p>
           </div>
         </footer>
@@ -682,13 +726,17 @@ export default function App() {
             >
               <div className={`w-11 h-7.5 rounded-full flex items-center justify-center transition-all duration-300 ${
                 currentView === 'home'
-                  ? 'bg-rose-600/90 text-white shadow-lg shadow-rose-600/20'
+                  ? appMode === 'anime' 
+                    ? 'bg-amber-500 text-zinc-950 shadow-lg shadow-amber-500/20' 
+                    : 'bg-rose-600/90 text-white shadow-lg shadow-rose-600/20'
                   : 'text-zinc-500 group-hover:text-zinc-300'
               }`}>
                 <Home className="w-4.5 h-4.5" />
               </div>
               <span className={`text-[9px] font-bold mt-1 transition-colors duration-300 ${
-                currentView === 'home' ? 'text-rose-500' : 'text-zinc-500'
+                currentView === 'home' 
+                  ? appMode === 'anime' ? 'text-amber-500' : 'text-rose-500' 
+                  : 'text-zinc-500'
               }`}>
                 الرئيسية
               </span>
@@ -702,15 +750,19 @@ export default function App() {
             >
               <div className={`w-11 h-7.5 rounded-full flex items-center justify-center transition-all duration-300 ${
                 currentView === 'search'
-                  ? 'bg-rose-600/90 text-white shadow-lg shadow-rose-600/20'
+                  ? appMode === 'anime' 
+                    ? 'bg-amber-500 text-zinc-950 shadow-lg shadow-amber-500/20' 
+                    : 'bg-rose-600/90 text-white shadow-lg shadow-rose-600/20'
                   : 'text-zinc-500 group-hover:text-zinc-300'
               }`}>
                 <Search className="w-4.5 h-4.5" />
               </div>
               <span className={`text-[9px] font-bold mt-1 transition-colors duration-300 ${
-                currentView === 'search' ? 'text-rose-500' : 'text-zinc-500'
+                currentView === 'search' 
+                  ? appMode === 'anime' ? 'text-amber-500' : 'text-rose-500' 
+                  : 'text-zinc-500'
               }`}>
-                المانهو
+                {appMode === 'anime' ? 'الأنمي' : 'المانهو'}
               </span>
             </button>
 
@@ -722,15 +774,19 @@ export default function App() {
             >
               <div className={`w-11 h-7.5 rounded-full flex items-center justify-center transition-all duration-300 ${
                 currentView === 'history'
-                  ? 'bg-rose-600/90 text-white shadow-lg shadow-rose-600/20'
+                  ? appMode === 'anime' 
+                    ? 'bg-amber-500 text-zinc-950 shadow-lg shadow-amber-500/20' 
+                    : 'bg-rose-600/90 text-white shadow-lg shadow-rose-600/20'
                   : 'text-zinc-500 group-hover:text-zinc-300'
               }`}>
                 <History className="w-4.5 h-4.5" />
               </div>
               <span className={`text-[9px] font-bold mt-1 transition-colors duration-300 ${
-                currentView === 'history' ? 'text-rose-500' : 'text-zinc-500'
+                currentView === 'history' 
+                  ? appMode === 'anime' ? 'text-amber-500' : 'text-rose-500' 
+                  : 'text-zinc-500'
               }`}>
-                السجل
+                {appMode === 'anime' ? 'سجل المشاهدة' : 'السجل'}
               </span>
             </button>
 
@@ -742,13 +798,17 @@ export default function App() {
             >
               <div className={`w-11 h-7.5 rounded-full flex items-center justify-center transition-all duration-300 ${
                 currentView === 'mylists'
-                  ? 'bg-rose-600/90 text-white shadow-lg shadow-rose-600/20'
+                  ? appMode === 'anime' 
+                    ? 'bg-amber-500 text-zinc-950 shadow-lg shadow-amber-500/20' 
+                    : 'bg-rose-600/90 text-white shadow-lg shadow-rose-600/20'
                   : 'text-zinc-500 group-hover:text-zinc-300'
               }`}>
                 <Heart className="w-4.5 h-4.5" />
               </div>
               <span className={`text-[9px] font-bold mt-1 transition-colors duration-300 ${
-                currentView === 'mylists' ? 'text-rose-500' : 'text-zinc-500'
+                currentView === 'mylists' 
+                  ? appMode === 'anime' ? 'text-amber-500' : 'text-rose-500' 
+                  : 'text-zinc-500'
               }`}>
                 قائمتي
               </span>
@@ -762,15 +822,19 @@ export default function App() {
             >
               <div className={`w-11 h-7.5 rounded-full flex items-center justify-center transition-all duration-300 ${
                 currentView === 'downloads'
-                  ? 'bg-rose-600/90 text-white shadow-lg shadow-rose-600/20'
+                  ? appMode === 'anime' 
+                    ? 'bg-amber-500 text-zinc-950 shadow-lg shadow-amber-500/20' 
+                    : 'bg-rose-600/90 text-white shadow-lg shadow-rose-600/20'
                   : 'text-zinc-500 group-hover:text-zinc-300'
               }`}>
                 <FolderDown className="w-4.5 h-4.5" />
               </div>
               <span className={`text-[9px] font-bold mt-1 transition-colors duration-300 ${
-                currentView === 'downloads' ? 'text-rose-500' : 'text-zinc-500'
+                currentView === 'downloads' 
+                  ? appMode === 'anime' ? 'text-amber-500' : 'text-rose-500' 
+                  : 'text-zinc-500'
               }`}>
-                تحميل
+                {appMode === 'anime' ? 'التحميل' : 'تحميل'}
               </span>
             </button>
 
@@ -782,13 +846,17 @@ export default function App() {
             >
               <div className={`w-11 h-7.5 rounded-full flex items-center justify-center transition-all duration-300 ${
                 currentView === 'account'
-                  ? 'bg-rose-600/90 text-white shadow-lg shadow-rose-600/20'
+                  ? appMode === 'anime' 
+                    ? 'bg-amber-500 text-zinc-950 shadow-lg shadow-amber-500/20' 
+                    : 'bg-rose-600/90 text-white shadow-lg shadow-rose-600/20'
                   : 'text-zinc-500 group-hover:text-zinc-300'
               }`}>
                 <User className="w-4.5 h-4.5" />
               </div>
               <span className={`text-[9px] font-bold mt-1 transition-colors duration-300 ${
-                currentView === 'account' ? 'text-rose-500' : 'text-zinc-500'
+                currentView === 'account' 
+                  ? appMode === 'anime' ? 'text-amber-500' : 'text-rose-500' 
+                  : 'text-zinc-500'
               }`}>
                 حسابي
               </span>
