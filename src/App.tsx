@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { mockManhuas, defaultScraperSources } from './data';
 import { UserProfile, ReadingHistoryItem, ReaderSettings, Manhua, Chapter, ScraperSource, ReadingListItem } from './types';
 import { updateUserProfile, fetchUserReadingHistory, saveUserReadingHistory, deleteUserHistoryItem, clearUserReadingHistory, fetchUserReadingList, addManhuaToReadingList, removeManhuaFromReadingList } from './lib/firebaseDb';
@@ -64,7 +64,7 @@ export default function App() {
     // Ensure 'type' is present for all sources
     return sourcesToUse.map(s => ({
         ...s,
-        type: s.type || (s.id === 'witanime' ? 'anime' : 'manga')
+        type: s.id === 'witanime' ? 'anime' : (s.type || 'manga')
     }));
   });
 
@@ -517,7 +517,9 @@ export default function App() {
   };
 
   // Filter sources based on appMode
-  const filteredSources = sources.filter((s) => s.type === appMode);
+  const filteredSources = useMemo(() => {
+    return sources.filter((s) => s.type === appMode);
+  }, [sources, appMode]);
 
   return (
     <div className={`min-h-screen bg-zinc-950 text-zinc-100 flex flex-col justify-between ${currentView !== 'reader' && homeLayout === 'modern' ? 'pb-20 md:pb-0' : ''}`}>

@@ -223,7 +223,7 @@ export default function HomeView({
   // تشغيل الجلب عند فتح الصفحة أو تغير المصادر
   useEffect(() => {
     handleFetchAllSources(1);
-  }, [sources]);
+  }, [sources, appMode]);
 
   // إعادة الجلب تلقائياً بمجرد إدخال الكوكيز وتخطي الكابتشا
   useEffect(() => {
@@ -234,7 +234,7 @@ export default function HomeView({
     return () => {
       window.removeEventListener('bypass-saved', handleBypassSaved);
     };
-  }, [sources]);
+  }, [sources, appMode]);
 
   // Combine filtered local manhuas and scraped manhuas for the display list
   const filteredLocalManhuas = manhuas.filter(m => {

@@ -466,7 +466,6 @@ export const defaultScraperSources: ScraperSource[] = [
     detailChapterLinkSelector: 'a',
     detailChapterTitleSelector: 'span',
     pageImgSelector: 'iframe',
-    pageImgAttr: 'src',
-    type: 'anime'
+    pageImgAttr: 'src'
   }
 ];
