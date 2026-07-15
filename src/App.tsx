@@ -21,10 +21,13 @@ import HistoryView from './views/HistoryView';
 import AdminView from './views/AdminView';
 import MyListView from './views/MyListView';
 import DownloadsView from './views/DownloadsView';
+import AnimeDetailsView from './views/AnimeDetailsView';
+import AnimePlayerView from './views/AnimePlayerView';
+
 
 export default function App() {
   // Navigation Router state
-  const [currentView, setCurrentView] = useState<'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'admin' | 'mylists' | 'downloads'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'admin' | 'mylists' | 'downloads' | 'anime-details' | 'anime-player'>('home');
   const [selectedManhuaId, setSelectedManhuaId] = useState<string | null>(null);
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
   
@@ -561,7 +564,15 @@ export default function App() {
         {currentView === 'home' && (
           <HomeView 
             manhuas={manhuas}
-            onSelectManhua={handleSelectManhua}
+            onSelectManhua={(id, optionalMangaShell) => {
+              if (appMode === 'anime' && optionalMangaShell) {
+                // Navigate to anime details
+                setSelectedManhuaId(optionalMangaShell.sourceUrl || '');
+                setCurrentView('anime-details');
+              } else {
+                handleSelectManhua(id, optionalMangaShell);
+              }
+            }}
             onSelectChapter={handleSelectChapter}
             onSelectCategory={handleSelectCategory}
             sources={filteredSources}
@@ -614,6 +625,28 @@ export default function App() {
             user={user}
             sources={sources}
             appMode={appMode}
+          />
+        )}
+
+        {currentView === 'anime-details' && (
+          <AnimeDetailsView 
+            animeUrl={selectedManhuaId || ''} 
+            onBack={() => setCurrentView('home')} 
+            onSelectEpisode={(epNum) => {
+              setSelectedChapterId(epNum.toString());
+              setCurrentView('anime-player');
+            }}
+            setAnime={setScrapedManhuaCache}
+          />
+        )}
+        
+        {currentView === 'anime-player' && (
+          <AnimePlayerView 
+            anime={scrapedManhuaCache as any}
+            episodeNumber={parseInt(selectedChapterId || '1')}
+            onNavigateEpisode={(id, ep) => {
+              setSelectedChapterId(ep.toString());
+            }}
           />
         )}
 

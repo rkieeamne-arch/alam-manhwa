@@ -1,21 +1,31 @@
-import { sources } from './src/sources/index';
-async function run() {
-  const handler = sources['generic'];
-  // We need to provide the source structure
-  const source = {
-    id: 'anime4up',
-    name: 'Anime4up',
-    baseUrl: 'https://w1.anime4up.rest',
-    type: 'anime',
-    detailChapterItemSelector: 'a[href*="/episode/"]',
-    detailChapterTitleSelector: 'span',
-    detailChapterLinkSelector: '',
-    pageImgSelector: 'iframe'
-  };
-  const res = await handler.parseChapterPages('https://w1.anime4up.rest/episode/%d8%a7%d9%86%d9%85%d9%8a-rezero-kara-hajimeru-isekai-seikatsu-4th-season-%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-6-%d9%85%d8%aa%d8%b1%d8%ac%d9%85%d8%a9/', source as any);
-  console.log('Pages:', res.length);
-  if (res.length > 0) {
-    console.log(res);
+import { proxiedFetch } from './src/sources/fetch';
+import * as cheerio from 'cheerio';
+
+async function test() {
+  const url = 'https://w1.anime4up.rest/home8/';
+  console.log('Fetching:', url);
+  try {
+    const res = await proxiedFetch(url);
+    console.log('Status:', res.status);
+    const html = await res.text();
+    console.log('HTML length:', html.length);
+    const $ = cheerio.load(html);
+    
+    console.log('Title:', $('title').text());
+    
+    // Look for links to episodes/anime
+    console.log('Inspecting potential anime cards/links:');
+    let count = 0;
+    $('a').each((_, el) => {
+      if (count++ > 10) return;
+      const href = $(el).attr('href');
+      const text = $(el).text().trim();
+      console.log('Link:', href, 'Text:', text.slice(0, 50));
+    });
+
+  } catch (err: any) {
+    console.error('Error:', err.message);
   }
 }
-run();
+
+test();

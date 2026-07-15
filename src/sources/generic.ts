@@ -343,15 +343,93 @@ export const genericSourceHandler: SourceHandler = {
     
     const extractChapters = (doc: cheerio.CheerioAPI) => {
       let chapterItems = source.detailChapterItemSelector ? doc(source.detailChapterItemSelector) : null;
+      const isAnime = source.type === 'anime';
+
       if (!chapterItems || chapterItems.length === 0) {
-        // Fallback chapter item selectors
-        chapterItems = doc('li.wp-manga-chapter, li.chapter-item, #cl li, #chapterlist li, .chapter-list li, tr.chapter-row');
-      }
-      if (!chapterItems || chapterItems.length === 0) {
-        // Absolute fallback: any links containing "chapter-" or "chapter/" or "/الفصل-"
-        chapterItems = doc('a[href*="/chapter-"], a[href*="/chapter/"], a[href*="/الفصل-"]');
+        if (isAnime) {
+          // Fallback episode item selectors
+          chapterItems = doc('.episodios a, .episodiodata a, .episodes-list a, .episodes-card a, .episode-item a, li.episode a, .episodes a, li.episodio a, .ep-card a, .episode-title a, a.episode-link, .season-list a, .seasons-list a, #episodes a, .episode a, [class*="episod"] a, [class*="ep_list"] a, [class*="ep-list"] a, [id*="episod"] a, [id*="episode"] a');
+        } else {
+          // Fallback chapter item selectors
+          chapterItems = doc('li.wp-manga-chapter, li.chapter-item, #cl li, #chapterlist li, .chapter-list li, tr.chapter-row');
+        }
       }
       
+      if (!chapterItems || chapterItems.length === 0) {
+        if (isAnime) {
+          // Absolute fallback for anime: any links containing episode patterns or Arabic "الحلقة" / "حلقة"
+          chapterItems = doc('a[href*="/episode-"], a[href*="/episode/"], a[href*="/episodes/"], a[href*="/episodio/"], a[href*="/episodios/"], a[href*="/ep-"], a[href*="/ep/"], a[href*="/الحلقة-"], a[href*="/الحلقة/"], a[href*="/%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-"], a[href*="/%d8%ad%d9%84%d9%82%d8%a9-"], a[href*="/%D8%A7%D9%84%D8%AD%D9%84%D9%82%D8%A9-"], a[href*="/%D8%AD%D9%84%D9%82%D9%81-"], a[href*="%d8%ad%d9%84%d9%82"]');
+        } else {
+          // Absolute fallback: any links containing "chapter-" or "chapter/" or "/الفصل-"
+          chapterItems = doc('a[href*="/chapter-"], a[href*="/chapter/"], a[href*="/الفصل-"]');
+        }
+      }
+
+      if (!chapterItems || chapterItems.length === 0) {
+        // Ultimate fallback: scan all <a> tags for keyword/pattern matches in href or text
+        const matchedLinks: any[] = [];
+        doc('a').each((_, el) => {
+          const href = doc(el).attr('href');
+          const text = doc(el).text().toLowerCase();
+          if (!href) return;
+          
+          const hrefLower = href.toLowerCase();
+          
+          if (isAnime) {
+            const isEpisodeLink = 
+              hrefLower.includes('/episode/') || 
+              hrefLower.includes('/episode-') || 
+              hrefLower.includes('/episodes/') || 
+              hrefLower.includes('/episodio/') || 
+              hrefLower.includes('/episodios/') || 
+              hrefLower.includes('/ep-') || 
+              hrefLower.includes('/ep/') || 
+              hrefLower.includes('الحلقة') || 
+              hrefLower.includes('حلقة') || 
+              hrefLower.includes('%d8%a7%d9%84%d8%ad%d9%84%d9%82%d9%81') || 
+              hrefLower.includes('%d8%ad%d9%84%d9%82%d9%81') || 
+              hrefLower.includes('%d8%ad%d9%84%d9%82') || 
+              text.includes('الحلقة') || 
+              text.includes('حلقة') || 
+              text.includes('episode') || 
+              text.includes('ep ');
+              
+            const isExcluded = 
+              hrefLower.endsWith('/anime/') || 
+              hrefLower.endsWith('/category/') || 
+              hrefLower.endsWith('/genre/') || 
+              hrefLower.includes('/genres/');
+              
+            if (isEpisodeLink && !isExcluded) {
+              matchedLinks.push(el);
+            }
+          } else {
+            const isChapterLink = 
+              hrefLower.includes('/chapter-') || 
+              hrefLower.includes('/chapter/') || 
+              hrefLower.includes('الفصل') || 
+              hrefLower.includes('%d8%a7%d9%84%d9%81%d8%b5%d9%84') || 
+              text.includes('الفصل') || 
+              text.includes('chapter');
+              
+            const isExcluded = 
+              hrefLower.endsWith('/manga/') || 
+              hrefLower.endsWith('/series/') || 
+              hrefLower.endsWith('/genre/');
+              
+            if (isChapterLink && !isExcluded) {
+              matchedLinks.push(el);
+            }
+          }
+        });
+        
+        if (matchedLinks.length > 0) {
+          chapterItems = doc(matchedLinks);
+        }
+      }
+      
+      if (!chapterItems) return;
+
       chapterItems.each((idx, el) => {
         const isLocked = doc(el).find('.fa-lock, i.lock, svg.lock, .premium, .locked, svg[class*="lock"], svg[class*="coin"]').length > 0 || 
                          doc(el).text().includes('مدفوع') || 
@@ -370,7 +448,15 @@ export const genericSourceHandler: SourceHandler = {
         
         const chapterUrl = normalizeUrl(rawChapterUrl, baseUrl);
         
-        let titleEl: any = source.detailChapterTitleSelector ? doc(el).find(source.detailChapterTitleSelector).first() : null;
+        let titleEl: any = null;
+        if (source.detailChapterTitleSelector) {
+          if (doc(el).is(source.detailChapterTitleSelector)) {
+            titleEl = doc(el);
+          } else {
+            titleEl = doc(el).find(source.detailChapterTitleSelector).first();
+          }
+        }
+        
         if (!titleEl || titleEl.length === 0) {
           titleEl = doc(el).find('.chaptext, span, p').first();
         }
@@ -386,12 +472,14 @@ export const genericSourceHandler: SourceHandler = {
         chapterTitle = chapterTitle.replace(/(منذ|قبل)?\s*\d+\s*(ساعات|ساعة|ايام|أيام|يوم|شهر|أشهر|دقائق|دقيقة|ثواني|ثانية|days|day|hours|hour|mins|min|months|month|years|year)(\s*(مضت|ago))?/gi, '');
         chapterTitle = chapterTitle.trim().replace(/^-|-$/g, '').trim();
 
+        const prefix = isAnime ? 'الحلقة' : 'الفصل';
+
         if (/^[\d.]+$/.test(chapterTitle)) {
-          chapterTitle = `الفصل ${chapterTitle}`;
+          chapterTitle = `${prefix} ${chapterTitle}`;
         }
         
         if (!chapterTitle || /^(\s|-)*$/.test(chapterTitle)) {
-          chapterTitle = `الفصل ${idx + 1}`;
+          chapterTitle = `${prefix} ${idx + 1}`;
         }
         
         const uniqueId = getUniqueId(chapterUrl);

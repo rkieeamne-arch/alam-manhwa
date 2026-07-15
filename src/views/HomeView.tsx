@@ -7,7 +7,8 @@ import {
 } from 'lucide-react';
 import { Manhua, ScraperSource, UserProfile, ReadingListItem } from '../types';
 import ManhuaCard from '../components/ManhuaCard';
-import { scrapeMangaList } from '../utils/scraper';
+import { scrapePopularList } from '../utils/scraper';
+import { fetchLatestEpisodes, fetchLatestSeries, searchAnime } from '../utils/animeScraper';
 
 interface HomeViewProps {
   manhuas: Manhua[];
@@ -126,9 +127,6 @@ export default function HomeView({
 
   // 1. دالة الجلب المدمجة (Global Fetch)
   const handleFetchAllSources = async (pageNum: number = 1, query?: string, isLoadMore: boolean = false) => {
-    const activeSources = sources.filter(s => appMode === 'anime' ? s.type === 'anime' : s.type !== 'anime');
-    if (activeSources.length === 0) return;
-
     const currentFetchId = ++fetchIdRef.current;
 
     if (isLoadMore) {
@@ -136,84 +134,58 @@ export default function HomeView({
     } else {
       setLoadingScraped(true);
       setScrapedError(null);
-      setPage(1); // Reset page state on fresh fetch/search
-      setScrapedList([]); // Clear the list for fresh fetch
+      setPage(1); 
+      setScrapedList([]);
     }
     
     try {
-      let completedSources = 0;
-      let anySuccess = false;
-      
-      // Parallel fetching to avoid blocking with retries
-      const fetchWithRetry = async (source: any, pageNum: number, query: string, retryCount = 0): Promise<any[]> => {
-        try {
-          const results = await scrapeMangaList(source, pageNum, query);
-          return results;
-        } catch (err) {
-          console.error(`Error fetching from ${source.name} (Attempt ${retryCount + 1}):`, err);
-          if (retryCount < 5 && currentFetchId === fetchIdRef.current) { // Retry up to 5 times
-            await new Promise(resolve => setTimeout(resolve, 4000));
-            return fetchWithRetry(source, pageNum, query, retryCount + 1);
-          }
-          return [];
+      let results: any[] = [];
+      if (appMode === 'anime') {
+        if (query) {
+          results = await searchAnime(query);
+        } else {
+          results = await fetchLatestEpisodes();
         }
-      };
+      } else {
+        // Manhua
+        const manhuaSources = sources.filter(s => s.type === 'manga');
+        if (manhuaSources.length > 0) {
+            // For now, let's just pick the first available source
+            results = await scrapePopularList(manhuaSources[0], query);
+        }
+      }
 
-      activeSources.forEach(source => {
-        fetchWithRetry(source, pageNum, query).then(results => {
-          if (currentFetchId !== fetchIdRef.current) return;
-          
-          completedSources++;
-          
-          if (results.length > 0) {
-            anySuccess = true;
-            setScrapedList(prev => {
-              const existingIds = new Set(prev.map(item => item.id));
-              const uniqueNew = results.filter(item => !existingIds.has(item.id));
-              let merged = [...prev, ...uniqueNew];
-              if (!query && !isLoadMore && prev.length === 0) {
-                merged = merged.sort(() => Math.random() - 0.5);
-              }
-              return merged;
-            });
-            
-            // Hide the big loader as soon as we have any data!
-            if (!isLoadMore) {
-               setLoadingScraped(false);
-            }
-          }
-
-          if (completedSources === activeSources.length) {
-            setLoadingScraped(false);
-            setLoadingMore(false);
-            
-            if (!anySuccess) {
-              if (query) {
-                setScrapedError('لم يتم العثور على نتائج للبحث في كافة المصادر.');
-                if (!isLoadMore) setScrapedList([]);
-              } else {
-                setScrapedError('تعذر جلب الأعمال من المصادر. قد يكون الموقع محجوباً (Cloudflare). جرب التحديث مرة أخرى.');
-                setScrapedList(prev => prev.length === 0 ? [] : prev);
-              }
-            } else {
-              if (isLoadMore) {
-                triggerToast(`تم تحديث القائمة الإضافية بنجاح!`);
-              } else if (query) {
-                triggerToast(`تم جلب نتائج البحث بنجاح!`);
-              } else {
-                triggerToast('تم تحديث قائمة الأعمال بنجاح!');
-              }
-            }
-          }
-        });
+      if (currentFetchId !== fetchIdRef.current) return;
+      
+      setScrapedList(prev => {
+        const existingIds = new Set(prev.map(item => item.id));
+        const uniqueNew = results.filter(item => !existingIds.has(item.id));
+        let merged = [...prev, ...uniqueNew];
+        if (!query && !isLoadMore && prev.length === 0) {
+          merged = merged.sort(() => Math.random() - 0.5);
+        }
+        return merged;
       });
+      
+      setLoadingScraped(false);
+      setLoadingMore(false);
+
+      if (results.length === 0) {
+        if (query) {
+          setScrapedError('لم يتم العثور على نتائج للبحث.');
+        } else {
+          setScrapedError('تعذر جلب الأعمال. جرب التحديث مرة أخرى.');
+        }
+      } else {
+        triggerToast('تم تحديث قائمة الأعمال بنجاح!');
+      }
       
     } catch (err: any) {
       if (currentFetchId !== fetchIdRef.current) return;
       setLoadingScraped(false);
       setLoadingMore(false);
       if (!isLoadMore) {
-        setScrapedError('حدث خطأ أثناء جلب البيانات من المصادر.');
+        setScrapedError('حدث خطأ أثناء جلب البيانات.');
       }
     }
   };
@@ -261,7 +233,7 @@ export default function HomeView({
       rating: 4.8,
       views: 0,
       coverUrl: item.coverUrl,
-      categories: ['مانهوا'],
+      categories: appMode === 'anime' ? ['أنمي'] : ['مانهوا'],
       chapters: [],
       releaseYear: 2026,
       sourceUrl: item.sourceUrl
@@ -298,33 +270,21 @@ export default function HomeView({
         
         <div className="flex items-center gap-3">
           <button
-            onClick={onToggleAppMode}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer flex-row-reverse border ${
-              appMode === 'anime' 
-                ? 'bg-amber-500/15 text-amber-500 border-amber-500/30 hover:bg-amber-500/25' 
-                : 'bg-rose-600/15 text-rose-500 border-rose-600/30 hover:bg-rose-600/25'
-            }`}
-          >
-            {appMode === 'anime' ? <Zap className="w-3.5 h-3.5" /> : <BookOpen className="w-3.5 h-3.5" />}
-            <span>{appMode === 'anime' ? 'وضعية المانهو' : 'وضعية الأنمي'}</span>
-          </button>
-          
-          <button
             onClick={toggleLayout}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-950 hover:bg-zinc-900 text-[11px] font-bold text-zinc-300 border border-zinc-850 hover:border-red-500/30 transition-all cursor-pointer flex-row-reverse"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-xs font-bold text-white border border-zinc-700 transition-all cursor-pointer flex-row-reverse"
           >
-          {homeLayout === 'modern' ? (
-            <>
-              <Layers className="w-3.5 h-3.5 text-zinc-400" />
-              <span>الواجهة الكلاسيكية 📋</span>
-            </>
-          ) : (
-            <>
-              <Sparkles className="w-3.5 h-3.5 text-red-500" />
-              <span>الواجهة الجديدة ✨</span>
-            </>
-          )}
-        </button>
+            {homeLayout === 'modern' ? (
+              <>
+                <Layers className="w-4 h-4 text-zinc-400" />
+                <span>تغيير الواجهة</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 text-red-500" />
+                <span>تغيير الواجهة</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 
@@ -450,7 +410,7 @@ export default function HomeView({
                 <div className="flex gap-4 overflow-x-auto scrollbar-none pb-2 flex-row-reverse">
                   {displayManhuas.slice(0, 10).map((item, itemIdx) => (
                     <motion.div 
-                      key={`popular-${item.id}`}
+                      key={`popular-${item.id}-${itemIdx}`}
                       variants={getScatteringVariants(8 + itemIdx)}
                       onClick={() => handleSelectScrapedItem(item)}
                       className="w-[110px] sm:w-[130px] shrink-0 cursor-pointer group"
@@ -533,7 +493,7 @@ export default function HomeView({
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 sm:gap-6">
                     {displayManhuas.map((item, gridIdx) => (
                       <motion.div 
-                        key={`grid-${item.id}`}
+                        key={`grid-${item.id}-${gridIdx}`}
                         variants={getScatteringVariants(19 + gridIdx)}
                       >
                         <ManhuaCard 
