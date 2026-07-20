@@ -74,6 +74,7 @@ async function startServer() {
 
   // Middleware
   app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
 
   // Middleware for Auth
   async function authenticate(req: express.Request, res: express.Response, next: express.NextFunction) {
@@ -92,14 +93,14 @@ async function startServer() {
     res.json({ success: true });
   });
 
-  // CORS-bypassing proxy for dynamic scraper sources
-  app.get('/api/proxy', async (req, res) => {
+  // CORS-bypassing proxy for dynamic scraper sources (supports GET, POST, etc.)
+  app.all('/api/proxy', async (req, res) => {
     const targetUrl = req.query.url as string;
     if (!targetUrl) {
       return res.status(400).json({ error: 'URL is required' });
     }
 
-    console.log(`[Proxy] Fetching: ${targetUrl}`);
+    console.log(`[Proxy] [${req.method}] Fetching: ${targetUrl}`);
 
     try {
       const parsedUrl = new URL(targetUrl);
@@ -149,6 +150,27 @@ async function startServer() {
         headers['Cookie'] = req.headers['x-proxy-cookie'] as string;
       }
 
+      // Reconstruct and forward request body for POST/PUT requests
+      const isPostOrPut = req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH';
+      let fetchBody: any = undefined;
+
+      if (isPostOrPut && req.body) {
+        const reqContentType = req.headers['content-type'] || '';
+        headers['Content-Type'] = reqContentType;
+        
+        if (reqContentType.includes('application/json')) {
+          fetchBody = JSON.stringify(req.body);
+        } else if (reqContentType.includes('application/x-www-form-urlencoded')) {
+          fetchBody = new URLSearchParams(req.body).toString();
+        } else if (typeof req.body === 'string') {
+          fetchBody = req.body;
+        } else if (Buffer.isBuffer(req.body)) {
+          fetchBody = req.body;
+        } else if (Object.keys(req.body).length > 0) {
+          fetchBody = new URLSearchParams(req.body).toString();
+        }
+      }
+
       // Smart Retry Mechanism - specifically for Timeouts (تايم أوت) / Slow connections
       let response: Response | null = null;
       let lastError: any = null;
@@ -163,7 +185,9 @@ async function startServer() {
 
         try {
           response = await fetch(targetUrl, { 
+            method: req.method,
             headers,
+            body: fetchBody,
             signal: controller.signal,
             redirect: 'follow'
           });

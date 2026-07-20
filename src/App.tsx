@@ -4,7 +4,7 @@ import { UserProfile, ReadingHistoryItem, ReaderSettings, Manhua, Chapter, Scrap
 import { updateUserProfile, fetchUserReadingHistory, saveUserReadingHistory, deleteUserHistoryItem, clearUserReadingHistory, fetchUserReadingList, addManhuaToReadingList, removeManhuaFromReadingList } from './lib/firebaseDb';
 import { subscribeToAuthChanges, logout, loginWithEmail, signupWithEmail, resetPassword, signInWithGoogle } from './lib/firebaseAuth';
 import { auth } from './lib/firebaseAuth';
-import { Home, Search, Heart, History, FolderDown, User } from 'lucide-react';
+import { Home, Search, Heart, History, FolderDown, User, MessageSquare } from 'lucide-react';
 
 // Components
 import Header from './components/Header';
@@ -443,11 +443,20 @@ export default function App() {
 
   // Nav Handlers
   const handleSelectManhua = (id: string, optionalMangaShell?: Manhua) => {
+    const isAnime = id.startsWith('series-') || 
+                    id.startsWith('scr-witanime-') || 
+                    id.startsWith('scr-anime4up-') || 
+                    optionalMangaShell?.type === 'anime';
+
     if (optionalMangaShell) {
       setScrapedManhuaCache(optionalMangaShell);
     }
     setSelectedManhuaId(id);
-    setCurrentView('manhua');
+    if (isAnime) {
+      setCurrentView('anime-details');
+    } else {
+      setCurrentView('manhua');
+    }
   };
 
   const handleSelectChapter = (manhuaId: string, chapterId: string, pageIndex: number = 0) => {
@@ -637,6 +646,11 @@ export default function App() {
               setCurrentView('anime-player');
             }}
             setAnime={setScrapedManhuaCache}
+            user={user}
+            readingList={readingList}
+            onAddToList={handleAddToList}
+            onRemoveFromList={handleRemoveFromList}
+            onNavigate={handleNavigate}
           />
         )}
         
@@ -723,8 +737,8 @@ export default function App() {
 
       {/* 4. FOOTER */}
       {currentView !== 'reader' && (
-        <footer className="border-t border-zinc-900 bg-zinc-950 py-6 text-center text-xs text-zinc-500">
-          <div className="max-w-7xl mx-auto px-4 space-y-2">
+        <footer className="border-t border-zinc-900 bg-zinc-950 py-8 text-center text-xs text-zinc-500">
+          <div className="max-w-7xl mx-auto px-4 space-y-3">
             <p className="font-display font-bold text-zinc-400 text-sm">
               {appMode === 'anime' ? (
                 <>عالم <span className="text-amber-500">الأنمي</span> •</>
@@ -732,13 +746,27 @@ export default function App() {
                 <>عالم <span className="text-rose-500">المانهو</span> •</>
               )}
             </p>
-            <p className="font-sans">
+            <p className="font-sans max-w-2xl mx-auto">
               {appMode === 'anime' ? (
                 <>منصة تجمع عشاق الأنمي في تجربة مشاهدة مريحة وممتعة لآخر الحلقات المترجمة. جميع الحقوق محفوظة © 2026.</>
               ) : (
                 <>منصة تجمع عشاق المانهو والمانجا في تجربة قراءة مريحة وممتعة. جميع الحقوق محفوظة © 2026.</>
               )}
             </p>
+            <div className="pt-2 flex flex-col items-center gap-3">
+              <div className="flex items-center justify-center gap-4 text-zinc-400">
+                <a href="mailto:hdmdudn93@gmail.com" className="hover:text-white underline cursor-pointer font-bold transition-colors flex items-center gap-1.5">
+                  تواصل معنا ✉️
+                </a>
+                <span>•</span>
+                <a href="https://discord.gg/NM59xtZtX3" target="_blank" rel="noopener noreferrer" className="hover:text-[#5865F2] underline cursor-pointer font-bold transition-colors flex items-center gap-1.5">
+                  ديسكورد المنصة 💬
+                </a>
+              </div>
+              <p className="text-[10px] text-zinc-600 font-mono">
+                للمقترحات والشكاوى: hdmdudn93@gmail.com
+              </p>
+            </div>
           </div>
         </footer>
       )}
@@ -751,7 +779,7 @@ export default function App() {
       {/* 5. MOBILE BOTTOM NAVIGATION BAR (Modern Interface Only) */}
       {currentView !== 'reader' && homeLayout === 'modern' && (
         <div className="fixed bottom-0 left-0 right-0 z-50 bg-zinc-950/95 backdrop-blur-md border-t border-zinc-900 px-2 pt-2 pb-safe shadow-2xl md:hidden">
-          <div className="grid grid-cols-6 items-center justify-items-center max-w-lg mx-auto" dir="rtl">
+          <div className="grid grid-cols-6 items-center justify-items-center max-w-xl mx-auto" dir="rtl">
             
             {/* Tab 1: الرئيسية */}
             <button

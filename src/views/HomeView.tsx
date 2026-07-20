@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Flame, Star, Award, TrendingUp, Compass, Grid, Loader2, RefreshCw, 
   Globe, Wifi, Cpu, ExternalLink, Plus, Trash2, Layers, X, Sparkles, 
-  BookOpen, Clock, Heart, Zap, Shield, ArrowRight, Check, Search, Play
+  BookOpen, Clock, Heart, Zap, Shield, ArrowRight, Check, Search, Play, Tv
 } from 'lucide-react';
 import { Manhua, ScraperSource, UserProfile, ReadingListItem } from '../types';
 import ManhuaCard from '../components/ManhuaCard';
@@ -126,12 +126,12 @@ export default function HomeView({
   };
 
   // 1. دالة الجلب المدمجة (Global Fetch)
-  const handleFetchAllSources = async (pageNum: number = 1, query?: string, isLoadMore: boolean = false) => {
+  const handleFetchAllSources = async (pageNum: number = 1, query?: string, isLoadMore: boolean = false, isSilent: boolean = false) => {
     const currentFetchId = ++fetchIdRef.current;
 
     if (isLoadMore) {
       setLoadingMore(true);
-    } else {
+    } else if (!isSilent) {
       setLoadingScraped(true);
       setScrapedError(null);
       setPage(1); 
@@ -158,6 +158,16 @@ export default function HomeView({
       if (currentFetchId !== fetchIdRef.current) return;
       
       setScrapedList(prev => {
+        if (isSilent && !isLoadMore && !query) {
+          const existingIds = new Set(prev.map(item => item.id));
+          const newItems = results.filter(item => !existingIds.has(item.id));
+          if (newItems.length > 0) {
+            triggerToast(`تم تحديث الأعمال وإضافة ${newItems.length} عمل جديد!`);
+            return [...newItems, ...prev];
+          }
+          return prev;
+        }
+
         const existingIds = new Set(prev.map(item => item.id));
         const uniqueNew = results.filter(item => !existingIds.has(item.id));
         let merged = [...prev, ...uniqueNew];
@@ -170,22 +180,24 @@ export default function HomeView({
       setLoadingScraped(false);
       setLoadingMore(false);
 
-      if (results.length === 0) {
+      if (results.length === 0 && !isSilent) {
         if (query) {
           setScrapedError('لم يتم العثور على نتائج للبحث.');
         } else {
           setScrapedError('تعذر جلب الأعمال. جرب التحديث مرة أخرى.');
         }
-      } else {
+      } else if (!isSilent && !isLoadMore) {
         triggerToast('تم تحديث قائمة الأعمال بنجاح!');
       }
       
     } catch (err: any) {
       if (currentFetchId !== fetchIdRef.current) return;
-      setLoadingScraped(false);
-      setLoadingMore(false);
-      if (!isLoadMore) {
-        setScrapedError('حدث خطأ أثناء جلب البيانات.');
+      if (!isSilent) {
+        setLoadingScraped(false);
+        setLoadingMore(false);
+        if (!isLoadMore) {
+          setScrapedError('حدث خطأ أثناء جلب البيانات.');
+        }
       }
     }
   };
@@ -195,7 +207,16 @@ export default function HomeView({
   // تشغيل الجلب عند فتح الصفحة أو تغير المصادر
   useEffect(() => {
     handleFetchAllSources(1);
-  }, [sources, appMode]);
+
+    const interval = setInterval(() => {
+      // Auto refresh latest updates silently every 3 minutes
+      if (!searchQuery) {
+        handleFetchAllSources(1, undefined, false, true);
+      }
+    }, 180000); // 3 minutes
+    
+    return () => clearInterval(interval);
+  }, [sources, appMode, searchQuery]);
 
   // إعادة الجلب تلقائياً بمجرد إدخال الكوكيز وتخطي الكابتشا
   useEffect(() => {
@@ -262,28 +283,42 @@ export default function HomeView({
       )}
 
       {/* رأس الصفحة مع زر تبديل الواجهة */}
-      <div className="flex items-center justify-between border-b border-zinc-900 pb-4 flex-row-reverse">
-        <h1 className="text-xl sm:text-2xl font-black text-white font-display flex items-center gap-2 flex-row-reverse">
-          <Sparkles className="w-5 h-5 text-red-500 animate-pulse" />
-          <span className={appMode === 'anime' ? 'text-amber-500' : 'text-red-500'}>{appMode === 'anime' ? 'مكتبة الأنمي' : 'الرئيسية'}</span>
-        </h1>
-        
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-4 border-b border-zinc-900 pb-5 w-full" dir="rtl">
+        {/* اليمين: زر تغيير الواجهة */}
+        <div className="flex-1 flex justify-start">
           <button
             onClick={toggleLayout}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-xs font-bold text-white border border-zinc-700 transition-all cursor-pointer flex-row-reverse"
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-[10px] sm:text-xs font-bold text-white border border-zinc-750 transition-all cursor-pointer shadow-sm shrink-0"
           >
-            {homeLayout === 'modern' ? (
-              <>
-                <Layers className="w-4 h-4 text-zinc-400" />
-                <span>تغيير الواجهة</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4 text-red-500" />
-                <span>تغيير الواجهة</span>
-              </>
-            )}
+            {homeLayout === 'modern' ? <Layers className="w-3.5 h-3.5 text-zinc-400" /> : <Sparkles className="w-3.5 h-3.5 text-red-500" />}
+            <span className="hidden sm:inline">تغيير الواجهة</span>
+            <span className="sm:hidden">الواجهة</span>
+          </button>
+        </div>
+
+        {/* الوسط: العنوان الرئيسي */}
+        <div className="flex-1 flex justify-center">
+          <h1 className="text-sm sm:text-xl font-black text-white font-display flex items-center gap-1 sm:gap-2 text-center truncate">
+            <Sparkles className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-red-500 animate-pulse shrink-0" />
+            <span className={appMode === 'anime' ? 'text-amber-500' : 'text-red-500'}>
+              {appMode === 'anime' ? 'مكتبة الأنمي' : 'الرئيسية'}
+            </span>
+          </h1>
+        </div>
+
+        {/* اليسار: زر التبديل بين الأنمي والمانهو */}
+        <div className="flex-1 flex justify-end">
+          <button
+            onClick={onToggleAppMode}
+            className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[10px] sm:text-xs font-bold transition-all cursor-pointer border shadow-sm shrink-0 ${
+              appMode === 'anime' 
+                ? 'bg-rose-600/15 text-rose-500 border-rose-600/30 hover:bg-rose-600/25' 
+                : 'bg-amber-500/15 text-amber-500 border-amber-500/30 hover:bg-amber-500/25'
+            }`}
+          >
+            {appMode === 'anime' ? <BookOpen className="w-3.5 h-3.5 shrink-0" /> : <Tv className="w-3.5 h-3.5 animate-pulse shrink-0" />}
+            <span className="hidden sm:inline">{appMode === 'anime' ? 'واجهة المانهو' : 'واجهة الأنمي'}</span>
+            <span className="sm:hidden">{appMode === 'anime' ? 'مانهو' : 'أنمي'}</span>
           </button>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { 
-  Search, BookOpen, User, ShieldAlert, History, Home, Sparkles, Heart, FolderDown, Tv 
+  Search, BookOpen, User, ShieldAlert, History, Home, Sparkles, Heart, FolderDown, Tv, MessageSquare 
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import logoImg from '../assets/images/manhua_logo_1783758713519.jpg';
@@ -40,35 +40,19 @@ export default function Header({
     <header className="z-40 bg-zinc-950/90 backdrop-blur-md border-b border-zinc-900 shadow-lg">
       <div className="max-w-7xl mx-auto px-4 py-3 sm:px-6">
         
-        {/* Main top row: Center title with Settings trigger, Left buttons, Right search (Responsive design) */}
+        {/* Main top row: Center title with Settings trigger, Left buttons, Right spacer (Responsive design) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
           
-          {/* Column 1: Search bar (aligned right/first on RTL) */}
-          <form onSubmit={handleSearchSubmit} className="order-2 md:order-1 flex items-center relative w-full max-w-sm">
-            <input
-              type="text"
-              placeholder={isAnime ? "ابحث عن أنمي بالاسم أو التصنيف..." : "ابحث عن مانهو بالاسم أو الكاتب..."}
-              value={searchVal}
-              onChange={(e) => setSearchVal(e.target.value)}
-              className={`w-full bg-zinc-900 border border-zinc-800 text-xs text-zinc-100 placeholder-zinc-500 rounded-full py-2 px-4 pl-10 focus:outline-none transition-colors ${isAnime ? 'focus:border-amber-500' : 'focus:border-red-600'}`}
-              id="header-search-input"
-            />
-            <button
-              type="submit"
-              className={`absolute left-3 p-1 text-zinc-400 transition-colors ${isAnime ? 'hover:text-amber-500' : 'hover:text-red-500'}`}
-              id="header-search-submit-btn"
-            >
-              <Search className="w-4 h-4" />
-            </button>
-          </form>
+          {/* Column 1: Spacer or Quick Info on mobile */}
+          <div className="order-2 md:order-1 hidden md:block"></div>
 
-          {/* Column 2: Centered Website Logo & Settings Trigger (Strictly in Center) */}
-          <div className="order-1 md:order-2 flex flex-col items-center justify-center gap-1 py-1">
-            <div className="flex items-center gap-2.5">
+          {/* Column 2: Centered Website Logo & App Mode Switcher (Strictly in Center) */}
+          <div className="order-1 md:order-2 flex flex-col items-center justify-center gap-2 py-1">
+            <div className="flex flex-col sm:flex-row items-center gap-3">
               {/* Logo text & emblem */}
               <div 
                 onClick={() => onNavigate('home')} 
-                className="cursor-pointer flex items-center gap-2 group select-none"
+                className="cursor-pointer flex items-center gap-2 group select-none justify-center"
               >
                 <div className={`w-9 h-9 rounded-full overflow-hidden border flex items-center justify-center shadow-md group-hover:scale-105 transition-all ${isAnime ? 'border-amber-500 shadow-amber-900/30' : 'border-red-500 shadow-red-900/30'}`}>
                   <img src={logoImg} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -77,38 +61,9 @@ export default function Header({
                   عالم <span className={`${isAnime ? 'text-amber-500' : 'text-red-500'} font-extrabold`}>{isAnime ? 'الأنمي' : 'المانهو'}</span>
                 </h1>
               </div>
-
-              {/* Discord Button and Settings Trigger */}
-              <div className="flex items-center gap-2">
-                <a
-                  href="https://discord.gg/NM59xtZtX3"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-indigo-600/10 hover:bg-indigo-600 text-indigo-500 hover:text-white border border-indigo-500/30 hover:border-indigo-600 font-bold text-xs transition-all active:scale-95 cursor-pointer shadow-sm"
-                  title="تواصل عبر ديسكورد"
-                >
-                  <span>ديسكورد</span>
-                </a>
-
-                {/* Global Desktop AppMode Switcher Button */}
-                {onToggleAppMode && (
-                  <button
-                    onClick={onToggleAppMode}
-                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full font-bold text-[10px] sm:text-xs transition-all active:scale-95 cursor-pointer shadow-sm ${
-                      isAnime
-                        ? 'bg-amber-500/15 hover:bg-amber-500 text-amber-500 hover:text-zinc-950 border border-amber-500/30 hover:border-amber-500'
-                        : 'bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white border border-red-500/30 hover:border-red-600'
-                    }`}
-                    title={isAnime ? "تبديل إلى واجهة المانجا" : "تبديل إلى واجهة الأنمي"}
-                  >
-                    {isAnime ? <BookOpen className="w-3.5 h-3.5" /> : <Tv className="w-3.5 h-3.5 animate-pulse" />}
-                    <span>{isAnime ? 'واجهة المانهو 📖' : 'واجهة الأنمي 🎬'}</span>
-                  </button>
-                )}
-              </div>
             </div>
             
-            <span className="text-[9px] text-zinc-500 font-medium tracking-widest hidden md:block">
+            <span className="text-[9px] text-zinc-500 font-medium tracking-widest hidden md:block text-center">
               {isAnime ? 'عش شغف الأنمي والكرتون • بجودة فائقة السرعة' : 'عش شغف المانهو والمانجا • بجودة فائقة السرعة'}
             </span>
           </div>

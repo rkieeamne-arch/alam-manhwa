@@ -1,6 +1,7 @@
 import { ScraperSource, Manhua, Chapter } from '../types';
 import { sources, SourceId } from '../sources';
 import { getProxiedUrl } from '../sources/fetch';
+import { extractNumber, cleanTitle, sortNumerically, deduplicate, validateItem, getCachedData, setCachedData } from './scraperUtils';
 
 export function normalizeUrl(url: string, baseUrl: string): string {
   if (!url) return '';
@@ -18,6 +19,10 @@ export function normalizeUrl(url: string, baseUrl: string): string {
 }
 
 export async function scrapeMangaList(source: ScraperSource, page: number = 1, query?: string): Promise<any[]> {
+  const cacheKey = `manga-list-${source.id}-${page}-${query || ''}`;
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
   try {
     const handlerId = source.id as SourceId;
     let handler = sources[handlerId];
@@ -28,37 +33,41 @@ export async function scrapeMangaList(source: ScraperSource, page: number = 1, q
     
     const result = await handler.parsePopularList(page, query, source);
     
-    return result.map(manga => {
-      // Create a dummy chapters array if we have a latestChapter string like "الفصل 105"
-      let chapters: any[] = manga.chapters || [];
-      if (chapters.length === 0 && manga.latestChapter) {
-        const chapMatch = manga.latestChapter.match(/\d+/);
-        if (chapMatch) {
-          const num = parseInt(chapMatch[0], 10);
-          if (!isNaN(num) && num > 0) {
-            chapters = Array(num).fill(0).map((_, i) => ({ id: `dummy-${i}`, title: `الفصل ${i+1}`, chapterNumber: i+1 }));
+    const normalized = result
+      .filter(m => validateItem(m))
+      .map(manga => {
+        // Create a dummy chapters array if we have a latestChapter string like "الفصل 105"
+        let chapters: any[] = manga.chapters || [];
+        if (chapters.length === 0 && manga.latestChapter) {
+          const num = extractNumber(manga.latestChapter);
+          if (num > 0) {
+            chapters = Array(Math.floor(num)).fill(0).map((_, i) => ({ id: `dummy-${i}`, title: `الفصل ${i+1}`, chapterNumber: i+1 }));
           }
         }
-      }
 
-      return {
-        id: `scr-${source.id}-${manga.id}`,
-        title: manga.title.replace(/(تحديث|مستمر|مكتمل|جديد|حصرية|مميزة|حصريه|مميزه|الموسم\s*الثاني|الموسم\s*الأول|الموسم\s*الثالث)/gi, '').replace(/\s+/g, ' ').trim(),
-        englishTitle: manga.title,
-        coverUrl: getProxiedUrl(manga.cover),
-        rawCoverUrl: manga.cover,
-        sourceUrl: manga.url,
-        sourceId: source.id,
-        description: manga.description || '',
-        rating: 4.5,
-        views: 0,
-        status: 'مستمر' as any,
-        categories: [],
-        releaseYear: 0,
-        chapters: chapters,
-        latestChapter: manga.latestChapter || ''
-      };
-    });
+        const title = cleanTitle(manga.title);
+
+        return {
+          id: `scr-${source.id}-${manga.id}`,
+          title,
+          englishTitle: manga.title,
+          coverUrl: getProxiedUrl(manga.cover),
+          rawCoverUrl: manga.cover,
+          sourceUrl: manga.url,
+          sourceId: source.id,
+          description: manga.description || '',
+          rating: 4.5,
+          views: 0,
+          status: 'مستمر' as any,
+          categories: [],
+          releaseYear: 0,
+          chapters: chapters,
+          latestChapter: manga.latestChapter || ''
+        };
+      });
+
+    setCachedData(cacheKey, normalized, 600); // 10 mins cache
+    return normalized;
   } catch (err: any) {
     console.warn('Warning in scrapeMangaList (handled):', err.message || err);
     return [];
@@ -97,7 +106,13 @@ function extractChapterNumber(title: string, index: number, totalChapters: numbe
   return index + 1;
 }
 
-export async function scrapeMangaDetails(source: ScraperSource, mangaUrl: string): Promise<Manhua> {
+export async function scrapeMangaDetails(source: ScraperSource, mangaUrl: string, bypassCache: boolean = false): Promise<Manhua> {
+  const cacheKey = `manga-details-${mangaUrl}`;
+  if (!bypassCache) {
+    const cached = getCachedData(cacheKey);
+    if (cached) return cached;
+  }
+
   try {
     const handlerId = source.id as SourceId;
     let handler = sources[handlerId];
@@ -109,31 +124,28 @@ export async function scrapeMangaDetails(source: ScraperSource, mangaUrl: string
     
     const manga = await handler.parseMangaDetails(mangaUrl, source);
     
-    // Deduplicate chapters just in case
-    const uniqueChapters = [];
-    const seenIds = new Set();
-    for (const ch of (manga.chapters || [])) {
-      if (!seenIds.has(ch.id)) {
-        uniqueChapters.push(ch);
-        seenIds.add(ch.id);
-      }
-    }
+    // Deduplicate and Sort numerically
+    const uniqueChapters = deduplicate(manga.chapters || []);
+    const sortedChapters = sortNumerically(uniqueChapters.map((ch, idx) => ({
+      ...ch,
+      chapterNumber: extractNumber(ch.name, idx + 1)
+    })));
 
-    const chapters: Chapter[] = uniqueChapters.map((ch, idx) => ({
+    const chapters: Chapter[] = sortedChapters.map(ch => ({
       id: `ch-${source.id}-${ch.id}`,
       manhuaId: `scr-${source.id}-${manga.id}`,
       title: ch.name,
-      chapterNumber: extractChapterNumber(ch.name, idx, uniqueChapters.length),
+      chapterNumber: ch.chapterNumber,
       releaseDate: 'محدث',
       pages: [ch.url],
       views: 0,
       isLocked: ch.isLocked
     }));
 
-    return {
+    const details: Manhua = {
       id: `scr-${source.id}-${manga.id}`,
-      title: manga.title,
-      description: manga.description || 'لا يوجد ملخص מתوفر.',
+      title: cleanTitle(manga.title),
+      description: manga.description || 'لا يوجد ملخص متوفر.',
       coverUrl: getProxiedUrl(manga.cover),
       author: 'غير معروف',
       artist: 'غير معروف',
@@ -144,6 +156,9 @@ export async function scrapeMangaDetails(source: ScraperSource, mangaUrl: string
       rating: 5.0,
       chapters: chapters
     };
+
+    setCachedData(cacheKey, details, 300); // 5 mins
+    return details;
   } catch (err: any) {
     console.warn('Warning in scrapeMangaDetails (handled):', err.message || err);
     throw err;

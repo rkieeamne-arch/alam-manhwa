@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Star, Eye, Calendar, User, Palette, Bookmark, BookOpen, Clock, Loader2, RefreshCw, Lock, Download, CheckCircle, DownloadCloud, Trash2, AlertCircle, Play } from 'lucide-react';
+import { ArrowRight, Star, Eye, Calendar, User, Palette, Bookmark, BookOpen, Clock, Loader2, RefreshCw, Lock, Download, CheckCircle, DownloadCloud, Trash2, AlertCircle, Play, ArrowUpDown } from 'lucide-react';
 import { Manhua, Chapter, ScraperSource, UserProfile, ReadingListItem } from '../types';
 import { scrapeMangaDetails, scrapeMangaChapters, scrapeChapterPages } from '../utils/scraper';
+import { extractNumber } from '../utils/scraperUtils';
 import AddToListPicker from '../components/AddToListPicker';
 import { saveManhuaOffline, saveChapterOffline, getOfflineChaptersForManhua, convertUrlToBase64, deleteChapterOffline, fetchAsBlob } from '../utils/offlineDb';
 
@@ -43,6 +44,7 @@ export default function ManhuaDetailsView({
   const [hasMoreChapters, setHasMoreChapters] = useState(true);
   const [showLockedDialog, setShowLockedDialog] = useState(false);
   const [selectedLockedChapter, setSelectedLockedChapter] = useState<Chapter | null>(null);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   const isScraped = manhua.id.startsWith('scr-');
   const displayManhua = scrapedManhua || manhua;
@@ -272,6 +274,49 @@ export default function ManhuaDetailsView({
 
     fetchDetails();
   }, [manhua.id, isScraped, sources]);
+
+  const forceRefreshChapters = async () => {
+    if (!isScraped || !displayManhua.sourceUrl || loadingMoreChapters) return;
+    
+    const source = sources.find(s => manhua.id.startsWith(`scr-${s.id}-`));
+    if (!source) return;
+
+    setLoadingMoreChapters(true);
+    try {
+      const freshManhua = await scrapeMangaDetails(source, displayManhua.sourceUrl, true);
+      
+      if (freshManhua.chapters && freshManhua.chapters.length > 0) {
+        const updatedChapters = [...displayManhua.chapters];
+        const existingIds = new Set(updatedChapters.map(c => c.id));
+        let addedCount = 0;
+        
+        for (const ch of freshManhua.chapters) {
+          if (!existingIds.has(ch.id)) {
+            updatedChapters.push(ch);
+            existingIds.add(ch.id);
+            addedCount++;
+          }
+        }
+
+        const updatedManhua = {
+          ...displayManhua,
+          chapters: updatedChapters,
+          description: freshManhua.description && freshManhua.description !== 'لا يوجد ملخص متوفر.' ? freshManhua.description : displayManhua.description,
+        };
+        
+        if (scrapedManhua) {
+          setScrapedManhua(updatedManhua);
+        }
+        if (onUpdateManhua) {
+          onUpdateManhua(updatedManhua);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to force refresh chapters:", err);
+    } finally {
+      setLoadingMoreChapters(false);
+    }
+  };
 
   const loadMoreChapters = async () => {
     if (!isScraped || !displayManhua.sourceUrl || loadingMoreChapters) return;
@@ -616,6 +661,13 @@ export default function ManhuaDetailsView({
             <span className="text-xs text-zinc-400 font-bold font-mono bg-zinc-900 px-3 py-1.5 rounded-full border border-zinc-800">
               {displayManhua.chapters.length} {chaptersName} مضافة
             </span>
+            <button 
+              onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+              className="p-1.5 bg-zinc-900 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-white transition-colors border border-zinc-800"
+              title="ترتيب ال${chaptersName}"
+            >
+              <ArrowUpDown className="w-4 h-4" />
+            </button>
             <button
               onClick={triggerDownloadAllChapters}
               disabled={downloadingAll || displayManhua.chapters.length === 0}
@@ -639,7 +691,15 @@ export default function ManhuaDetailsView({
         {/* Chapters table/list */}
         {displayManhua.chapters.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
-            {displayManhua.chapters.map((ch) => (
+            {[...displayManhua.chapters]
+              .sort((a, b) => {
+                 const extractedA = extractNumber(a.name);
+                 const extractedB = extractNumber(b.name);
+                 const numA = extractedA !== null ? extractedA : (displayManhua.chapters.length - displayManhua.chapters.indexOf(a));
+                 const numB = extractedB !== null ? extractedB : (displayManhua.chapters.length - displayManhua.chapters.indexOf(b));
+                 return sortOrder === 'asc' ? numA - numB : numB - numA;
+              })
+              .map((ch) => (
               <div
                 key={ch.id}
                 onClick={() => {
@@ -740,26 +800,65 @@ export default function ManhuaDetailsView({
           </div>
         )}
 
-        {/* Load More Chapters Button */}
-        {isScraped && hasMoreChapters && displayManhua.chapters.length > 0 && (
-          <div className="pt-4 flex justify-center">
-            <button
-              onClick={loadMoreChapters}
-              disabled={loadingMoreChapters}
-              className="flex items-center gap-2 px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border border-zinc-700 rounded-xl text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loadingMoreChapters ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>جاري جلب المزيد...</span>
-                </>
+        {/* Chapter Fetching & Refreshing Control Panel */}
+        {isScraped && displayManhua.chapters.length > 0 && (
+          <div className="mt-8 pt-6 border-t border-zinc-900/80 flex flex-col items-center justify-center space-y-4 w-full max-w-xl mx-auto" style={{ direction: 'rtl' }}>
+            <div className="text-center space-y-1">
+              <h4 className="text-xs font-black tracking-wider text-red-500 uppercase font-sans">أدوات مزامنة وجلب الفصول ⚡</h4>
+              <p className="text-[11px] text-zinc-400">تحديث فوري للعمل وسحب الفصول مباشرة وبدقة متناهية من المصدر الرسمي</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
+              {/* Force Refresh All Chapters (Bypass Cache) */}
+              <button
+                onClick={forceRefreshChapters}
+                disabled={loadingMoreChapters}
+                className="relative group flex items-center justify-center gap-2.5 px-6 py-3.5 bg-zinc-950 hover:bg-zinc-900 text-zinc-200 hover:text-white border border-zinc-800 hover:border-red-500/30 rounded-xl text-xs font-extrabold transition-all duration-300 shadow-[0_4px_15px_rgba(0,0,0,0.5)] hover:scale-[1.01] active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+                id="btn-force-refresh-chapters"
+              >
+                {loadingMoreChapters ? (
+                  <>
+                    <Loader2 className="w-4 h-4 text-red-500 animate-spin shrink-0" />
+                    <span>جاري تحديث الفصول...</span>
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4 text-red-500 group-hover:rotate-180 transition-transform duration-700 ease-out shrink-0" />
+                    <span>تحديث وجلب كافة الفصول ⚡</span>
+                  </>
+                )}
+              </button>
+
+              {/* Load More Chapters (Pagination) */}
+              {hasMoreChapters ? (
+                <button
+                  onClick={loadMoreChapters}
+                  disabled={loadingMoreChapters}
+                  className="relative group flex items-center justify-center gap-2.5 px-6 py-3.5 bg-gradient-to-r from-red-950/40 to-zinc-950 hover:from-red-900/40 hover:to-zinc-900 text-zinc-200 hover:text-white border border-red-500/20 hover:border-red-500/50 rounded-xl text-xs font-extrabold transition-all duration-300 shadow-[0_4px_15px_rgba(239,68,68,0.05)] hover:scale-[1.01] active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+                  id="btn-load-more-chapters"
+                >
+                  {loadingMoreChapters ? (
+                    <>
+                      <Loader2 className="w-4 h-4 text-red-500 animate-spin shrink-0" />
+                      <span>جاري البحث الإضافي...</span>
+                    </>
+                  ) : (
+                    <>
+                      <BookOpen className="w-4 h-4 text-red-500 shrink-0" />
+                      <span>جلب الفصول الإضافية 🔄</span>
+                    </>
+                  )}
+                </button>
               ) : (
-                <>
-                  <RefreshCw className="w-4 h-4 text-red-500" />
-                  <span>مزيد من ال{chaptersName}</span>
-                </>
+                <div className="flex items-center justify-center px-6 py-3.5 bg-zinc-950/50 text-zinc-500 border border-zinc-900/60 rounded-xl text-xs font-bold text-center">
+                  <span>وصلت لنهاية فصول المصدر الحالي ✓</span>
+                </div>
               )}
-            </button>
+            </div>
+
+            <p className="text-[10px] text-zinc-500 font-medium text-center leading-relaxed max-w-md">
+              * في حال لم تظهر فصول معينة (مثل الفصل 62 وما بعده)، اضغط على زر **تحديث وجلب كافة الفصول ⚡** لتخطي التخزين المؤقت وسحب كامل أرشيف العمل مباشرة من الموقع المصدري.
+            </p>
           </div>
         )}
 

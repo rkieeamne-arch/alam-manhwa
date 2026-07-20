@@ -2,6 +2,7 @@ import * as cheerio from 'cheerio';
 import { Manga, Chapter, ChapterPage, SourceHandler, CATEGORY_ENGLISH_MAP } from './types';
 import { proxiedFetch } from './fetch';
 import { ScraperSource } from '../types';
+import { retryFetch, extractNumber, cleanTitle, sortNumerically, deduplicate, validateItem } from '../utils/scraperUtils';
 
 export function getUniqueId(url: string): string {
   if (!url) return 'unknown-' + Math.random().toString(36).substring(7);
@@ -90,7 +91,7 @@ export const genericSourceHandler: SourceHandler = {
     let html = '';
     try {
       console.log(`[Scraper] Fetching popular list from: ${url}`);
-      const response = await proxiedFetch(url);
+      const response = await retryFetch(url);
       if (!response.ok) {
         throw new Error(`Response status ${response.status}`);
       }
@@ -100,7 +101,7 @@ export const genericSourceHandler: SourceHandler = {
         const altUrl = `${baseUrl}/genre/${englishSlug}/`;
         console.log(`[Scraper] Retrying with alternative genre URL: ${altUrl}`);
         try {
-          const response = await proxiedFetch(altUrl);
+          const response = await retryFetch(altUrl);
           if (response.ok) {
             html = await response.text();
             url = altUrl;
@@ -111,7 +112,7 @@ export const genericSourceHandler: SourceHandler = {
           const searchUrl = `${baseUrl}/?s=${encodeURIComponent(englishSlug)}&post_type=wp-manga`;
           console.log(`[Scraper] Retrying with search URL: ${searchUrl}`);
           try {
-            const response = await proxiedFetch(searchUrl);
+            const response = await retryFetch(searchUrl);
             if (response.ok) {
               html = await response.text();
               url = searchUrl;
@@ -122,7 +123,7 @@ export const genericSourceHandler: SourceHandler = {
             const origSearchUrl = `${baseUrl}/?s=${encodeURIComponent(query || '')}&post_type=wp-manga`;
             console.log(`[Scraper] Last resort search URL: ${origSearchUrl}`);
             try {
-              const response = await proxiedFetch(origSearchUrl);
+              const response = await retryFetch(origSearchUrl);
               if (response.ok) {
                 html = await response.text();
                 url = origSearchUrl;
@@ -138,7 +139,7 @@ export const genericSourceHandler: SourceHandler = {
         // Automatic Fallback: If popular path is blocked (403/503) or fails, try the home page baseUrl directly!
         console.warn(`[Scraper] Failed fetching ${url}, falling back to homepage ${baseUrl} due to:`, e);
         try {
-          const response = await proxiedFetch(baseUrl);
+          const response = await retryFetch(baseUrl);
           if (response.ok) {
             html = await response.text();
           } else {
@@ -197,13 +198,15 @@ export const genericSourceHandler: SourceHandler = {
           titleText = linkEl.text().trim();
         }
 
-        if (sourceUrl && !list.some(item => item.id === uniqueId)) {
-          list.push({
+        const item = {
             id: uniqueId,
-            title: titleText || 'بدون عنوان',
+            title: cleanTitle(titleText || 'بدون عنوان'),
             cover: coverUrl || 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=300',
             url: sourceUrl
-          });
+          };
+
+        if (sourceUrl && validateItem(item) && !list.some(item => item.id === uniqueId)) {
+          list.push(item);
         }
       }
     };
@@ -300,20 +303,20 @@ export const genericSourceHandler: SourceHandler = {
     if (!source) throw new Error("Source configuration missing for generic scraper.");
     
     const baseUrl = source.baseUrl;
-    const response = await proxiedFetch(mangaUrl);
+    const response = await retryFetch(mangaUrl);
     const html = await response.text();
     const $ = cheerio.load(html);
 
     // Self-healing selectors for title
     let title = '';
     if (source.detailTitleSelector) {
-      title = $(source.detailTitleSelector).first().text().trim();
+      title = cleanTitle($(source.detailTitleSelector).first().text());
     }
     if (!title) {
-      title = $('.post-title h1, .post-content h1, .entry-title, h1, h1[itemProp="name"]').first().text().trim();
+      title = cleanTitle($('.post-title h1, .post-content h1, .entry-title, h1, h1[itemProp="name"]').first().text());
     }
     if (!title) {
-      title = $('meta[property="og:title"]').attr('content') || $('title').text().trim();
+      title = cleanTitle($('meta[property="og:title"]').attr('content') || $('title').text());
     }
 
     // Self-healing selectors for cover
@@ -351,7 +354,7 @@ export const genericSourceHandler: SourceHandler = {
           chapterItems = doc('.episodios a, .episodiodata a, .episodes-list a, .episodes-card a, .episode-item a, li.episode a, .episodes a, li.episodio a, .ep-card a, .episode-title a, a.episode-link, .season-list a, .seasons-list a, #episodes a, .episode a, [class*="episod"] a, [class*="ep_list"] a, [class*="ep-list"] a, [id*="episod"] a, [id*="episode"] a');
         } else {
           // Fallback chapter item selectors
-          chapterItems = doc('li.wp-manga-chapter, li.chapter-item, #cl li, #chapterlist li, .chapter-list li, tr.chapter-row');
+          chapterItems = doc('li.wp-manga-chapter, li.chapter-item, #cl li, #chapterlist li, .chapter-list li, tr.chapter-row, .eplister li, #chapterlist a, .eplister a');
         }
       }
       
@@ -360,8 +363,8 @@ export const genericSourceHandler: SourceHandler = {
           // Absolute fallback for anime: any links containing episode patterns or Arabic "الحلقة" / "حلقة"
           chapterItems = doc('a[href*="/episode-"], a[href*="/episode/"], a[href*="/episodes/"], a[href*="/episodio/"], a[href*="/episodios/"], a[href*="/ep-"], a[href*="/ep/"], a[href*="/الحلقة-"], a[href*="/الحلقة/"], a[href*="/%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-"], a[href*="/%d8%ad%d9%84%d9%82%d8%a9-"], a[href*="/%D8%A7%D9%84%D8%AD%D9%84%D9%82%D8%A9-"], a[href*="/%D8%AD%D9%84%D9%82%D9%81-"], a[href*="%d8%ad%d9%84%d9%82"]');
         } else {
-          // Absolute fallback: any links containing "chapter-" or "chapter/" or "/الفصل-"
-          chapterItems = doc('a[href*="/chapter-"], a[href*="/chapter/"], a[href*="/الفصل-"]');
+          // Absolute fallback: any links containing "chapter" or "الفصل"
+          chapterItems = doc('a[href*="chapter-"], a[href*="chapter/"], a[href*="-chapter"], a[href*="الفصل-"], a[href*="-الفصل"]');
         }
       }
 
@@ -398,7 +401,9 @@ export const genericSourceHandler: SourceHandler = {
               hrefLower.endsWith('/anime/') || 
               hrefLower.endsWith('/category/') || 
               hrefLower.endsWith('/genre/') || 
-              hrefLower.includes('/genres/');
+              hrefLower.includes('/genres/') ||
+              text.includes('جميع حلقات') ||
+              text.includes('جميع الفصول');
               
             if (isEpisodeLink && !isExcluded) {
               matchedLinks.push(el);
@@ -415,7 +420,9 @@ export const genericSourceHandler: SourceHandler = {
             const isExcluded = 
               hrefLower.endsWith('/manga/') || 
               hrefLower.endsWith('/series/') || 
-              hrefLower.endsWith('/genre/');
+              hrefLower.endsWith('/genre/') ||
+              text.includes('جميع حلقات') ||
+              text.includes('جميع الفصول');
               
             if (isChapterLink && !isExcluded) {
               matchedLinks.push(el);
@@ -448,23 +455,45 @@ export const genericSourceHandler: SourceHandler = {
         
         const chapterUrl = normalizeUrl(rawChapterUrl, baseUrl);
         
-        let titleEl: any = null;
+        // Clone element and strip common non-title components like dates/views
+        const tempEl = linkEl.clone();
+        tempEl.find('.chapterdate, .chapter-date, .date, .time, .views, .view, span[class*="date"], span[class*="time"], span[class*="view"]').remove();
+
+        let chapterTitle = '';
         if (source.detailChapterTitleSelector) {
-          if (doc(el).is(source.detailChapterTitleSelector)) {
-            titleEl = doc(el);
-          } else {
-            titleEl = doc(el).find(source.detailChapterTitleSelector).first();
+          const tEl = doc(el).is(source.detailChapterTitleSelector) ? doc(el) : doc(el).find(source.detailChapterTitleSelector).first();
+          if (tEl.length > 0) {
+            const tempTEl = tEl.clone();
+            tempTEl.find('.chapterdate, .chapter-date, .date, .time, .views, .view, span[class*="date"], span[class*="time"], span[class*="view"]').remove();
+            chapterTitle = tempTEl.text().trim();
           }
         }
         
-        if (!titleEl || titleEl.length === 0) {
-          titleEl = doc(el).find('.chaptext, span, p').first();
-        }
-        if (!titleEl || titleEl.length === 0) {
-          titleEl = linkEl;
+        if (!chapterTitle) {
+          const linkText = tempEl.text().trim();
+          const lowerLinkText = linkText.toLowerCase();
+          const hasChapterKeyword = linkText.includes('الفصل') || linkText.includes('الحلقة') || lowerLinkText.includes('chapter') || lowerLinkText.includes('episode') || lowerLinkText.includes('ch.') || lowerLinkText.includes('ep.') || /^\s*\d+/.test(linkText);
+          
+          if (linkText && (hasChapterKeyword || linkText.length > 3)) {
+            chapterTitle = linkText;
+          } else {
+            const chapTextEl = doc(el).find('.chaptext, span, p').first();
+            if (chapTextEl.length > 0) {
+              const tempChapTextEl = chapTextEl.clone();
+              tempChapTextEl.find('.chapterdate, .chapter-date, .date, .time, .views, .view, span[class*="date"], span[class*="time"], span[class*="view"]').remove();
+              chapterTitle = tempChapTextEl.text().trim() || linkText;
+            } else {
+              chapterTitle = linkText;
+            }
+          }
         }
 
-        let chapterTitle = titleEl.text().trim() || linkEl.text().trim();
+        // Clean common site-specific noise from chapter titles
+        chapterTitle = chapterTitle
+          .replace(/[\d,.]+\s*(قراءة|مشاهدة)/gi, '')
+          .replace(/محدث\s*الآن/gi, '')
+          .replace(/جديد/gi, '')
+          .trim();
         
         // Advanced cleanup to prevent dates from being parsed as chapter numbers
         chapterTitle = chapterTitle.split('\n')[0].replace(/\s+/g, ' ').trim();
@@ -482,6 +511,19 @@ export const genericSourceHandler: SourceHandler = {
           chapterTitle = `${prefix} ${idx + 1}`;
         }
         
+        // Skip links that are actually just series links or table headers
+        if (
+          chapterTitle.includes('جميع حلقات') || 
+          chapterTitle.includes('جميع الفصول') ||
+          chapterTitle.includes('الحالة') ||
+          chapterTitle.includes('النوع') ||
+          chapterTitle.includes('الفصول') ||
+          chapterTitle.includes('تحديث') ||
+          chapterTitle.includes('آخر تحديث')
+        ) {
+          return;
+        }
+        
         const uniqueId = getUniqueId(chapterUrl);
         if (!allChapters.some(ch => ch.id === uniqueId)) {
           allChapters.push({
@@ -494,15 +536,29 @@ export const genericSourceHandler: SourceHandler = {
       });
     };
 
-    // Attempt Madara AJAX chapter fetch first
-    const mangaId = $('#manga-chapters-holder').attr('data-id') || 
-                    $('.wp-manga-action-button').attr('data-post') || 
-                    $('input.rating-post-id').val();
+    // Attempt Madara AJAX chapter fetch first with enhanced post id discovery
+    let mangaId = $('#manga-chapters-holder').attr('data-id') || 
+                  $('.wp-manga-action-button').attr('data-post') || 
+                  $('input.rating-post-id').val() ||
+                  $('[data-post-id]').attr('data-post-id') ||
+                  $('input[name="post_id"]').val() ||
+                  $('input#manga-id').val();
+
+    if (!mangaId) {
+      $('script').each((_, el) => {
+        const scriptContent = $(el).text();
+        const match = scriptContent.match(/(?:wp_manga_post_id|manga_id|post_id)\s*=\s*["']?(\d+)["']?/i);
+        if (match) {
+          mangaId = match[1];
+          return false;
+        }
+      });
+    }
                     
     if (mangaId) {
       try {
         const ajaxUrl = baseUrl + (baseUrl.endsWith('/') ? '' : '/') + 'wp-admin/admin-ajax.php';
-        const ajaxRes = await proxiedFetch(ajaxUrl, {
+        const ajaxRes = await retryFetch(ajaxUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -519,55 +575,99 @@ export const genericSourceHandler: SourceHandler = {
       }
     }
 
+    // Try a second common Madara-specific AJAX endpoint /ajax/chapters/ if we got few or no chapters
+    if (allChapters.length < 5) {
+      try {
+        const ajaxUrl = mangaUrl.endsWith('/') ? `${mangaUrl}ajax/chapters/` : `${mangaUrl}/ajax/chapters/`;
+        const ajaxRes = await retryFetch(ajaxUrl, {
+          method: 'POST'
+        });
+        const ajaxHtml = await ajaxRes.text();
+        if (ajaxHtml && ajaxHtml.length > 50 && !ajaxHtml.includes('{"error"')) {
+           const $ajax = cheerio.load(ajaxHtml);
+           extractChapters($ajax);
+        }
+      } catch (e) {
+        // Fallback to GET for /ajax/chapters/
+        try {
+          const ajaxUrl = mangaUrl.endsWith('/') ? `${mangaUrl}ajax/chapters/` : `${mangaUrl}/ajax/chapters/`;
+          const ajaxRes = await retryFetch(ajaxUrl);
+          const ajaxHtml = await ajaxRes.text();
+          if (ajaxHtml && ajaxHtml.length > 50 && !ajaxHtml.includes('{"error"')) {
+             const $ajax = cheerio.load(ajaxHtml);
+             extractChapters($ajax);
+          }
+        } catch (_) {}
+      }
+    }
+
+    // Extract any chapters already rendered in the main page's static HTML as well
     extractChapters($);
-
-    // Try finding next page for chapters if pagination exists (basic heuristic)
-    let currentPage = 2;
-    let hasMore = true;
-    while (hasMore && currentPage <= 10) {
-      const nextLink = $('a').filter((_, el) => $(el).text().includes('Next') || $(el).text().includes('التالي') || $(el).text().includes('›'));
-      if (nextLink.length > 0) {
-         try {
-           const pRes = await proxiedFetch(`${mangaUrl}?page=${currentPage}`);
-           const pHtml = await pRes.text();
-           const $p = cheerio.load(pHtml);
-           const countBefore = allChapters.length;
-           extractChapters($p);
-           if (allChapters.length > countBefore) currentPage++;
-           else hasMore = false;
-         } catch {
-           hasMore = false;
-         }
-      } else {
-        hasMore = false;
-      }
-    }
     
-    // Sort logic: if chapters are newest first, reverse them to ascending order
-    if (allChapters.length > 1) {
-      const firstNumStr = allChapters[0].name.match(/\d+/)?.[0] || '0';
-      const lastNumStr = allChapters[allChapters.length - 1].name.match(/\d+/)?.[0] || '0';
-      const firstNum = parseInt(firstNumStr, 10);
-      const lastNum = parseInt(lastNumStr, 10);
-      if (firstNum > lastNum) {
-        allChapters.reverse();
-      }
-    }
+        // Try finding next page for chapters if pagination exists
+        let currentPage = 2;
+        let hasMore = true;
+        let $currentDoc = $;
+        
+        while (hasMore && currentPage <= 50) {
+          // Look for common next page link selectors or text
+          let nextLink = $currentDoc('.pagination a.next, .nav-previous a, a[rel="next"]').first().attr('href');
+          if (!nextLink) {
+             const nextEl = $currentDoc('a').filter((_, el) => {
+               const t = $currentDoc(el).text().toLowerCase();
+               return t.includes('next') || t.includes('التالي') || t.includes('›') || t.includes('الصفحة التالية');
+             }).first();
+             nextLink = nextEl.attr('href');
+          }
 
-    return {
-      id: getUniqueId(mangaUrl),
-      title: title || 'اسم غير معروف',
-      cover: cover || '',
-      description: description || 'لا يوجد وصف متاح.',
-      url: mangaUrl,
-      chapters: allChapters,
-    };
-  },
+          // Also check for Madara specific "load more" if it wasn't caught by AJAX
+          if (!nextLink) {
+             hasMore = false;
+             break;
+          }
+
+          try {
+             const pUrl = nextLink.startsWith('http') ? nextLink : normalizeUrl(nextLink, baseUrl);
+             // Prevent infinite loops on same URL
+             if (pUrl === mangaUrl || allChapters.some(c => c.url === pUrl)) {
+               hasMore = false;
+               break;
+             }
+             
+             const pRes = await retryFetch(pUrl);
+             const pHtml = await pRes.text();
+             $currentDoc = cheerio.load(pHtml);
+             
+             const countBefore = allChapters.length;
+             extractChapters($currentDoc);
+             
+             if (allChapters.length > countBefore) {
+                currentPage++;
+             } else {
+                hasMore = false;
+             }
+          } catch {
+             hasMore = false;
+          }
+        }
+        
+        // Final cleaning
+        allChapters = deduplicate(allChapters);
+    
+        return {
+          id: getUniqueId(mangaUrl),
+          title: title || 'اسم غير معروف',
+          cover: cover || '',
+          description: description || 'لا يوجد وصف متاح.',
+          url: mangaUrl,
+          chapters: allChapters,
+        };
+      },
 
   async parseChapterPages(chapterUrl: string, source?: ScraperSource): Promise<ChapterPage[]> {
     if (!source) throw new Error("Source configuration missing for generic scraper.");
     const baseUrl = source.baseUrl;
-    const response = await proxiedFetch(chapterUrl);
+    const response = await retryFetch(chapterUrl);
     const html = await response.text();
     const $ = cheerio.load(html);
 
@@ -789,5 +889,117 @@ export const genericSourceHandler: SourceHandler = {
     }
 
     return pages;
+  },
+
+  async parseMangaChapters(mangaUrl: string, page: number, source?: ScraperSource): Promise<Chapter[]> {
+    if (!source) return [];
+    const baseUrl = source.baseUrl;
+    const chapters: Chapter[] = [];
+    
+    // Some sites have chapter lists paginated via ${mangaUrl}page/${page}/ or ${mangaUrl}?paged=${page}
+    const urlsToTry = [
+      mangaUrl.endsWith('/') ? `${mangaUrl}page/${page}/` : `${mangaUrl}/page/${page}/`,
+      mangaUrl.includes('?') ? `${mangaUrl}&paged=${page}` : `${mangaUrl}?paged=${page}`
+    ];
+    
+    for (const url of urlsToTry) {
+      try {
+        const response = await retryFetch(url);
+        if (response.ok) {
+          const html = await response.text();
+          const $ = cheerio.load(html);
+          
+          let chapterItems = source.detailChapterItemSelector ? $(source.detailChapterItemSelector) : null;
+          const isAnime = source.type === 'anime';
+
+          if (!chapterItems || chapterItems.length === 0) {
+            if (isAnime) {
+              chapterItems = $('.episodios a, .episodiodata a, .episodes-list a, .episodes-card a, .episode-item a, li.episode a, .episodes a, li.episodio a, .ep-card a, .episode-title a, a.episode-link, .season-list a, .seasons-list a, #episodes a, .episode a, [class*="episod"] a, [class*="ep_list"] a, [class*="ep-list"] a, [id*="episod"] a, [id*="episode"] a');
+            } else {
+              chapterItems = $('li.wp-manga-chapter, li.chapter-item, #cl li, #chapterlist li, .chapter-list li, tr.chapter-row, .eplister li, #chapterlist a, .eplister a');
+            }
+          }
+          
+          if (!chapterItems || chapterItems.length === 0) {
+            if (isAnime) {
+              chapterItems = $('a[href*="/episode-"], a[href*="/episode/"], a[href*="/episodes/"], a[href*="/episodio/"], a[href*="/episodios/"], a[href*="/ep-"], a[href*="/ep/"], a[href*="/الحلقة-"], a[href*="/الحلقة/"], a[href*="/%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9-"], a[href*="/%d8%ad%d9%84%d9%82%d8%a9-"], a[href*="/%D8%A7%D9%84%D8%AD%D9%84%D9%82%D8%A9-"], a[href*="/%D8%AD%D9%84%D9%82%D9%81-"], a[href*="%d8%ad%d9%84%d9%82"]');
+            } else {
+              chapterItems = $('a[href*="chapter-"], a[href*="chapter/"], a[href*="-chapter"], a[href*="الفصل-"], a[href*="-الفصل"]');
+            }
+          }
+
+          chapterItems.each((_idx, el) => {
+            let linkEl = source.detailChapterLinkSelector ? ($(el).is(source.detailChapterLinkSelector) ? $(el) : $(el).find(source.detailChapterLinkSelector).first()) : null;
+            if (!linkEl || linkEl.length === 0) {
+              linkEl = $(el).is('a') ? $(el) : $(el).find('a').first();
+            }
+            const rawChapterUrl = linkEl.attr('href');
+            if (!rawChapterUrl) return;
+            
+            const chapterUrl = normalizeUrl(rawChapterUrl, baseUrl);
+
+            // Clone and clean
+            const tempEl = linkEl.clone();
+            tempEl.find('.chapterdate, .chapter-date, .date, .time, .views, .view, span[class*="date"], span[class*="time"], span[class*="view"]').remove();
+
+            let titleEl = source.detailChapterTitleSelector ? ($(el).is(source.detailChapterTitleSelector) ? $(el) : $(el).find(source.detailChapterTitleSelector).first()) : null;
+            if (!titleEl || titleEl.length === 0) {
+              titleEl = $(el).find('.chaptext, span, p').first();
+            }
+            if (!titleEl || titleEl.length === 0) {
+              titleEl = linkEl;
+            }
+
+            const tempTitleEl = titleEl.clone();
+            tempTitleEl.find('.chapterdate, .chapter-date, .date, .time, .views, .view, span[class*="date"], span[class*="time"], span[class*="view"]').remove();
+
+            let chapterTitle = tempTitleEl.text().trim() || tempEl.text().trim();
+            chapterTitle = chapterTitle.split('\n')[0].replace(/\s+/g, ' ').trim();
+            chapterTitle = chapterTitle.replace(/(منذ|قبل)?\s*\d+\s*(ساعات|ساعة|ايام|أيام|يوم|شهر|أشهر|دقائق|دقيقة|ثواني|ثانية|days|day|hours|hour|mins|min|months|month|years|year)(\s*(مضت|ago))?/gi, '');
+            chapterTitle = chapterTitle.trim().replace(/^-|-$/g, '').trim();
+
+            const prefix = isAnime ? 'الحلقة' : 'الفصل';
+            if (/^[\d.]+$/.test(chapterTitle)) {
+              chapterTitle = `${prefix} ${chapterTitle}`;
+            }
+            
+            if (!chapterTitle || /^(\s|-)*$/.test(chapterTitle)) {
+              return;
+            }
+
+            // Skip links that are actually just series links or table headers
+            if (
+              chapterTitle.includes('جميع حلقات') || 
+              chapterTitle.includes('جميع الفصول') ||
+              chapterTitle.includes('الحالة') ||
+              chapterTitle.includes('النوع') ||
+              chapterTitle.includes('الفصول') ||
+              chapterTitle.includes('تحديث') ||
+              chapterTitle.includes('آخر تحديث')
+            ) {
+              return;
+            }
+
+            const uniqueId = getUniqueId(chapterUrl);
+            if (!chapters.some(ch => ch.id === uniqueId)) {
+              chapters.push({
+                id: uniqueId,
+                name: chapterTitle,
+                url: chapterUrl,
+                isLocked: $(el).find('.fa-lock, i.lock, svg.lock, .premium, .locked').length > 0
+              });
+            }
+          });
+          
+          if (chapters.length > 0) {
+            break;
+          }
+        }
+      } catch (e) {
+        console.warn(`[Scraper] Failed parsing generic chapters on ${url}:`, e);
+      }
+    }
+    
+    return chapters;
   },
 };

@@ -15,6 +15,31 @@ export default function AnimePlayerView({ anime, episodeNumber, onNavigateEpisod
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
+  useEffect(() => {
+    if (!anime || !anime.episodes) {
+      setLoading(false);
+      return;
+    }
+    const episode = anime.episodes.find(e => e.episodeNumber === episodeNumber);
+    const episodeUrl = episode?.url || '';
+    if (!episodeUrl) {
+      setLoading(false);
+      return;
+    }
+    
+    setLoading(true);
+    fetchWatchServers(episodeUrl)
+      .then(s => {
+        setServers(s);
+        setActiveServer(s[0] || null);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setLoading(false);
+      });
+  }, [anime, episodeNumber]);
+
   const seekVideo = (seconds: number) => {
     if (iframeRef.current && iframeRef.current.contentWindow) {
       iframeRef.current.contentWindow.postMessage(
@@ -75,10 +100,14 @@ export default function AnimePlayerView({ anime, episodeNumber, onNavigateEpisod
         </div>
       </div>
       
-      <div className="p-4 bg-zinc-900 text-white flex items-center justify-between">
-        <button onClick={() => handleNavigateEpisode('prev')} className="p-2 bg-zinc-800 rounded-lg"><ChevronLeft /></button>
-        <div className="text-lg font-bold">{anime.title} - الحلقة {episodeNumber}</div>
-        <button onClick={() => handleNavigateEpisode('next')} className="p-2 bg-zinc-800 rounded-lg"><ChevronRight /></button>
+      <div className="p-4 bg-zinc-900 text-white flex items-center justify-between gap-4">
+        <button onClick={() => handleNavigateEpisode('prev')} className="p-2 bg-zinc-800 rounded-lg shrink-0"><ChevronLeft /></button>
+        <div className="text-sm sm:text-lg font-bold truncate text-center flex-1" dir="rtl">
+          <span className="text-amber-500">الحلقة {episodeNumber}</span>
+          <span className="mx-2 text-zinc-500">•</span>
+          <span className="text-zinc-300">{anime.title}</span>
+        </div>
+        <button onClick={() => handleNavigateEpisode('next')} className="p-2 bg-zinc-800 rounded-lg shrink-0"><ChevronRight /></button>
       </div>
 
       <div className="p-4 bg-zinc-950 flex gap-2 overflow-x-auto">
