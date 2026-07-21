@@ -15,6 +15,27 @@ body {
   overflow-x: hidden;
   position: relative;
   min-height: 100vh;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+body:not(.dark) {
+  background-color: #f4f4f6;
+  color: #18181b;
+  --color-zinc-950: #e4e4e7;
+  --color-zinc-900: #ffffff;
+  --color-zinc-850: #f4f4f5;
+  --color-zinc-800: #e4e4e7;
+  --color-zinc-750: #d4d4d8;
+  --color-zinc-700: #a1a1aa;
+  --color-zinc-600: #71717a;
+  --color-zinc-500: #52525b;
+  --color-zinc-400: #3f3f46;
+  --color-zinc-300: #27272a;
+  --color-zinc-200: #1c1c1e;
+  --color-zinc-100: #09090b;
+  --color-zinc-50: #18181b;
+  
+  color-scheme: light;
 }
 
 body::before {
@@ -29,6 +50,11 @@ body::before {
   background: radial-gradient(circle at 50% 50%, rgba(185, 28, 28, 0.08) 0%, rgba(9, 9, 11, 0) 70%),
               radial-gradient(circle at 80% 20%, rgba(153, 27, 27, 0.05) 0%, rgba(9, 9, 11, 0) 50%);
   animation: breathe 15s ease-in-out infinite, flicker 4s infinite alternate;
+}
+
+body:not(.dark)::before {
+  background: radial-gradient(circle at 50% 50%, rgba(239, 68, 68, 0.04) 0%, rgba(244, 244, 245, 0) 70%),
+              radial-gradient(circle at 80% 20%, rgba(239, 68, 68, 0.03) 0%, rgba(244, 244, 245, 0) 50%);
 }
 
 @keyframes breathe {

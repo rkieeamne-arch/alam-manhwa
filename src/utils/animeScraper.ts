@@ -133,9 +133,13 @@ export interface Episode {
   url: string;
 }
 
-export async function fetchLatestEpisodes(): Promise<Anime[]> {
+export async function fetchLatestEpisodes(pageNum: number = 1): Promise<Anime[]> {
   try {
-    const res = await retryFetch(ANIME_HOME_URL);
+    let url = ANIME_HOME_URL;
+    if (pageNum > 1) {
+      url = ANIME_HOME_URL.replace(/\/$/, '') + `/page/${pageNum}/`;
+    }
+    const res = await retryFetch(url);
     if (!res.ok) throw new Error(`Status: ${res.status}`);
     const text = await res.text();
     const $ = cheerio.load(text);
@@ -234,10 +238,13 @@ export async function fetchLatestSeries(): Promise<Anime[]> {
   }
 }
 
-export async function searchAnime(query: string): Promise<Anime[]> {
+export async function searchAnime(query: string, pageNum: number = 1): Promise<Anime[]> {
   if (!query || query.trim() === '') return [];
   try {
-    const searchUrl = `${SEARCH_BASE_URL}?s=${encodeURIComponent(query)}`;
+    let searchUrl = `${SEARCH_BASE_URL}?s=${encodeURIComponent(query)}`;
+    if (pageNum > 1) {
+      searchUrl = `${SEARCH_BASE_URL}page/${pageNum}/?s=${encodeURIComponent(query)}`;
+    }
     const res = await proxiedFetch(searchUrl);
     const text = await res.text();
     const $ = cheerio.load(text);

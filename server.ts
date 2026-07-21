@@ -5,6 +5,8 @@ import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { mockManhuas } from './src/data';
+import { scrapePopularList, scrapeMangaDetails, scrapeMangaChapters, scrapeChapterPages } from './src/utils/scraper';
+import { sources } from './src/sources';
 
 // Caching for dynamic sitemap generator
 let sitemapSlugsCache: string[] = [];
@@ -93,11 +95,77 @@ async function startServer() {
     res.json({ success: true });
   });
 
+  // API routes
+  app.get('/api/home', async (req, res) => {
+    try {
+      const source = { id: 'azorafly', baseUrl: 'https://azorafly.com', type: 'manga' } as any;
+      const data = await scrapePopularList(source, undefined, 1);
+      res.json(data);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to fetch home data' });
+    }
+  });
+
+  app.get('/api/search', async (req, res) => {
+    const query = req.query.q as string;
+    if (!query) return res.status(400).json({ error: 'Query required' });
+    try {
+      const source = { id: 'azorafly', baseUrl: 'https://azorafly.com', type: 'manga' } as any;
+      const data = await scrapePopularList(source, query, 1);
+      res.json(data);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to search' });
+    }
+  });
+
+  app.get('/api/manhwa/:id', async (req, res) => {
+    const sourceUrl = req.query.sourceUrl as string;
+    if (!sourceUrl) return res.status(400).json({ error: 'sourceUrl required' });
+    try {
+      const source = { id: 'azorafly', baseUrl: 'https://azorafly.com', type: 'manga' } as any;
+      const data = await scrapeMangaDetails(source, sourceUrl);
+      res.json(data);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to fetch details' });
+    }
+  });
+
+  app.get('/api/chapter/:id', async (req, res) => {
+    const chapterUrl = req.query.chapterUrl as string;
+    if (!chapterUrl) return res.status(400).json({ error: 'chapterUrl required' });
+    try {
+      const source = { id: 'azorafly', baseUrl: 'https://azorafly.com', type: 'manga' } as any;
+      const data = await scrapeChapterPages(source, chapterUrl);
+      res.json(data);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to fetch chapter pages' });
+    }
+  });
+
   // CORS-bypassing proxy for dynamic scraper sources (supports GET, POST, etc.)
   app.all('/api/proxy', async (req, res) => {
-    const targetUrl = req.query.url as string;
+    let targetUrl = req.query.url as string;
     if (!targetUrl) {
       return res.status(400).json({ error: 'URL is required' });
+    }
+
+    // Reconstruct targetUrl if other query parameters were passed to the proxy directly
+    try {
+      const urlObj = new URL(targetUrl);
+      Object.keys(req.query).forEach((key) => {
+        if (key !== 'url') {
+          urlObj.searchParams.set(key, req.query[key] as string);
+        }
+      });
+      targetUrl = urlObj.toString();
+    } catch (e) {
+      const extraParams = Object.keys(req.query)
+        .filter((key) => key !== 'url')
+        .map((key) => `${encodeURIComponent(key)}=${encodeURIComponent(req.query[key] as string)}`)
+        .join('&');
+      if (extraParams) {
+        targetUrl += (targetUrl.includes('?') ? '&' : '?') + extraParams;
+      }
     }
 
     console.log(`[Proxy] [${req.method}] Fetching: ${targetUrl}`);

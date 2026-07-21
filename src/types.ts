@@ -70,6 +70,18 @@ export interface ReadingHistoryItem {
   pageIndex: number;
 }
 
+export interface AnimeWatchHistoryItem {
+  id: string; // unique history entry id
+  animeId: string;
+  animeTitle: string;
+  animeCover: string;
+  episodeId: string;
+  episodeTitle: string;
+  episodeNumber: number;
+  lastWatchedTime: string;
+  stoppedAtSeconds: number; // e.g. 750 seconds (12:30)
+}
+
 export interface ReaderSettings {
   readingMode: 'webtoon' | 'vertical' | 'horizontal';
   zoomLevel: number; // 50 to 150 %
@@ -125,5 +137,18 @@ export interface ScraperSource {
   // 4. CSS Selectors for reader pages page
   pageImgSelector: string;
   pageImgAttr: string; // usually 'src' or 'data-src' or 'data-cdn'
+}
+
+export interface NotificationItem {
+  id: string;
+  title: string;
+  type: 'manga' | 'anime';
+  content: string;
+  time: string;
+  isNew: boolean;
+  targetId: string;
+  chapterOrEp?: string | number;
+  cover?: string;
+  sourceUrl?: string;
 }
 

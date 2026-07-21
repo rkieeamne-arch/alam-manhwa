@@ -364,7 +364,7 @@ export default function ReaderView({
     >
       {/* 1. TOP EDGE SLIM PROGRESS LINE */}
       <div 
-        className="fixed top-0 left-0 right-0 h-[3px] bg-red-600 transition-all duration-300 z-50" 
+        className="fixed top-0 right-0 h-[4px] bg-gradient-to-l from-red-500 via-amber-500 to-red-500 shadow-[0_0_8px_rgba(239,68,68,0.7)] transition-all duration-300 z-50 rounded-l-full pointer-events-none" 
         style={{ width: `${currentProgress}%` }}
       />
 
@@ -600,14 +600,53 @@ export default function ReaderView({
         )}
       </div>
 
-      {/* 5. GORGEOUS UNICODE PROGRESS PILL (Bottom Floating - Toggled on Focus) */}
+      {/* 5. GORGEOUS STUNNING PROGRESS CARD */}
       {showUI && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 transition-all duration-300">
-          <div className="bg-zinc-950/90 text-zinc-100 border border-zinc-800/80 px-4 py-2 rounded-full text-xs font-bold shadow-2xl flex items-center gap-3 backdrop-blur-md">
-            <span>الفصل {chapter.chapterNumber}</span>
-            <span className="font-mono text-red-500 tracking-wider">
-              {getUnicodeProgressBar(currentProgress)} {currentProgress}%
-            </span>
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 transition-all duration-300 w-[92%] max-w-md animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="bg-zinc-950/90 text-zinc-100 border border-red-500/10 px-5 py-4 rounded-3xl shadow-[0_12px_40px_rgba(0,0,0,0.8)] border-t-red-500/20 flex flex-col gap-3 backdrop-blur-md relative overflow-hidden">
+            {/* Ambient subtle glow decorator */}
+            <div className="absolute -bottom-10 -right-10 w-24 h-24 bg-red-500/5 rounded-full blur-2xl pointer-events-none" />
+            
+            {/* Header Info Row */}
+            <div className="flex items-center justify-between text-xs font-black">
+              <span className="text-zinc-400 bg-zinc-900/60 px-2.5 py-1 rounded-lg border border-zinc-850">الفصل {chapter.chapterNumber}</span>
+              <div className="flex items-center gap-1.5 bg-zinc-900/60 px-2.5 py-1 rounded-lg border border-zinc-850">
+                <span className="text-zinc-400 font-medium text-[11px]">موضع القراءة:</span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-amber-400 font-black">
+                  {readerSettings.readingMode === 'webtoon' ? `${currentProgress}%` : `الصفحة ${currentPageIndex + 1} من ${displayPages.length}`}
+                </span>
+              </div>
+            </div>
+            
+            {/* Real Graphic Progress Bar */}
+            <div className="flex items-center gap-3">
+              {readerSettings.readingMode !== 'webtoon' && (
+                <button 
+                  onClick={handlePrevPage}
+                  className="p-2 hover:bg-zinc-900 rounded-xl text-zinc-400 hover:text-white border border-transparent hover:border-zinc-800 transition-all active:scale-90 cursor-pointer"
+                  title="الصفحة السابقة"
+                >
+                  <ChevronRight className="w-4 h-4 text-zinc-300" />
+                </button>
+              )}
+              
+              <div className="flex-grow relative h-2 bg-zinc-900 rounded-full border border-zinc-850/30 overflow-hidden">
+                <div 
+                  className="absolute right-0 top-0 h-full bg-gradient-to-l from-red-500 via-orange-500 to-amber-500 rounded-full transition-all duration-300 shadow-[0_0_8px_rgba(239,68,68,0.5)]"
+                  style={{ width: `${currentProgress}%` }}
+                />
+              </div>
+
+              {readerSettings.readingMode !== 'webtoon' && (
+                <button 
+                  onClick={handleNextPage}
+                  className="p-2 hover:bg-zinc-900 rounded-xl text-zinc-400 hover:text-white border border-transparent hover:border-zinc-800 transition-all active:scale-90 cursor-pointer"
+                  title="الصفحة التالية"
+                >
+                  <ChevronLeft className="w-4 h-4 text-zinc-300" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

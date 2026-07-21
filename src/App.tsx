@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { mockManhuas, defaultScraperSources } from './data';
-import { UserProfile, ReadingHistoryItem, ReaderSettings, Manhua, Chapter, ScraperSource, ReadingListItem } from './types';
-import { updateUserProfile, fetchUserReadingHistory, saveUserReadingHistory, deleteUserHistoryItem, clearUserReadingHistory, fetchUserReadingList, addManhuaToReadingList, removeManhuaFromReadingList } from './lib/firebaseDb';
+import { UserProfile, ReadingHistoryItem, AnimeWatchHistoryItem, ReaderSettings, Manhua, Chapter, ScraperSource, ReadingListItem, NotificationItem } from './types';
+import { updateUserProfile, fetchUserReadingHistory, saveUserReadingHistory, deleteUserHistoryItem, clearUserReadingHistory, fetchUserReadingList, addManhuaToReadingList, removeManhuaFromReadingList, fetchUserAnimeHistory, saveUserAnimeHistory, deleteUserAnimeHistoryItem, clearUserAnimeHistory } from './lib/firebaseDb';
 import { subscribeToAuthChanges, logout, loginWithEmail, signupWithEmail, resetPassword, signInWithGoogle } from './lib/firebaseAuth';
 import { auth } from './lib/firebaseAuth';
-import { Home, Search, Heart, History, FolderDown, User, MessageSquare } from 'lucide-react';
+import { Home, Search, Heart, History, FolderDown, User, MessageSquare, Bell, Tv, BookOpen, X } from 'lucide-react';
 
 // Components
 import Header from './components/Header';
@@ -23,6 +23,28 @@ import MyListView from './views/MyListView';
 import DownloadsView from './views/DownloadsView';
 import AnimeDetailsView from './views/AnimeDetailsView';
 import AnimePlayerView from './views/AnimePlayerView';
+import { fetchAnimeDetails } from './utils/animeScraper';
+
+
+function getUniqueId(url: string): string {
+  if (!url) return 'unknown-' + Math.random().toString(36).substring(7);
+  try {
+    const urlObj = new URL(url);
+    const path = urlObj.pathname.replace(/\/$/, '');
+    const slug = path.substring(path.lastIndexOf('/') + 1) || 'manga';
+    const urlForHash = url.replace(/\/$/, '');
+    let hash = 0;
+    for (let i = 0; i < urlForHash.length; i++) {
+      const char = urlForHash.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash |= 0;
+    }
+    const hashStr = Math.abs(hash).toString(36);
+    return `${slug}-${hashStr}`;
+  } catch (e) {
+    return 'unknown-' + Math.random().toString(36).substring(7);
+  }
+}
 
 
 export default function App() {
@@ -111,6 +133,101 @@ export default function App() {
     return [];
   });
 
+  // Anime Watch History State
+  const [animeHistory, setAnimeHistory] = useState<AnimeWatchHistoryItem[]>(() => {
+    const saved = localStorage.getItem('anime_watch_history');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  });
+
+  // User Notifications State
+  const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
+    // Clear any previous mock/fake notifications stored in localStorage
+    localStorage.removeItem('user_notifications');
+    return [];
+  });
+
+  const [activeToast, setActiveToast] = useState<NotificationItem | null>(null);
+
+  // Save Notifications to LocalStorage
+  useEffect(() => {
+    localStorage.setItem('user_notifications', JSON.stringify(notifications));
+  }, [notifications]);
+
+  // Toast Auto-Dismiss
+  useEffect(() => {
+    if (activeToast) {
+      const dismiss = setTimeout(() => {
+        setActiveToast(null);
+      }, 7000);
+      return () => clearTimeout(dismiss);
+    }
+  }, [activeToast]);
+
+  const handleNotificationClick = (notif: NotificationItem) => {
+    // Mark as read
+    setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, isNew: false } : n));
+    
+    // Auto-dismiss toast if clicked
+    if (activeToast?.id === notif.id) {
+      setActiveToast(null);
+    }
+
+    // Direct routing
+    if (notif.type === 'anime') {
+      setAppMode('anime');
+      setSelectedManhuaId(notif.targetId);
+      if (notif.chapterOrEp) {
+        setSelectedChapterId(notif.chapterOrEp.toString());
+        setCurrentView('anime-player');
+      } else {
+        setCurrentView('anime-details');
+      }
+    } else {
+      setAppMode('manga');
+      setSelectedManhuaId(notif.targetId);
+      if (notif.sourceUrl) {
+        setScrapedManhuaCache({
+          id: notif.targetId,
+          title: notif.title,
+          englishTitle: notif.title,
+          coverUrl: notif.cover || '',
+          rawCoverUrl: notif.cover || '',
+          sourceUrl: notif.sourceUrl,
+          sourceId: notif.targetId.split('-')[1] || 'azorafly',
+          description: notif.content,
+          author: 'غير معروف',
+          artist: 'غير معروف',
+          status: 'مستمر' as any,
+          rating: 4.8,
+          views: 0,
+          categories: ['مانهوا'],
+          chapters: []
+        });
+      }
+      if (notif.chapterOrEp) {
+        setSelectedChapterId(notif.chapterOrEp.toString());
+        setCurrentView('reader');
+      } else {
+        setCurrentView('manhua');
+      }
+    }
+  };
+
+  const handleMarkAllNotificationsRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, isNew: false })));
+  };
+
+  const handleClearAllNotifications = () => {
+    setNotifications([]);
+  };
+
   // User Reading Lists (Favorites, Currently reading, Plan to read)
   const [readingList, setReadingList] = useState<ReadingListItem[]>([]);
 
@@ -119,8 +236,10 @@ export default function App() {
     const loadUserData = async () => {
       try {
         const fetchedHistory = await fetchUserReadingHistory(user.id);
+        const fetchedAnimeHistory = await fetchUserAnimeHistory(user.id);
         const fetchedList = await fetchUserReadingList(user.id);
         setHistory(fetchedHistory);
+        setAnimeHistory(fetchedAnimeHistory);
         setReadingList(fetchedList);
       } catch (err) {
         console.error("Failed to load user local data:", err);
@@ -275,12 +394,12 @@ export default function App() {
     // Apply night mode to document body for total immersion
     if (readerSettings.isNightMode) {
       document.body.classList.add('dark');
-      document.body.style.backgroundColor = '#09090b'; // zinc-950
-      document.body.style.color = '#fafafa'; // zinc-50
+      document.body.style.backgroundColor = '';
+      document.body.style.color = '';
     } else {
       document.body.classList.remove('dark');
-      document.body.style.backgroundColor = '#fafafa'; // light slate
-      document.body.style.color = '#18181b'; // zinc-900
+      document.body.style.backgroundColor = '';
+      document.body.style.color = '';
     }
   }, [readerSettings]);
 
@@ -297,6 +416,12 @@ export default function App() {
       localStorage.setItem('manhua_reading_history', JSON.stringify(history));
     }
   }, [history, user]);
+
+  useEffect(() => {
+    if (!user) {
+      localStorage.setItem('anime_watch_history', JSON.stringify(animeHistory));
+    }
+  }, [animeHistory, user]);
 
   // Dynamic Manhuas State (starts empty as requested)
   const [manhuas, setManhuas] = useState<Manhua[]>(() => {
@@ -414,6 +539,57 @@ export default function App() {
       }
     } else {
       setHistory([]);
+    }
+  };
+
+  // Anime History Functions
+  const handleAddAnimeHistory = async (item: Omit<AnimeWatchHistoryItem, 'id' | 'lastWatchedTime'>) => {
+    if (user?.id) {
+      try {
+        const savedItem = await saveUserAnimeHistory(user.id, item);
+        setAnimeHistory((prev) => {
+          const filtered = prev.filter((h) => h.animeId !== item.animeId);
+          return [savedItem, ...filtered];
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    } else {
+      setAnimeHistory((prev) => {
+        const filtered = prev.filter((h) => h.animeId !== item.animeId);
+        const newItem: AnimeWatchHistoryItem = {
+          ...item,
+          id: 'animehist-' + Date.now(),
+          lastWatchedTime: new Date().toISOString()
+        };
+        return [newItem, ...filtered];
+      });
+    }
+  };
+
+  const handleRemoveAnimeHistoryItem = async (id: string) => {
+    if (user?.id) {
+      try {
+        await deleteUserAnimeHistoryItem(user.id, id);
+        setAnimeHistory((prev) => prev.filter((h) => h.id !== id));
+      } catch (err) {
+        console.error(err);
+      }
+    } else {
+      setAnimeHistory((prev) => prev.filter((h) => h.id !== id));
+    }
+  };
+
+  const handleClearAnimeHistory = async () => {
+    if (user?.id) {
+      try {
+        await clearUserAnimeHistory(user.id);
+        setAnimeHistory([]);
+      } catch (err) {
+        console.error(err);
+      }
+    } else {
+      setAnimeHistory([]);
     }
   };
 
@@ -547,6 +723,12 @@ export default function App() {
           homeLayout={homeLayout}
           appMode={appMode}
           onToggleAppMode={handleToggleAppMode}
+          isNightMode={readerSettings.isNightMode}
+          onToggleNightMode={() => setReaderSettings(prev => ({ ...prev, isNightMode: !prev.isNightMode }))}
+          notifications={notifications}
+          onNotificationClick={handleNotificationClick}
+          onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
+          onClearAllNotifications={handleClearAllNotifications}
         />
       )}
 
@@ -661,6 +843,13 @@ export default function App() {
             onNavigateEpisode={(id, ep) => {
               setSelectedChapterId(ep.toString());
             }}
+            onBack={() => setCurrentView('anime-details')}
+            onAddAnimeHistory={handleAddAnimeHistory}
+            initialStoppedSeconds={
+              animeHistory.find(
+                (h) => h.animeId === selectedManhuaId && h.episodeNumber === parseInt(selectedChapterId || '1')
+              )?.stoppedAtSeconds || 0
+            }
           />
         )}
 
@@ -706,9 +895,28 @@ export default function App() {
         {currentView === 'history' && (
           <HistoryView 
             history={history}
+            animeHistory={animeHistory}
             onSelectChapter={handleSelectChapter}
+            onSelectEpisode={async (animeId, episodeNumber) => {
+              setSelectedManhuaId(animeId);
+              setAppMode('anime');
+              setSelectedChapterId(episodeNumber.toString());
+              setCurrentView('anime-player');
+              
+              // Prefetch anime details in the background so player can load
+              try {
+                const details = await fetchAnimeDetails(animeId);
+                if (details) {
+                  setScrapedManhuaCache(details);
+                }
+              } catch (e) {
+                console.error("Failed to prefetch anime details:", e);
+              }
+            }}
             onRemoveItem={handleRemoveHistoryItem}
+            onRemoveAnimeItem={handleRemoveAnimeHistoryItem}
             onClearAll={handleClearHistory}
+            onClearAllAnime={handleClearAnimeHistory}
           />
         )}
 
@@ -926,6 +1134,57 @@ export default function App() {
             </button>
 
           </div>
+        </div>
+      )}
+
+      {/* Real-time Dynamic Toast Notification popup */}
+      {activeToast && (
+        <div 
+          onClick={() => handleNotificationClick(activeToast)}
+          className="fixed bottom-24 left-4 md:bottom-6 md:left-6 z-50 max-w-sm w-[calc(100vw-2rem)] sm:w-96 bg-zinc-950/95 border border-red-500/30 text-white rounded-2xl shadow-2xl p-4 flex gap-3 cursor-pointer select-none animate-fade-in group hover:border-red-500 transition-all duration-300"
+          dir="rtl"
+        >
+          {/* Cover */}
+          <div className="w-12 h-16 rounded overflow-hidden shrink-0 bg-zinc-900 border border-zinc-800">
+            {activeToast.cover ? (
+              <img 
+                src={activeToast.cover} 
+                alt={activeToast.title} 
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                {activeToast.type === 'anime' ? <Tv className="w-5 h-5 text-zinc-600" /> : <BookOpen className="w-5 h-5 text-zinc-600" />}
+              </div>
+            )}
+          </div>
+
+          {/* Details */}
+          <div className="flex-1 min-w-0 pr-1 text-right">
+            <div className="flex items-center gap-1.5 text-red-500 text-[10px] font-black">
+              <Bell className="w-3.5 h-3.5 animate-bounce" />
+              <span>تحديث جديد متاح الآن!</span>
+            </div>
+            <h4 className="text-xs font-black text-white truncate mt-0.5">
+              {activeToast.title}
+            </h4>
+            <p className="text-[10px] text-zinc-400 mt-1 leading-snug line-clamp-2">
+              {activeToast.content}
+            </p>
+          </div>
+
+          {/* Close button */}
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              setActiveToast(null);
+            }}
+            className="absolute top-2 left-2 text-zinc-500 hover:text-white p-1 rounded-full hover:bg-zinc-900 transition-all"
+            title="إغلاق التنبيه"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 

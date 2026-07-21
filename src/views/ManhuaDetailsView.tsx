@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Star, Eye, Calendar, User, Palette, Bookmark, BookOpen, Clock, Loader2, RefreshCw, Lock, Download, CheckCircle, DownloadCloud, Trash2, AlertCircle, Play, ArrowUpDown } from 'lucide-react';
+import { ArrowRight, Star, Eye, Calendar, User, Palette, Bookmark, BookOpen, Clock, Loader2, RefreshCw, Lock, Download, CheckCircle, DownloadCloud, Trash2, AlertCircle, Play, ArrowUpDown, ChevronDown } from 'lucide-react';
 import { Manhua, Chapter, ScraperSource, UserProfile, ReadingListItem } from '../types';
 import { scrapeMangaDetails, scrapeMangaChapters, scrapeChapterPages } from '../utils/scraper';
 import { extractNumber } from '../utils/scraperUtils';
@@ -800,65 +800,23 @@ export default function ManhuaDetailsView({
           </div>
         )}
 
-        {/* Chapter Fetching & Refreshing Control Panel */}
-        {isScraped && displayManhua.chapters.length > 0 && (
-          <div className="mt-8 pt-6 border-t border-zinc-900/80 flex flex-col items-center justify-center space-y-4 w-full max-w-xl mx-auto" style={{ direction: 'rtl' }}>
-            <div className="text-center space-y-1">
-              <h4 className="text-xs font-black tracking-wider text-red-500 uppercase font-sans">أدوات مزامنة وجلب الفصول ⚡</h4>
-              <p className="text-[11px] text-zinc-400">تحديث فوري للعمل وسحب الفصول مباشرة وبدقة متناهية من المصدر الرسمي</p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
-              {/* Force Refresh All Chapters (Bypass Cache) */}
-              <button
-                onClick={forceRefreshChapters}
-                disabled={loadingMoreChapters}
-                className="relative group flex items-center justify-center gap-2.5 px-6 py-3.5 bg-zinc-950 hover:bg-zinc-900 text-zinc-200 hover:text-white border border-zinc-800 hover:border-red-500/30 rounded-xl text-xs font-extrabold transition-all duration-300 shadow-[0_4px_15px_rgba(0,0,0,0.5)] hover:scale-[1.01] active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
-                id="btn-force-refresh-chapters"
-              >
-                {loadingMoreChapters ? (
-                  <>
-                    <Loader2 className="w-4 h-4 text-red-500 animate-spin shrink-0" />
-                    <span>جاري تحديث الفصول...</span>
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="w-4 h-4 text-red-500 group-hover:rotate-180 transition-transform duration-700 ease-out shrink-0" />
-                    <span>تحديث وجلب كافة الفصول ⚡</span>
-                  </>
-                )}
-              </button>
-
-              {/* Load More Chapters (Pagination) */}
-              {hasMoreChapters ? (
-                <button
-                  onClick={loadMoreChapters}
-                  disabled={loadingMoreChapters}
-                  className="relative group flex items-center justify-center gap-2.5 px-6 py-3.5 bg-gradient-to-r from-red-950/40 to-zinc-950 hover:from-red-900/40 hover:to-zinc-900 text-zinc-200 hover:text-white border border-red-500/20 hover:border-red-500/50 rounded-xl text-xs font-extrabold transition-all duration-300 shadow-[0_4px_15px_rgba(239,68,68,0.05)] hover:scale-[1.01] active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
-                  id="btn-load-more-chapters"
-                >
-                  {loadingMoreChapters ? (
-                    <>
-                      <Loader2 className="w-4 h-4 text-red-500 animate-spin shrink-0" />
-                      <span>جاري البحث الإضافي...</span>
-                    </>
-                  ) : (
-                    <>
-                      <BookOpen className="w-4 h-4 text-red-500 shrink-0" />
-                      <span>جلب الفصول الإضافية 🔄</span>
-                    </>
-                  )}
-                </button>
+        {/* Simple Down-Arrow Button to Load More Chapters */}
+        {isScraped && hasMoreChapters && (
+          <div className="flex justify-center py-2">
+            <button
+              onClick={loadMoreChapters}
+              disabled={loadingMoreChapters}
+              className="text-zinc-500 hover:text-red-500 transition-colors p-2 cursor-pointer flex flex-col items-center gap-1.5 active:scale-95 disabled:opacity-40"
+              title="جلب المزيد من الفصول"
+              id="btn-load-more-chapters"
+            >
+              {loadingMoreChapters ? (
+                <Loader2 className="w-4 h-4 text-red-500 animate-spin" />
               ) : (
-                <div className="flex items-center justify-center px-6 py-3.5 bg-zinc-950/50 text-zinc-500 border border-zinc-900/60 rounded-xl text-xs font-bold text-center">
-                  <span>وصلت لنهاية فصول المصدر الحالي ✓</span>
-                </div>
+                <ChevronDown className="w-4 h-4 text-red-500 animate-bounce" />
               )}
-            </div>
-
-            <p className="text-[10px] text-zinc-500 font-medium text-center leading-relaxed max-w-md">
-              * في حال لم تظهر فصول معينة (مثل الفصل 62 وما بعده)، اضغط على زر **تحديث وجلب كافة الفصول ⚡** لتخطي التخزين المؤقت وسحب كامل أرشيف العمل مباشرة من الموقع المصدري.
-            </p>
+              <span className="text-[10px] font-bold tracking-wider">المزيد من الفصول</span>
+            </button>
           </div>
         )}
 

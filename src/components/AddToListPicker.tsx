@@ -10,6 +10,7 @@ interface AddToListPickerProps {
   onRemoveFromList: (manhuaId: string) => Promise<void>;
   onNavigate?: (view: any) => void;
   className?: string;
+  align?: 'left' | 'right';
 }
 
 export default function AddToListPicker({
@@ -19,7 +20,8 @@ export default function AddToListPicker({
   onAddToList,
   onRemoveFromList,
   onNavigate,
-  className = ''
+  className = '',
+  align = 'right'
 }: AddToListPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -107,7 +109,7 @@ export default function AddToListPicker({
       {isOpen && (
         <div 
           onClick={(e) => e.stopPropagation()} // Prevent card click inside overlay
-          className="absolute z-50 left-0 mt-2 w-48 bg-zinc-950 border border-zinc-900 rounded-xl shadow-2xl p-1.5 animate-in fade-in-50 slide-in-from-top-1 duration-100 text-right"
+          className={`absolute z-50 mt-2 w-48 bg-zinc-950 border border-zinc-900 rounded-xl shadow-2xl p-1.5 animate-in fade-in-50 slide-in-from-top-1 duration-100 text-right ${align === 'left' ? 'left-0' : 'right-0'}`}
           style={{ transform: 'translateX(0)' }}
         >
           {user ? (

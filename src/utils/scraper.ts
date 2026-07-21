@@ -235,7 +235,7 @@ export async function testSelector(targetUrl: string, selector: string, attribut
   return ['Not supported with the new architecture.'];
 }
 
-export async function scrapePopularList(source: ScraperSource, query?: string): Promise<any[]> {
+export async function scrapePopularList(source: ScraperSource, query?: string, pageNum: number = 1): Promise<any[]> {
   try {
     const handlerId = source.id as SourceId;
     // هنا السر: نتأكد من اختيار المعالج الصحيح بناءً على الرابط أو المعرف
@@ -246,8 +246,8 @@ export async function scrapePopularList(source: ScraperSource, query?: string): 
       else handler = sources['generic'];
     }
     
-    // نمرر الـ query للمعالج لكي يقوم بالبحث الفعلي
-    const result = await handler.parsePopularList(1, query, source);
+    // نمرر الـ query والمعالج لكي يقوم بالبحث الفعلي مع رقم الصفحة
+    const result = await handler.parsePopularList(pageNum, query, source);
     
     return result.map(manga => ({
       id: `scr-${source.id}-${manga.id}`,

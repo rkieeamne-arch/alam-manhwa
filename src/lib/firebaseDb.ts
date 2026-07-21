@@ -1,4 +1,4 @@
-import { UserProfile, ReadingHistoryItem, Manhua, ReadingListItem } from '../types';
+import { UserProfile, ReadingHistoryItem, AnimeWatchHistoryItem, Manhua, ReadingListItem } from '../types';
 
 // Helper to get local storage item safely
 const getLocal = <T>(key: string, fallback: T): T => {
@@ -101,4 +101,38 @@ export const removeManhuaFromReadingList = async (userId: string, manhuaId: stri
   const list = getLocal<ReadingListItem[]>('manhua_reading_list', []);
   const updated = list.filter(item => item.manhuaId !== manhuaId);
   setLocal('manhua_reading_list', updated);
+};
+
+export const fetchUserAnimeHistory = async (userId: string): Promise<AnimeWatchHistoryItem[]> => {
+  return getLocal<AnimeWatchHistoryItem[]>('anime_watch_history', []);
+};
+
+export const saveUserAnimeHistory = async (userId: string, item: Omit<AnimeWatchHistoryItem, 'id' | 'lastWatchedTime'>): Promise<AnimeWatchHistoryItem> => {
+  const history = getLocal<AnimeWatchHistoryItem[]>('anime_watch_history', []);
+  const existingIndex = history.findIndex(h => h.animeId === item.animeId);
+  const newItem: AnimeWatchHistoryItem = {
+    ...item,
+    id: existingIndex >= 0 ? history[existingIndex].id : 'animehist-' + Date.now(),
+    lastWatchedTime: new Date().toISOString()
+  };
+
+  let newHistory = [...history];
+  if (existingIndex >= 0) {
+    newHistory[existingIndex] = newItem;
+  } else {
+    newHistory.unshift(newItem);
+  }
+
+  setLocal('anime_watch_history', newHistory);
+  return newItem;
+};
+
+export const deleteUserAnimeHistoryItem = async (userId: string, id: string) => {
+  const history = getLocal<AnimeWatchHistoryItem[]>('anime_watch_history', []);
+  const updated = history.filter(h => h.id !== id);
+  setLocal('anime_watch_history', updated);
+};
+
+export const clearUserAnimeHistory = async (userId: string) => {
+  setLocal('anime_watch_history', []);
 };
