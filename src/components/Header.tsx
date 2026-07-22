@@ -21,6 +21,7 @@ interface HeaderProps {
   onNotificationClick?: (notif: NotificationItem) => void;
   onMarkAllNotificationsRead?: () => void;
   onClearAllNotifications?: () => void;
+  onDeleteNotification?: (id: string) => void;
 }
 
 export default function Header({
@@ -37,7 +38,8 @@ export default function Header({
   notifications = [],
   onNotificationClick = () => {},
   onMarkAllNotificationsRead = () => {},
-  onClearAllNotifications = () => {}
+  onClearAllNotifications = () => {},
+  onDeleteNotification = () => {}
 }: HeaderProps) {
   const [searchVal, setSearchVal] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
@@ -270,6 +272,18 @@ export default function Header({
                                 </span>
                               ) : null}
                             </div>
+
+                            {/* Delete single notification button */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onDeleteNotification(notif.id);
+                              }}
+                              className="p-1 text-zinc-500 hover:text-red-400 transition-colors shrink-0 self-center"
+                              title="حذف هذا الإشعار"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         ))
                       ) : (
@@ -319,16 +333,14 @@ export default function Header({
               </button>
             )}
 
-            {user && user.role === 'admin' && (
-              <button
-                onClick={() => onNavigate('admin')}
-                className={`p-2 rounded-full transition-colors ${isAnime ? 'bg-amber-950/20 hover:bg-amber-950/50 text-amber-400 hover:text-amber-300 border border-amber-900/30' : 'p-2 bg-red-950/20 hover:bg-red-950/50 text-red-400 hover:text-red-300 border border-red-900/30'}`}
-                title="لوحة الإدارة"
-                id="header-admin-quick"
-              >
-                <ShieldAlert className="w-4 h-4" />
-              </button>
-            )}
+            <button
+              onClick={() => onNavigate('admin')}
+              className={`p-2 rounded-full transition-colors ${isAnime ? 'bg-amber-950/20 hover:bg-amber-950/50 text-amber-400 hover:text-amber-300 border border-amber-900/30' : 'bg-red-950/20 hover:bg-red-950/50 text-red-400 hover:text-red-300 border border-red-900/30'}`}
+              title="لوحة الإدارة (رمز الأمان)"
+              id="header-admin-quick"
+            >
+              <ShieldAlert className="w-4 h-4" />
+            </button>
           </div>
 
         </div>
@@ -425,22 +437,20 @@ export default function Header({
             الحساب الشخصي
           </button>
 
-          {user && user.role === 'admin' && (
-            <button
-              onClick={() => onNavigate('admin')}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                currentView === 'admin'
-                  ? isAnime
-                    ? 'bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20'
-                    : 'bg-red-600 text-white shadow-md shadow-red-900/20'
-                  : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900'
-              }`}
-              id="nav-admin-btn"
-            >
-              <ShieldAlert className="w-3.5 h-3.5" />
-              لوحة الإدارة
-            </button>
-          )}
+          <button
+            onClick={() => onNavigate('admin')}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              currentView === 'admin'
+                ? isAnime
+                  ? 'bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20'
+                  : 'bg-red-600 text-white shadow-md shadow-red-900/20'
+                : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900'
+            }`}
+            id="nav-admin-btn"
+          >
+            <ShieldAlert className="w-3.5 h-3.5" />
+            لوحة الإدارة
+          </button>
         </nav>
 
       </div>

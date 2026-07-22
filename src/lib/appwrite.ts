@@ -43,20 +43,11 @@ export function getLocalAds(): AppwriteAd[] {
   const saved = localStorage.getItem(LOCAL_ADS_KEY);
   if (saved) {
     try {
-      return JSON.parse(saved);
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) return parsed;
     } catch (e) {}
   }
-  return [
-    {
-      $id: 'default-ad-1',
-      title: 'إعلان أسبوعي - خصم على الاشتراك VIP',
-      imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&auto=format&fit=crop&q=80',
-      linkUrl: '#',
-      position: 'top_banner',
-      isActive: true,
-      createdAt: new Date().toISOString()
-    }
-  ];
+  return [];
 }
 
 export function saveLocalAds(ads: AppwriteAd[]) {
@@ -120,8 +111,17 @@ export async function createAppwriteAd(ad: Omit<AppwriteAd, '$id'>): Promise<App
 
   const url = `${config.endpoint.replace(/\/$/, '')}/databases/${config.databaseId}/collections/${config.adsCollectionId}/documents`;
   const documentId = `ad_${Date.now()}`;
+
+  // Primary payload with standard keys
+  const payloadData: Record<string, any> = {
+    title: ad.title,
+    imageUrl: ad.imageUrl,
+    linkUrl: ad.linkUrl,
+    position: ad.position,
+    isActive: ad.isActive
+  };
   
-  const response = await fetch(url, {
+  let response = await fetch(url, {
     method: 'POST',
     headers: {
       'X-Appwrite-Project': config.projectId,
@@ -129,29 +129,50 @@ export async function createAppwriteAd(ad: Omit<AppwriteAd, '$id'>): Promise<App
     },
     body: JSON.stringify({
       documentId,
-      data: {
-        title: ad.title,
-        imageUrl: ad.imageUrl,
-        linkUrl: ad.linkUrl,
-        position: ad.position,
-        isActive: ad.isActive
-      }
+      data: payloadData
     })
   });
 
+  // If failed due to attribute mismatch (e.g. image_url or link_url expected instead), try snake_case
+  if (!response.ok && response.status === 400) {
+    const altData: Record<string, any> = {
+      title: ad.title,
+      image_url: ad.imageUrl,
+      link_url: ad.linkUrl,
+      position: ad.position,
+      is_active: ad.isActive
+    };
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'X-Appwrite-Project': config.projectId,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        documentId: `ad_${Date.now()}`,
+        data: altData
+      })
+    });
+  }
+
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`خطأ في Appwrite (${response.status}): ${errorText}`);
+    console.warn(`[Appwrite] Create ad failed (${response.status}): ${errorText}. Saving locally.`);
+    const local = getLocalAds();
+    const newAd: AppwriteAd = { ...ad, $id: `local-${Date.now()}`, createdAt: new Date().toISOString() };
+    const updated = [newAd, ...local];
+    saveLocalAds(updated);
+    return newAd;
   }
 
   const createdDoc = await response.json();
   const createdAd: AppwriteAd = {
     $id: createdDoc.$id,
     title: createdDoc.title || ad.title,
-    imageUrl: createdDoc.imageUrl || ad.imageUrl,
-    linkUrl: createdDoc.linkUrl || ad.linkUrl,
+    imageUrl: createdDoc.imageUrl || createdDoc.image_url || ad.imageUrl,
+    linkUrl: createdDoc.linkUrl || createdDoc.link_url || ad.linkUrl,
     position: createdDoc.position || ad.position,
-    isActive: createdDoc.isActive ?? ad.isActive,
+    isActive: createdDoc.isActive ?? createdDoc.is_active ?? ad.isActive,
     createdAt: createdDoc.$createdAt
   };
 

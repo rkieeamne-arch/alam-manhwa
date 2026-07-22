@@ -155,29 +155,17 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) {
+          // Filter out mock/fake notifications
+          return parsed.filter((n: NotificationItem) => 
+            n.id !== 'site-welcome-1' && 
+            n.id !== 'site-servers-2' && 
+            n.id !== 'default-ad-1'
+          );
+        }
       } catch (e) {}
     }
-    return [
-      {
-        id: 'site-welcome-1',
-        title: 'مرحباً بك في المنصة!',
-        type: 'site',
-        content: 'تم تحديث الموقع وتفعيل قاعدة بيانات Appwrite وإمكانية تصفح الأنمي والمانهو بسلاسة.',
-        time: 'منذ قليل',
-        isNew: true,
-        targetId: 'site'
-      },
-      {
-        id: 'site-servers-2',
-        title: 'تحديث سيرفرات القارئ والبث المباشر',
-        type: 'site',
-        content: 'تم تحسين سرعة القارئ المتتابع وإضافة إشعارات الموقع المباشرة.',
-        time: 'منذ يومين',
-        isNew: false,
-        targetId: 'site'
-      }
-    ];
+    return [];
   });
 
   const [activeToast, setActiveToast] = useState<NotificationItem | null>(null);
@@ -263,6 +251,11 @@ export default function App() {
 
   const handleClearAllNotifications = () => {
     setNotifications([]);
+    localStorage.removeItem('user_notifications');
+  };
+
+  const handleDeleteNotification = (id: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
   };
 
   // User Reading Lists (Favorites, Currently reading, Plan to read)
@@ -345,11 +338,12 @@ export default function App() {
     const mangaId = params.get('manga');
     const chapterId = params.get('chapter');
     const view = params.get('view');
-    const secretAdmin = params.get('admin') || params.get('secret') || params.get('key') || params.get('secret_admin');
+    const secretAdmin = params.get('admin') || params.get('secret') || params.get('key') || params.get('pin') || params.get('secret_admin');
 
-    // Secret Admin Link Check (e.g. ?admin=azora or ?secret=admin or ?admin=true)
-    if (secretAdmin === 'azora' || secretAdmin === 'admin' || secretAdmin === 'true' || secretAdmin === '1' || secretAdmin === 'secret') {
+    // Secret Admin Link Check (e.g. ?admin=28429625 or ?pin=28429625 or ?view=admin)
+    if (secretAdmin === '28429625' || secretAdmin === 'azora' || secretAdmin === 'admin' || secretAdmin === 'true' || secretAdmin === '1' || secretAdmin === 'secret') {
       localStorage.setItem('admin_secret_unlocked', 'true');
+      sessionStorage.setItem('admin_unlocked', 'true');
       setUser(prev => ({ ...prev, role: 'admin' }));
       setCurrentView('admin');
       return;
@@ -814,6 +808,7 @@ export default function App() {
           onNotificationClick={handleNotificationClick}
           onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
           onClearAllNotifications={handleClearAllNotifications}
+          onDeleteNotification={handleDeleteNotification}
         />
       )}
 
