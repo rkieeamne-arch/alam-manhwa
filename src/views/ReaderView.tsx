@@ -81,6 +81,9 @@ export default function ReaderView({
         }
 
         const pagesUrl = chapter.pages[0]; // stored raw URL
+        if (!pagesUrl) {
+          throw new Error('رابط الفصل غير متوفر في السجل، الرجاء العودة لصفحة المانهوا واختيار الفصل من هناك.');
+        }
         const pages = await scrapeChapterPages(source, pagesUrl as string);
         if (pages.length === 0) {
           throw new Error('فشل جلب الصفحات المصورة. قد تكون الصور محمية خلف جدار ناري أو نظام عرض تفاعلي خاص.');
@@ -214,7 +217,9 @@ export default function ReaderView({
         chapterTitle: chapter.title,
         chapterNumber: chapter.chapterNumber,
         progressPercent: currentPercent,
-        pageIndex: currentPageIndex
+        pageIndex: currentPageIndex,
+        sourceUrl: manhua.sourceUrl,
+        chapterUrl: typeof chapter.pages?.[0] === 'string' ? chapter.pages[0] : undefined
       });
     }
   }, [manhua, chapter, currentPageIndex, scrollProgress, displayPages.length, readerSettings.readingMode]);
@@ -370,39 +375,41 @@ export default function ReaderView({
 
       {/* 2. TRANSLUCENT TOP NAVIGATION / INFO BAR (Focus toggled) */}
       <div 
-        className={`fixed top-0 left-0 right-0 z-40 transition-all duration-300 transform ${
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 transform ${
           showUI ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'
-        } ${panelThemeClasses} border-b shadow-md backdrop-blur-md px-4 py-2.5`}
+        } ${panelThemeClasses} border-b shadow-md backdrop-blur-md px-3 sm:px-4 pb-2 sm:pb-2.5`}
+        style={{ paddingTop: 'max(env(safe-area-inset-top), 8px)' }}
       >
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-2 sm:gap-3">
           {/* Back Button & Title */}
-          <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center gap-2 min-w-0 shrink-0 relative z-50">
             <button
               onClick={onBackToManhua}
-              className={`p-2 rounded-lg border transition-colors cursor-pointer ${
+              className={`flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg border transition-all cursor-pointer shrink-0 z-30 font-bold text-xs ${
                 bgColor === 'sepia' 
                   ? 'bg-[#f0e6d2] hover:bg-[#eae0cc] border-[#eae0cc] text-[#4a3525]' 
                   : bgColor === 'light'
                   ? 'bg-zinc-100 hover:bg-zinc-200 border-zinc-200 text-zinc-800'
-                  : 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-300'
+                  : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-zinc-100'
               }`}
               title="العودة للتفاصيل"
               id="reader-back-btn"
             >
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-4 h-4 shrink-0" />
+              <span className="hidden xs:inline">خروج</span>
             </button>
-            <div className="min-w-0">
-              <h2 className="text-xs font-black opacity-80 truncate max-w-[150px] sm:max-w-[250px]">
+            <div className="min-w-0 max-w-[90px] xs:max-w-[140px] sm:max-w-[220px]">
+              <h2 className="text-xs font-black opacity-90 truncate">
                 {manhua.title}
               </h2>
-              <h3 className="text-xs font-bold text-red-500 truncate mt-0.5">
+              <h3 className="text-[11px] font-bold text-red-500 truncate">
                 {chapter.title}
               </h3>
             </div>
           </div>
 
           {/* Quick Controls in Top Bar */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink">
             {/* Chapter Selection Selector */}
             <select
               value={chapter.id}
@@ -410,7 +417,7 @@ export default function ReaderView({
                 onSelectChapter(e.target.value);
                 setCurrentPageIndex(0);
               }}
-              className={`text-xs font-bold py-1.5 px-3 pr-8 rounded-lg border focus:outline-none focus:border-red-500 cursor-pointer ${
+              className={`text-xs font-bold py-1.5 px-2 rounded-lg border focus:outline-none focus:border-red-500 cursor-pointer max-w-[110px] xs:max-w-[160px] sm:max-w-[280px] truncate ${
                 bgColor === 'sepia' 
                   ? 'bg-[#f0e6d2] border-[#eae0cc] text-[#4a3525]' 
                   : bgColor === 'light'
@@ -429,7 +436,7 @@ export default function ReaderView({
             {/* Settings Quick Trigger */}
             <button
               onClick={() => setShowSettings(!showSettings)}
-              className={`p-2 rounded-lg border transition-colors cursor-pointer ${
+              className={`p-2 rounded-lg border transition-colors cursor-pointer shrink-0 ${
                 showSettings 
                   ? 'bg-red-600 text-white border-red-600'
                   : bgColor === 'sepia'
@@ -440,7 +447,7 @@ export default function ReaderView({
               }`}
               title="إعدادات القراءة"
             >
-              <Settings className="w-4 h-4" />
+              <Settings className="w-4 h-4 shrink-0" />
             </button>
           </div>
         </div>

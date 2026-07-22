@@ -204,61 +204,92 @@ export const azoraflySourceHandler: SourceHandler = {
 
     let allChapters: Chapter[] = [];
     
-    // First try extracting chapters from Astro JSON props
-    const jsonPropsMatch = html.match(/&quot;initialChap&quot;:\[1,\[(.*?)\]\]\]/);
-    const postIdMatch = html.match(/&quot;postId&quot;:\[0,(\d+)\]/);
-    
-    if (postIdMatch) {
-      const postId = postIdMatch[1];
-      try {
-        const apiRes = await proxiedFetch(`https://api.azorafly.com/api/chapters?postId=${postId}`);
-        const apiData = await apiRes.json();
-        if (apiData?.data && Array.isArray(apiData.data)) {
-          for (const ch of apiData.data) {
-            const num = ch.number;
+    const extractPostId = (sourceHtml: string): string => {
+      const patterns = [
+        /&quot;postId&quot;:\s*\[\s*0\s*,\s*(\d+)\s*\]/,
+        /&quot;postId&quot;:\s*(\d+)/,
+        /&quot;post_id&quot;:\s*\[\s*0\s*,\s*(\d+)\s*\]/,
+        /&quot;post_id&quot;:\s*(\d+)/,
+        /"postId"\s*:\s*\[?\s*0?\s*,?\s*(\d+)\s*\]?/,
+        /"post_id"\s*:\s*\[?\s*0?\s*,?\s*(\d+)\s*\]?/,
+        /data-post-id="(\d+)"/,
+        /data-id="(\d+)"/,
+        /postId\s*[:=]\s*"?(\d+)"?/i,
+        /post_id\s*[:=]\s*"?(\d+)"?/i
+      ];
+      for (const pat of patterns) {
+        const m = sourceHtml.match(pat);
+        if (m && m[1]) return m[1];
+      }
+      return '';
+    };
+
+    const fetchApiChapters = async (pId: string, pageNum: number = 0): Promise<Chapter[]> => {
+      const chaps: Chapter[] = [];
+      const mangaSlug = mangaUrl.split('/').pop() || '';
+      const pagesToFetch = pageNum > 0 ? [pageNum] : Array.from({ length: 30 }, (_, i) => i + 1);
+
+      for (const p of pagesToFetch) {
+        try {
+          const skip = (p - 1) * 100;
+          const url = `https://api.azorafly.com/api/chapters?postId=${pId}&skip=${skip}&take=100`;
+          const apiRes = await proxiedFetch(url);
+          if (!apiRes.ok) break;
+          const apiData = await apiRes.json();
+          const rawList = apiData?.post?.chapters || apiData?.data || apiData?.chapters || (Array.isArray(apiData) ? apiData : null);
+          if (!rawList || !Array.isArray(rawList) || rawList.length === 0) break;
+
+          let added = 0;
+          for (const ch of rawList) {
+            const num = ch.number ?? ch.chapter_number;
             const slug = ch.slug;
             const chapterTitle = ch.title;
-            const fullUrl = `${BASE_URL}/series/${mangaUrl.split('/').pop()}/${slug}`;
+            const fullUrl = `${BASE_URL}/series/${mangaSlug}/${slug}`;
             const id = getUniqueId(fullUrl);
             const name = chapterTitle ? `الفصل ${num} - ${chapterTitle}` : `الفصل ${num}`;
-            const isLocked = ch.price > 0 || 
-                             ch.coins > 0 || 
-                             ch.price_coins > 0 || 
-                             ch.isPremium === true || 
-                             ch.is_premium === true || 
-                             ch.type === 'premium' || 
-                             (chapterTitle && (chapterTitle.includes('مدفوع') || chapterTitle.includes('VIP') || chapterTitle.includes('vip') || chapterTitle.includes('بريميوم')));
-            if (!allChapters.some(c => c.id === id)) {
-              allChapters.push({ id, name, url: fullUrl, isLocked: !!isLocked });
+            const isLocked = ch.price > 0 || ch.coins > 0 || ch.price_coins > 0 || ch.isPremium === true || ch.is_premium === true || ch.type === 'premium';
+            if (!chaps.some(c => c.id === id)) {
+              chaps.push({ id, name, url: fullUrl, isLocked: !!isLocked });
+              added++;
             }
           }
+          if (added === 0) break;
+          if (pageNum > 0) break;
+          if (rawList.length < 100) break;
+        } catch (e) {
+          break;
         }
-      } catch (err) {
-        console.error("Failed to fetch Azorafly chapters from API", err);
       }
+      return chaps;
+    };
+
+    const postId = extractPostId(html);
+    if (postId) {
+      allChapters = await fetchApiChapters(postId, 0);
     }
     
-    if (allChapters.length === 0 && jsonPropsMatch) {
-      const inner = jsonPropsMatch[1];
-      // Extract number, slug, title
-      const regex = /&quot;number&quot;:\[0,([0-9.]+)\](.*?)&quot;slug&quot;:\[0,&quot;([^&]+)&quot;\](.*?)&quot;title&quot;:\[0,&quot;([^&]*)&quot;\]/g;
-      let m;
-      while ((m = regex.exec(inner)) !== null) {
-        const num = m[1];
-        const slug = m[3];
-        const chapterTitle = m[5].replace(/\\&quot;/g, '"');
-        const fullUrl = `${BASE_URL}/series/${mangaUrl.split('/').pop()}/${slug}`;
-        const id = getUniqueId(fullUrl);
-        const name = chapterTitle ? `الفصل ${num} - ${chapterTitle}` : `الفصل ${num}`;
-        const isLocked = chapterTitle && (chapterTitle.includes('مدفوع') || chapterTitle.includes('VIP') || chapterTitle.includes('vip') || chapterTitle.includes('بريميوم'));
-        if (!allChapters.some(c => c.id === id)) {
-          allChapters.push({ id, name, url: fullUrl, isLocked: !!isLocked });
+    if (allChapters.length === 0) {
+      const jsonPropsMatch = html.match(/&quot;initialChap&quot;:\[1,\[(.*?)\]\]\]/);
+      if (jsonPropsMatch) {
+        const inner = jsonPropsMatch[1];
+        const regex = /&quot;number&quot;:\[0,([0-9.]+)\](.*?)&quot;slug&quot;:\[0,&quot;([^&]+)&quot;\](.*?)&quot;title&quot;:\[0,&quot;([^&]*)&quot;\]/g;
+        let m;
+        while ((m = regex.exec(inner)) !== null) {
+          const num = m[1];
+          const slug = m[3];
+          const chapterTitle = m[5].replace(/\\&quot;/g, '"');
+          const fullUrl = `${BASE_URL}/series/${mangaUrl.split('/').pop()}/${slug}`;
+          const id = getUniqueId(fullUrl);
+          const name = chapterTitle ? `الفصل ${num} - ${chapterTitle}` : `الفصل ${num}`;
+          const isLocked = chapterTitle && (chapterTitle.includes('مدفوع') || chapterTitle.includes('VIP') || chapterTitle.includes('vip') || chapterTitle.includes('بريميوم'));
+          if (!allChapters.some(c => c.id === id)) {
+            allChapters.push({ id, name, url: fullUrl, isLocked: !!isLocked });
+          }
         }
       }
     } 
     
     if (allChapters.length === 0) {
-      // More aggressive fallback: find all links with hrefs containing 'chapter' or 'الفصل' in text
       $first('a').each((_, el) => {
         const href = $first(el).attr('href');
         const text = $first(el).text().trim();
@@ -285,42 +316,63 @@ export const azoraflySourceHandler: SourceHandler = {
   },
 
   async parseMangaChapters(mangaUrl: string, page: number): Promise<Chapter[]> {
-    // Azorafly might use an API for pagination, but if we don't know it, we just return empty
-    // OR we could try fetching ?page=X if it server-renders the props
     const pageUrl = page === 1 ? mangaUrl : `${mangaUrl}?page=${page}`;
     const pRes = await proxiedFetch(pageUrl);
     const html = await pRes.text();
-    const $ = cheerio.load(html);
+
+    const extractPostId = (sourceHtml: string): string => {
+      const patterns = [
+        /&quot;postId&quot;:\s*\[\s*0\s*,\s*(\d+)\s*\]/,
+        /&quot;postId&quot;:\s*(\d+)/,
+        /&quot;post_id&quot;:\s*\[\s*0\s*,\s*(\d+)\s*\]/,
+        /&quot;post_id&quot;:\s*(\d+)/,
+        /"postId"\s*:\s*\[?\s*0?\s*,?\s*(\d+)\s*\]?/,
+        /"post_id"\s*:\s*\[?\s*0?\s*,?\s*(\d+)\s*\]?/,
+        /data-post-id="(\d+)"/,
+        /data-id="(\d+)"/,
+        /postId\s*[:=]\s*"?(\d+)"?/i,
+        /post_id\s*[:=]\s*"?(\d+)"?/i
+      ];
+      for (const pat of patterns) {
+        const m = sourceHtml.match(pat);
+        if (m && m[1]) return m[1];
+      }
+      return '';
+    };
+
+    const postId = extractPostId(html);
+    const mangaSlug = mangaUrl.split('/').pop() || '';
     
-    const pageChapters: Chapter[] = [];
-    
-    const jsonPropsMatch = html.match(/&quot;initialChap&quot;:\[1,\[(.*?)\]\]\]/);
-    const postIdMatch = html.match(/&quot;postId&quot;:\[0,(\d+)\]/);
-    
-    if (postIdMatch) {
-      const postId = postIdMatch[1];
+    if (postId) {
       try {
-        const apiRes = await proxiedFetch(`https://api.azorafly.com/api/chapters?postId=${postId}`);
-        const apiData = await apiRes.json();
-        if (apiData?.data && Array.isArray(apiData.data)) {
-          for (const ch of apiData.data) {
-            const num = ch.number;
-            const slug = ch.slug;
-            const chapterTitle = ch.title;
-            const fullUrl = `${BASE_URL}/series/${mangaUrl.split('/').pop()}/${slug}`;
-            const id = getUniqueId(fullUrl);
-            const name = chapterTitle ? `الفصل ${num} - ${chapterTitle}` : `الفصل ${num}`;
-            if (!pageChapters.some(c => c.id === id)) {
-              pageChapters.push({ id, name, url: fullUrl });
+        const skip = (page - 1) * 100;
+        const u = `https://api.azorafly.com/api/chapters?postId=${postId}&skip=${skip}&take=100`;
+        const apiRes = await proxiedFetch(u);
+        if (apiRes.ok) {
+          const apiData = await apiRes.json();
+          const rawList = apiData?.post?.chapters || apiData?.data || apiData?.chapters || (Array.isArray(apiData) ? apiData : null);
+          if (rawList && Array.isArray(rawList) && rawList.length > 0) {
+            const pageChaps: Chapter[] = [];
+            for (const ch of rawList) {
+              const num = ch.number ?? ch.chapter_number;
+              const slug = ch.slug;
+              const chapterTitle = ch.title;
+              const fullUrl = `${BASE_URL}/series/${mangaSlug}/${slug}`;
+              const id = getUniqueId(fullUrl);
+              const name = chapterTitle ? `الفصل ${num} - ${chapterTitle}` : `الفصل ${num}`;
+              if (!pageChaps.some(c => c.id === id)) {
+                pageChaps.push({ id, name, url: fullUrl });
+              }
             }
+            if (pageChaps.length > 0) return pageChaps;
           }
         }
-      } catch (err) {
-        console.error("Failed to fetch Azorafly chapters from API in parseMangaChapters", err);
-      }
+      } catch (e) {}
     }
 
-    if (pageChapters.length === 0 && jsonPropsMatch) {
+    const pageChapters: Chapter[] = [];
+    const jsonPropsMatch = html.match(/&quot;initialChap&quot;:\[1,\[(.*?)\]\]\]/);
+    if (jsonPropsMatch) {
       const inner = jsonPropsMatch[1];
       const regex = /&quot;number&quot;:\[0,([0-9.]+)\](.*?)&quot;slug&quot;:\[0,&quot;([^&]+)&quot;\](.*?)&quot;title&quot;:\[0,&quot;([^&]*)&quot;\]/g;
       let m;
@@ -338,6 +390,7 @@ export const azoraflySourceHandler: SourceHandler = {
     } 
     
     if (pageChapters.length === 0) {
+      const $ = cheerio.load(html);
       $('a[href*="/chapter-"]').each((_, el) => {
         const href = $(el).attr('href');
         if (href) {

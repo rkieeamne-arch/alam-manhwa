@@ -46,10 +46,21 @@ export default function ManhuaDetailsView({
   const [selectedLockedChapter, setSelectedLockedChapter] = useState<Chapter | null>(null);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
-  const isScraped = manhua.id.startsWith('scr-');
+  const isScraped = manhua.id.startsWith('scr-') || !!manhua.sourceUrl || !!scrapedManhua;
   const displayManhua = scrapedManhua || manhua;
 
-  const currentSource = sources.find(s => displayManhua.id.startsWith(`scr-${s.id}-`));
+  const resolveSource = (m: Manhua) => {
+    return sources.find(s =>
+      m.id.startsWith(`scr-${s.id}-`) ||
+      (m.sourceUrl && (m.sourceUrl.includes(s.baseUrl) || m.sourceUrl.includes(s.id))) ||
+      (m.sourceId && m.sourceId === s.id)
+    ) || sources.find(s =>
+      manhua.id.startsWith(`scr-${s.id}-`) ||
+      (manhua.sourceUrl && (manhua.sourceUrl.includes(s.baseUrl) || manhua.sourceUrl.includes(s.id)))
+    ) || sources.find(s => s.id === 'azorafly') || sources[0];
+  };
+
+  const currentSource = resolveSource(displayManhua);
   const isAnime = currentSource?.type === 'anime' || manhua.id.includes('witanime');
   
   const contentTypeName = isAnime ? 'أنمي' : 'مانهو';
@@ -92,7 +103,7 @@ export default function ManhuaDetailsView({
     }));
 
     try {
-      const source = sources.find(s => displayManhua.id.startsWith(`scr-${s.id}-`));
+      const source = resolveSource(displayManhua);
       if (!source && isScraped) {
         throw new Error('المصدر غير متوفر.');
       }
@@ -243,7 +254,7 @@ export default function ManhuaDetailsView({
       setChapterPage(1);
       setHasMoreChapters(true);
       try {
-        const source = sources.find(s => manhua.id.startsWith(`scr-${s.id}-`) || manhua.sourceUrl?.includes(s.baseUrl));
+        const source = resolveSource(manhua);
         
         if (!source) {
           throw new Error('المصدر البرمجي أو الإضافة المسؤولة عن هذا العمل غير متوفرة حالياً.');
@@ -254,8 +265,8 @@ export default function ManhuaDetailsView({
         const finalManhua = {
           ...details,
           id: manhua.id,
-          coverUrl: manhua.coverUrl,
-          sourceUrl: manhua.sourceUrl,
+          coverUrl: manhua.coverUrl || details.coverUrl,
+          sourceUrl: manhua.sourceUrl || details.sourceUrl,
           isFeatured: manhua.isFeatured,
           views: manhua.views || 0,
         };
@@ -278,7 +289,7 @@ export default function ManhuaDetailsView({
   const forceRefreshChapters = async () => {
     if (!isScraped || !displayManhua.sourceUrl || loadingMoreChapters) return;
     
-    const source = sources.find(s => manhua.id.startsWith(`scr-${s.id}-`));
+    const source = resolveSource(displayManhua);
     if (!source) return;
 
     setLoadingMoreChapters(true);
@@ -321,7 +332,7 @@ export default function ManhuaDetailsView({
   const loadMoreChapters = async () => {
     if (!isScraped || !displayManhua.sourceUrl || loadingMoreChapters) return;
     
-    const source = sources.find(s => manhua.id.startsWith(`scr-${s.id}-`));
+    const source = resolveSource(displayManhua);
     if (!source) return;
 
     setLoadingMoreChapters(true);
@@ -329,26 +340,27 @@ export default function ManhuaDetailsView({
       const nextPage = chapterPage + 1;
       const newChapters = await scrapeMangaChapters(source, displayManhua.sourceUrl, nextPage);
       
-      if (newChapters.length === 0) {
+      if (!newChapters || newChapters.length === 0) {
         setHasMoreChapters(false);
       } else {
         setChapterPage(nextPage);
         const updatedChapters = [...displayManhua.chapters];
         
-        // Add only unique chapters
         const existingIds = new Set(updatedChapters.map(c => c.id));
+        const existingTitles = new Set(updatedChapters.map(c => c.title.trim().toLowerCase()));
         let addedCount = 0;
         
         for (const ch of newChapters) {
-          if (!existingIds.has(ch.id)) {
+          const titleKey = ch.title.trim().toLowerCase();
+          if (!existingIds.has(ch.id) && !existingTitles.has(titleKey)) {
             updatedChapters.push(ch);
             existingIds.add(ch.id);
+            existingTitles.add(titleKey);
             addedCount++;
           }
         }
 
-        if (addedCount === 0 && newChapters.length > 0) {
-          // If we got chapters but they were all duplicates, we might have hit the end
+        if (addedCount === 0) {
           setHasMoreChapters(false);
         }
 

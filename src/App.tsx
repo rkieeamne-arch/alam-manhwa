@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { mockManhuas, defaultScraperSources } from './data';
+import { defaultScraperSources } from './data';
 import { UserProfile, ReadingHistoryItem, AnimeWatchHistoryItem, ReaderSettings, Manhua, Chapter, ScraperSource, ReadingListItem, NotificationItem } from './types';
 import { updateUserProfile, fetchUserReadingHistory, saveUserReadingHistory, deleteUserHistoryItem, clearUserReadingHistory, fetchUserReadingList, addManhuaToReadingList, removeManhuaFromReadingList, fetchUserAnimeHistory, saveUserAnimeHistory, deleteUserAnimeHistoryItem, clearUserAnimeHistory } from './lib/firebaseDb';
 import { subscribeToAuthChanges, logout, loginWithEmail, signupWithEmail, resetPassword, signInWithGoogle } from './lib/firebaseAuth';
@@ -428,12 +428,17 @@ export default function App() {
     const saved = localStorage.getItem('manhua_list');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved) as Manhua[];
+        // Filter out old mock manhuas that have short numeric IDs (1-10)
+        return parsed.filter(m => {
+          const isOldMockId = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'].includes(m.id);
+          return !isOldMockId;
+        });
       } catch (e) {
-        return mockManhuas;
+        return [];
       }
     }
-    return mockManhuas;
+    return [];
   });
 
   // Persist manhuas to localStorage
@@ -457,7 +462,7 @@ export default function App() {
   };
 
   const handleRestoreDefaults = () => {
-    setManhuas(mockManhuas);
+    setManhuas([]);
   };
 
   const handleClearAllManhuas = () => {
@@ -635,9 +640,38 @@ export default function App() {
     }
   };
 
-  const handleSelectChapter = (manhuaId: string, chapterId: string, pageIndex: number = 0) => {
+  const handleSelectChapter = (manhuaId: string, chapterId: string, pageIndex: number = 0, historyItem?: ReadingHistoryItem) => {
     setSelectedManhuaId(manhuaId);
     setSelectedChapterId(chapterId);
+    
+    // Reconstruct scraped manhua shell if navigating from history and it's a scraped source
+    if (historyItem && manhuaId.startsWith('scr-')) {
+      const reconstructed: Manhua = {
+        id: manhuaId,
+        title: historyItem.manhuaTitle,
+        description: 'جاري جلب التفاصيل من المصدر...',
+        author: 'غير معروف',
+        artist: 'غير معروف',
+        status: 'مستمر',
+        rating: 4.8,
+        views: 0,
+        coverUrl: historyItem.manhuaCover,
+        categories: ['مانهوا'],
+        chapters: [{
+           id: chapterId,
+           manhuaId: manhuaId,
+           title: historyItem.chapterTitle,
+           chapterNumber: historyItem.chapterNumber,
+           releaseDate: historyItem.lastReadTime || new Date().toISOString(),
+           views: 0,
+           pages: historyItem.chapterUrl ? [historyItem.chapterUrl] : []
+        }],
+        releaseYear: 2026,
+        sourceUrl: historyItem.sourceUrl,
+      };
+      setScrapedManhuaCache(reconstructed);
+    }
+    
     setCurrentView('reader');
   };
 

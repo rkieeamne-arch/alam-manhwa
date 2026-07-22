@@ -5,7 +5,7 @@ import { ReadingHistoryItem, AnimeWatchHistoryItem } from '../types';
 interface HistoryViewProps {
   history: ReadingHistoryItem[];
   animeHistory: AnimeWatchHistoryItem[];
-  onSelectChapter: (manhuaId: string, chapterId: string, pageIndex: number) => void;
+  onSelectChapter: (manhuaId: string, chapterId: string, pageIndex: number, historyItem?: ReadingHistoryItem) => void;
   onSelectEpisode: (animeId: string, episodeNumber: number) => void;
   onRemoveItem: (id: string) => void;
   onRemoveAnimeItem: (id: string) => void;
@@ -179,7 +179,7 @@ export default function HistoryView({
                         </span>
 
                         <button
-                          onClick={() => onSelectChapter(item.manhuaId, item.chapterId, item.pageIndex)}
+                          onClick={() => onSelectChapter(item.manhuaId, item.chapterId, item.pageIndex, item)}
                           className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors flex items-center gap-0.5 cursor-pointer text-[10px]"
                           id={`resume-history-${item.id}`}
                         >

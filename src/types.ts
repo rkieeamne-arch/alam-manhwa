@@ -68,6 +68,8 @@ export interface ReadingHistoryItem {
   lastReadTime: string;
   progressPercent: number; // e.g., page 5 of 10 -> 50%
   pageIndex: number;
+  sourceUrl?: string;
+  chapterUrl?: string;
 }
 
 export interface AnimeWatchHistoryItem {
