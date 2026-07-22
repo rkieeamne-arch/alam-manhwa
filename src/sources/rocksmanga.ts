@@ -154,7 +154,9 @@ export const rocksMangaSourceHandler: SourceHandler = {
     const cover = $('div.thumb img, .infox img, .poster img').first().attr('src') || 
                   $('div.thumb img, .infox img, .poster img').first().attr('data-src') ||
                   $('meta[property="og:image"]').attr('content') || '';
-    const description = $('div.entry-content p, .wd-full .entry-content, .summary').text().trim();
+    let description = $('div.entry-content p, .wd-full .entry-content, .summary, .description, .post-content').text().trim().replace(/\s+/g, ' ');
+    if (!description) description = $('meta[property="og:description"]').attr('content') || '';
+    if (description.length > 500) description = description.substring(0, 500) + '...';
 
     const chapters: Chapter[] = [];
     $('ul.scroll-sm li.item, .scroll-sm li, ul.cl li, .eplister li').each((_idx, el) => {

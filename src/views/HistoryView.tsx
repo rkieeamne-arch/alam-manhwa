@@ -11,6 +11,8 @@ interface HistoryViewProps {
   onRemoveAnimeItem: (id: string) => void;
   onClearAll: () => void;
   onClearAllAnime: () => void;
+  onNavigateToManhua?: (manhuaId: string) => void;
+  onNavigateToAnime?: (animeId: string) => void;
 }
 
 export default function HistoryView({
@@ -21,7 +23,9 @@ export default function HistoryView({
   onRemoveItem,
   onRemoveAnimeItem,
   onClearAll,
-  onClearAllAnime
+  onClearAllAnime,
+  onNavigateToManhua,
+  onNavigateToAnime
 }: HistoryViewProps) {
   const [activeTab, setActiveTab] = useState<'manhua' | 'anime'>('manhua');
   
@@ -122,7 +126,11 @@ export default function HistoryView({
                   className="flex gap-4 p-4 bg-zinc-900/30 hover:bg-zinc-900/50 rounded-2xl border border-zinc-800/80 hover:border-red-500/30 transition-all group relative overflow-hidden"
                 >
                   {/* Cover thumbnail */}
-                  <div className="w-16 h-24 rounded-lg overflow-hidden bg-zinc-950 shrink-0 border border-zinc-800">
+                  <div 
+                    onClick={() => onNavigateToManhua && onNavigateToManhua(item.manhuaId)}
+                    className="w-16 h-24 rounded-lg overflow-hidden bg-zinc-950 shrink-0 border border-zinc-800 cursor-pointer hover:opacity-90 transition-opacity"
+                    title="الانتقال إلى صفحة العمل"
+                  >
                     <img 
                       src={item.manhuaCover || undefined} 
                       alt={item.manhuaTitle} 
@@ -135,7 +143,11 @@ export default function HistoryView({
                   <div className="flex-1 min-w-0 flex flex-col justify-between py-1">
                     <div>
                       <div className="flex items-start justify-between gap-2">
-                        <h3 className="text-xs font-extrabold text-zinc-400 truncate max-w-[200px]">
+                        <h3 
+                          onClick={() => onNavigateToManhua && onNavigateToManhua(item.manhuaId)}
+                          className="text-xs font-extrabold text-zinc-300 hover:text-red-400 cursor-pointer truncate max-w-[200px] transition-colors"
+                          title="الانتقال إلى صفحة العمل"
+                        >
                           {item.manhuaTitle}
                         </h3>
                         
@@ -178,14 +190,24 @@ export default function HistoryView({
                           <span>آخر قراءة: {formatDate(item.lastReadTime)}</span>
                         </span>
 
-                        <button
-                          onClick={() => onSelectChapter(item.manhuaId, item.chapterId, item.pageIndex, item)}
-                          className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors flex items-center gap-0.5 cursor-pointer text-[10px]"
-                          id={`resume-history-${item.id}`}
-                        >
-                          <Play className="w-3 h-3 fill-white text-white" />
-                          <span>استكمال القراءة</span>
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => onNavigateToManhua && onNavigateToManhua(item.manhuaId)}
+                            className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-lg transition-colors flex items-center gap-0.5 cursor-pointer text-[10px]"
+                            id={`details-manhua-${item.id}`}
+                          >
+                            <BookOpen className="w-3 h-3" />
+                            <span>صفحة العمل</span>
+                          </button>
+                          <button
+                            onClick={() => onSelectChapter(item.manhuaId, item.chapterId, item.pageIndex, item)}
+                            className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors flex items-center gap-0.5 cursor-pointer text-[10px]"
+                            id={`resume-history-${item.id}`}
+                          >
+                            <Play className="w-3 h-3 fill-white text-white" />
+                            <span>استكمال القراءة</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -206,7 +228,7 @@ export default function HistoryView({
         animeHistory.length > 0 ? (
           <div className="space-y-4">
             <p className="text-xs text-zinc-500 leading-relaxed pr-1">
-              تاريخ مشاهداتك للأنمي يتم حفظه تلقائياً ومزامنته محلياً. انقر على زر <span className="text-red-500 font-bold">"متابعة المشاهدة"</span> للرجوع الفوري للحلقة التي شاهدتها ومتابعتها.
+              تاريخ مشاهداتك للأنمي يتم حفظه تلقائياً ومزامنته محلياً. انقر على زر <span className="text-red-500 font-bold">"متابعة المشاهدة"</span> أو زر <span className="text-zinc-300 font-bold">"صفحة العمل"</span> للرجوع الفوري.
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -216,7 +238,11 @@ export default function HistoryView({
                   className="flex gap-4 p-4 bg-zinc-900/30 hover:bg-zinc-900/50 rounded-2xl border border-zinc-800/80 hover:border-red-500/30 transition-all group relative overflow-hidden"
                 >
                   {/* Cover thumbnail */}
-                  <div className="w-16 h-24 rounded-lg overflow-hidden bg-zinc-950 shrink-0 border border-zinc-800">
+                  <div 
+                    onClick={() => onNavigateToAnime && onNavigateToAnime(item.animeId)}
+                    className="w-16 h-24 rounded-lg overflow-hidden bg-zinc-950 shrink-0 border border-zinc-800 cursor-pointer hover:opacity-90 transition-opacity"
+                    title="الانتقال إلى صفحة العمل"
+                  >
                     <img 
                       src={item.animeCover || undefined} 
                       alt={item.animeTitle} 
@@ -229,7 +255,11 @@ export default function HistoryView({
                   <div className="flex-1 min-w-0 flex flex-col justify-between py-1">
                     <div>
                       <div className="flex items-start justify-between gap-2">
-                        <h3 className="text-xs font-extrabold text-zinc-400 truncate max-w-[200px]">
+                        <h3 
+                          onClick={() => onNavigateToAnime && onNavigateToAnime(item.animeId)}
+                          className="text-xs font-extrabold text-zinc-300 hover:text-amber-400 cursor-pointer truncate max-w-[200px] transition-colors"
+                          title="الانتقال إلى صفحة العمل"
+                        >
                           {item.animeTitle}
                         </h3>
                         
@@ -272,14 +302,24 @@ export default function HistoryView({
                           <span>آخر مشاهدة: {formatDate(item.lastWatchedTime)}</span>
                         </span>
 
-                        <button
-                          onClick={() => onSelectEpisode(item.animeId, item.episodeNumber)}
-                          className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-black font-black rounded-lg transition-colors flex items-center gap-0.5 cursor-pointer text-[10px]"
-                          id={`resume-anime-history-${item.id}`}
-                        >
-                          <Play className="w-3 h-3 fill-black text-black" />
-                          <span>متابعة المشاهدة</span>
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => onNavigateToAnime && onNavigateToAnime(item.animeId)}
+                            className="px-2.5 py-1 bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-lg transition-colors flex items-center gap-0.5 cursor-pointer text-[10px]"
+                            id={`details-anime-${item.id}`}
+                          >
+                            <BookOpen className="w-3 h-3" />
+                            <span>صفحة العمل</span>
+                          </button>
+                          <button
+                            onClick={() => onSelectEpisode(item.animeId, item.episodeNumber)}
+                            className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-black font-black rounded-lg transition-colors flex items-center gap-0.5 cursor-pointer text-[10px]"
+                            id={`resume-anime-history-${item.id}`}
+                          >
+                            <Play className="w-3 h-3 fill-black text-black" />
+                            <span>متابعة المشاهدة</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>

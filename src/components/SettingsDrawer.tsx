@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, User, BookOpen, Settings, LogIn, LogOut, RefreshCw, 
-  ChevronRight, Sparkles, Moon, Sun, ZoomIn, ZoomOut, Palette, ShieldAlert
+  ChevronRight, Sparkles, Moon, Sun, ZoomIn, ZoomOut, Palette, ShieldAlert, Layers
 } from 'lucide-react';
 import { UserProfile, ReadingHistoryItem, ReaderSettings } from '../types';
 
@@ -314,6 +314,30 @@ export default function SettingsDrawer({
                       أفقي (يمين-يسار)
                     </button>
                   </div>
+                </div>
+
+                {/* Continuous Mode Toggle */}
+                <div className="flex items-center justify-between bg-zinc-950 p-3 rounded-lg border border-zinc-800">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
+                      <Layers className="w-4 h-4 text-red-500" />
+                      فصول مسترسلة متتالية
+                    </span>
+                    <span className="text-[10px] text-zinc-500">تحميل الفصول مباشرة تحت بعضها بدون ضغط التالي</span>
+                  </div>
+                  <button
+                    onClick={() => updateReaderSettings({ continuousMode: !readerSettings.continuousMode })}
+                    className={`w-10 h-5 rounded-full p-0.5 transition-colors duration-200 focus:outline-none shrink-0 ${
+                      readerSettings.continuousMode ? 'bg-red-600' : 'bg-zinc-700'
+                    }`}
+                    id="continuous-mode-toggle-btn"
+                  >
+                    <div
+                      className={`w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
+                        readerSettings.continuousMode ? 'transform -translate-x-5' : ''
+                      }`}
+                    />
+                  </button>
                 </div>
 
                 {/* Night Mode Toggle */}

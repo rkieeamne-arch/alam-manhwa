@@ -90,6 +90,7 @@ export interface ReaderSettings {
   isNightMode: boolean;
   navColor: string; // hex color for navigation buttons
   autoSync: boolean;
+  continuousMode?: boolean; // قراءة الفصول بشكل مسترسل متتالي
 }
 
 export interface ManhuaComment {
@@ -144,7 +145,7 @@ export interface ScraperSource {
 export interface NotificationItem {
   id: string;
   title: string;
-  type: 'manga' | 'anime';
+  type: 'manga' | 'anime' | 'site';
   content: string;
   time: string;
   isNew: boolean;

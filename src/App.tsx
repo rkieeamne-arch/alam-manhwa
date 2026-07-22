@@ -99,9 +99,12 @@ export default function App() {
   // Core User Authentication State
   const [user, setUser] = useState<UserProfile>(() => {
     const saved = localStorage.getItem('manhua_user_profile');
+    const isAdminUnlocked = localStorage.getItem('admin_secret_unlocked') === 'true';
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (isAdminUnlocked) parsed.role = 'admin';
+        return parsed;
       } catch (e) {}
     }
     const defaultProfile: UserProfile = {
@@ -110,7 +113,7 @@ export default function App() {
       displayName: 'قارئ مخلص',
       avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
       bannerUrl: 'https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?w=1200&auto=format&fit=crop&q=80',
-      role: 'user',
+      role: isAdminUnlocked ? 'admin' : 'user',
       joinedAt: new Date().toLocaleDateString('ar-EG'),
       bio: 'عاشق للمانهو والمانجا',
       xp: 15,
@@ -148,9 +151,33 @@ export default function App() {
 
   // User Notifications State
   const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
-    // Clear any previous mock/fake notifications stored in localStorage
-    localStorage.removeItem('user_notifications');
-    return [];
+    const saved = localStorage.getItem('user_notifications');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return [
+      {
+        id: 'site-welcome-1',
+        title: 'مرحباً بك في المنصة!',
+        type: 'site',
+        content: 'تم تحديث الموقع وتفعيل قاعدة بيانات Appwrite وإمكانية تصفح الأنمي والمانهو بسلاسة.',
+        time: 'منذ قليل',
+        isNew: true,
+        targetId: 'site'
+      },
+      {
+        id: 'site-servers-2',
+        title: 'تحديث سيرفرات القارئ والبث المباشر',
+        type: 'site',
+        content: 'تم تحسين سرعة القارئ المتتابع وإضافة إشعارات الموقع المباشرة.',
+        time: 'منذ يومين',
+        isNew: false,
+        targetId: 'site'
+      }
+    ];
   });
 
   const [activeToast, setActiveToast] = useState<NotificationItem | null>(null);
@@ -179,7 +206,17 @@ export default function App() {
       setActiveToast(null);
     }
 
-    // Direct routing
+    // Site Notifications direct handling
+    if (notif.type === 'site') {
+      if (notif.sourceUrl && notif.sourceUrl !== '#') {
+        window.open(notif.sourceUrl, '_blank');
+      } else {
+        setCurrentView('home');
+      }
+      return;
+    }
+
+    // Direct routing for Anime & Manga
     if (notif.type === 'anime') {
       setAppMode('anime');
       setSelectedManhuaId(notif.targetId);
@@ -263,7 +300,8 @@ export default function App() {
       zoomLevel: 100,
       isNightMode: true,
       navColor: '#ef4444', // default crimson red
-      autoSync: true
+      autoSync: true,
+      continuousMode: true // تفعيل خيار الفصول المسترسلة افتراضياً أو قابلة للتبديل
     };
   });
 
@@ -307,6 +345,15 @@ export default function App() {
     const mangaId = params.get('manga');
     const chapterId = params.get('chapter');
     const view = params.get('view');
+    const secretAdmin = params.get('admin') || params.get('secret') || params.get('key') || params.get('secret_admin');
+
+    // Secret Admin Link Check (e.g. ?admin=azora or ?secret=admin or ?admin=true)
+    if (secretAdmin === 'azora' || secretAdmin === 'admin' || secretAdmin === 'true' || secretAdmin === '1' || secretAdmin === 'secret') {
+      localStorage.setItem('admin_secret_unlocked', 'true');
+      setUser(prev => ({ ...prev, role: 'admin' }));
+      setCurrentView('admin');
+      return;
+    }
 
     if (mangaId && chapterId) {
       setSelectedManhuaId(mangaId);
@@ -320,6 +367,10 @@ export default function App() {
         'home', 'manhua', 'reader', 'search', 'account', 'history', 'admin', 'mylists', 'downloads'
       ];
       if (allowedViews.includes(view as any)) {
+        if (view === 'admin') {
+          localStorage.setItem('admin_secret_unlocked', 'true');
+          setUser(prev => ({ ...prev, role: 'admin' }));
+        }
         setCurrentView(view as any);
       }
     }
@@ -951,6 +1002,35 @@ export default function App() {
             onRemoveAnimeItem={handleRemoveAnimeHistoryItem}
             onClearAll={handleClearHistory}
             onClearAllAnime={handleClearAnimeHistory}
+            onNavigateToManhua={(manhuaId) => {
+              const histItem = history.find(h => h.manhuaId === manhuaId);
+              if (histItem && manhuaId.startsWith('scr-')) {
+                setScrapedManhuaCache({
+                  id: manhuaId,
+                  title: histItem.manhuaTitle,
+                  englishTitle: histItem.manhuaTitle,
+                  description: 'جاري تحميل التفاصيل من المصدر...',
+                  author: 'غير معروف',
+                  artist: 'غير معروف',
+                  status: 'مستمر' as any,
+                  rating: 4.8,
+                  views: 0,
+                  coverUrl: histItem.manhuaCover || '',
+                  rawCoverUrl: histItem.manhuaCover || '',
+                  sourceUrl: histItem.sourceUrl || '',
+                  sourceId: manhuaId.split('-')[1] || 'azorafly',
+                  categories: ['مانهوا'],
+                  chapters: [],
+                  releaseYear: 2026
+                });
+              }
+              handleSelectManhua(manhuaId);
+            }}
+            onNavigateToAnime={(animeId) => {
+              setSelectedManhuaId(animeId);
+              setAppMode('anime');
+              setCurrentView('anime-details');
+            }}
           />
         )}
 
@@ -966,6 +1046,7 @@ export default function App() {
             onAddSource={handleAddSource}
             onDeleteSource={handleDeleteSource}
             onRestoreSources={handleRestoreSources}
+            onAddNotification={(notif) => setNotifications(prev => [notif, ...prev])}
           />
         )}
 

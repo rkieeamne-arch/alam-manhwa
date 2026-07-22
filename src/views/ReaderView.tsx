@@ -54,6 +54,23 @@ export default function ReaderView({
   const [scrollProgress, setScrollProgress] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Continuous Chapters Mode State
+  interface ExtraChapterItem {
+    chapter: Chapter;
+    pages: (string | Blob)[];
+    loading: boolean;
+    error: string | null;
+  }
+  const [extraChapters, setExtraChapters] = useState<ExtraChapterItem[]>([]);
+  const [loadingNextChapter, setLoadingNextChapter] = useState(false);
+  const [activeChapter, setActiveChapter] = useState<Chapter>(chapter);
+
+  // Sync activeChapter when root chapter prop changes
+  useEffect(() => {
+    setActiveChapter(chapter);
+    setExtraChapters([]);
+  }, [chapter.id]);
+
   const isScrapedChapter = chapter.id.startsWith('ch-');
   const chapterSource = sources?.find(s => chapter.id.startsWith(`ch-${s.id}-`));
   const isAnime = appMode === 'anime' || chapterSource?.type === 'anime';
@@ -267,10 +284,145 @@ export default function ReaderView({
 
   // Chapter Sorting for Prev / Next Chapter Buttons
   const sortedChapters = [...manhua.chapters].sort((a, b) => a.chapterNumber - b.chapterNumber);
-  const currentChIndex = sortedChapters.findIndex(c => c.id === chapter.id);
+  const currentChIndex = sortedChapters.findIndex(c => c.id === activeChapter.id);
   
   const prevChapter = currentChIndex > 0 ? sortedChapters[currentChIndex - 1] : null;
   const nextChapter = currentChIndex < sortedChapters.length - 1 ? sortedChapters[currentChIndex + 1] : null;
+
+  // Track active chapter in view on scroll in continuous mode
+  useEffect(() => {
+    if (!readerSettings.continuousMode || isAnime) {
+      if (activeChapter.id !== chapter.id) {
+        setActiveChapter(chapter);
+      }
+      return;
+    }
+
+    const handleScrollActiveChapter = () => {
+      const chapterEls = document.querySelectorAll<HTMLElement>('[data-chapter-id]');
+      if (chapterEls.length === 0) return;
+
+      let currentInViewId: string | null = null;
+      const viewportThreshold = window.innerHeight * 0.4;
+
+      chapterEls.forEach((el) => {
+        const rect = el.getBoundingClientRect();
+        if (rect.top <= viewportThreshold && rect.bottom > 80) {
+          currentInViewId = el.getAttribute('data-chapter-id');
+        }
+      });
+
+      if (currentInViewId && currentInViewId !== activeChapter.id) {
+        const foundCh = sortedChapters.find(c => c.id === currentInViewId);
+        if (foundCh) {
+          setActiveChapter(foundCh);
+          onAddHistory({
+            manhuaId: manhua.id,
+            manhuaTitle: manhua.title,
+            manhuaCover: manhua.coverUrl,
+            chapterId: foundCh.id,
+            chapterTitle: foundCh.title,
+            chapterNumber: foundCh.chapterNumber,
+            progressPercent: 0,
+            pageIndex: 0,
+            sourceUrl: manhua.sourceUrl,
+            chapterUrl: typeof foundCh.pages?.[0] === 'string' ? foundCh.pages[0] : undefined
+          });
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScrollActiveChapter, { passive: true });
+    return () => window.removeEventListener('scroll', handleScrollActiveChapter);
+  }, [readerSettings.continuousMode, activeChapter.id, sortedChapters, isAnime, chapter, manhua, onAddHistory]);
+
+  // Continuous Chapters Loader Function
+  const loadNextContinuousChapter = async () => {
+    if (loadingNextChapter) return;
+
+    const lastCh = extraChapters.length > 0 
+      ? extraChapters[extraChapters.length - 1].chapter 
+      : activeChapter;
+
+    const lastIndex = sortedChapters.findIndex(c => c.id === lastCh.id);
+    if (lastIndex < 0 || lastIndex >= sortedChapters.length - 1) return;
+
+    const nextCh = sortedChapters[lastIndex + 1];
+    if (extraChapters.some(item => item.chapter.id === nextCh.id)) return;
+
+    setLoadingNextChapter(true);
+    setExtraChapters(prev => [...prev, { chapter: nextCh, pages: [], loading: true, error: null }]);
+
+    try {
+      let pagesToSet: (string | Blob)[] = [];
+      if (nextCh.pages && nextCh.pages.length > 1) {
+        pagesToSet = nextCh.pages;
+      } else if (nextCh.id.startsWith('ch-')) {
+        const source = sources.find(s => nextCh.id.startsWith(`ch-${s.id}-`));
+        if (!source) throw new Error('مصدر هذا الفصل غير متوفر');
+        const pageUrl = nextCh.pages[0];
+        if (!pageUrl) throw new Error('رابط الفصل غير متوفر');
+        pagesToSet = await scrapeChapterPages(source, pageUrl as string);
+      } else {
+        pagesToSet = nextCh.pages || [];
+      }
+
+      // Smooth 1s delay so transition banner is clearly visible to user before images pop in
+      await new Promise(res => setTimeout(res, 1000));
+
+      setExtraChapters(prev => prev.map(item => 
+        item.chapter.id === nextCh.id 
+          ? { ...item, pages: pagesToSet, loading: false, error: null }
+          : item
+      ));
+
+      // Record reading history for continuous auto-loaded chapter
+      onAddHistory({
+        manhuaId: manhua.id,
+        manhuaTitle: manhua.title,
+        manhuaCover: manhua.coverUrl,
+        chapterId: nextCh.id,
+        chapterTitle: nextCh.title,
+        chapterNumber: nextCh.chapterNumber,
+        progressPercent: 0,
+        pageIndex: 0,
+        sourceUrl: manhua.sourceUrl,
+        chapterUrl: typeof nextCh.pages?.[0] === 'string' ? nextCh.pages[0] : undefined
+      });
+    } catch (err: any) {
+      console.error('Error loading continuous next chapter:', err);
+      setExtraChapters(prev => prev.map(item => 
+        item.chapter.id === nextCh.id 
+          ? { ...item, loading: false, error: err.message || 'فشل جلب صور الفصل' }
+          : item
+      ));
+    } finally {
+      setLoadingNextChapter(false);
+    }
+  };
+
+  // Scroll listener to auto-trigger loading next chapter in continuous mode
+  useEffect(() => {
+    if (!readerSettings.continuousMode || isAnime) return;
+
+    const handleContinuousScroll = () => {
+      const scrollBottom = window.innerHeight + window.scrollY;
+      const documentHeight = document.documentElement.scrollHeight;
+
+      if (documentHeight - scrollBottom < 700 && !loadingNextChapter) {
+        loadNextContinuousChapter();
+      }
+    };
+
+    window.addEventListener('scroll', handleContinuousScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleContinuousScroll);
+  }, [readerSettings.continuousMode, extraChapters, activeChapter.id, loadingNextChapter, sortedChapters, isAnime]);
+
+  const lastLoadedChapter = extraChapters.length > 0
+    ? extraChapters[extraChapters.length - 1].chapter
+    : chapter;
+  const lastLoadedIndex = sortedChapters.findIndex(c => c.id === lastLoadedChapter.id);
+  const nextChapterAvailable = lastLoadedIndex >= 0 && lastLoadedIndex < sortedChapters.length - 1;
 
   // Handle Comment Submissions
   const handlePostComment = (e: React.FormEvent) => {
@@ -435,7 +587,7 @@ export default function ReaderView({
                 {manhua.title}
               </h2>
               <h3 className="text-[11px] font-bold text-red-500 truncate">
-                {chapter.title}
+                {activeChapter.title || `الفصل ${activeChapter.chapterNumber}`}
               </h3>
             </div>
           </div>
@@ -444,10 +596,13 @@ export default function ReaderView({
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink">
             {/* Chapter Selection Selector */}
             <select
-              value={chapter.id}
+              value={activeChapter.id}
               onChange={(e) => {
-                onSelectChapter(e.target.value);
+                const selectedId = e.target.value;
+                onSelectChapter(selectedId);
                 setCurrentPageIndex(0);
+                setExtraChapters([]);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               className={`text-xs font-bold py-1.5 px-2 rounded-lg border focus:outline-none focus:border-red-500 cursor-pointer max-w-[110px] xs:max-w-[160px] sm:max-w-[280px] truncate ${
                 bgColor === 'sepia' 
@@ -563,17 +718,99 @@ export default function ReaderView({
             {/* WEBTOON MODE */}
             {readerSettings.readingMode === 'webtoon' && (
               <div className="w-full space-y-0">
-                {displayPages.map((pageUrl, idx) => (
-                  <div key={idx} className="relative w-full overflow-hidden bg-black flex justify-center">
-                    <img
-                      src={pageUrl || undefined}
-                      alt={`صفحة ${idx + 1}`}
-                      className="w-full max-w-full md:max-w-2xl lg:max-w-3xl xl:max-w-4xl h-auto object-contain block mx-auto"
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                    />
+                <div data-chapter-id={chapter.id} className="w-full space-y-0">
+                  {displayPages.map((pageUrl, idx) => (
+                    <div key={`main-p-${idx}`} className="relative w-full overflow-hidden bg-black flex justify-center">
+                      <img
+                        src={typeof pageUrl === 'string' ? pageUrl : URL.createObjectURL(pageUrl as Blob)}
+                        alt={`صفحة ${idx + 1}`}
+                        className="w-full max-w-full md:max-w-2xl lg:max-w-3xl xl:max-w-4xl h-auto object-contain block mx-auto"
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {/* CONTINUOUS EXTRA CHAPTERS */}
+                {extraChapters.map((extItem) => (
+                  <div key={`ext-ch-${extItem.chapter.id}`} data-chapter-id={extItem.chapter.id} className="w-full">
+                    {/* Chapter Header Banner */}
+                    <div className="py-8 px-4 my-10 bg-gradient-to-r from-red-950/90 via-zinc-900 to-red-950/90 border-y-2 border-red-500/50 text-center rounded-2xl shadow-2xl flex flex-col items-center justify-center gap-2 max-w-4xl mx-auto my-12" id={`continuous-chapter-${extItem.chapter.id}`}>
+                      <span className="text-[11px] font-black text-red-400 uppercase tracking-widest px-3.5 py-1 bg-red-950/80 rounded-full border border-red-500/40 shadow-inner">
+                        بداية الفصل التالي (قراءة مسترسلة)
+                      </span>
+                      <h3 className="text-lg sm:text-2xl font-black text-white font-display">
+                        {extItem.chapter.title || `الفصل ${extItem.chapter.chapterNumber}`}
+                      </h3>
+                    </div>
+
+                    {extItem.loading && (
+                      <div className="py-16 text-center space-y-3 max-w-md mx-auto">
+                        <Loader2 className="w-8 h-8 text-red-500 animate-spin mx-auto" />
+                        <p className="text-xs font-bold text-zinc-300">جاري تحميل صور الفصل {extItem.chapter.chapterNumber}...</p>
+                      </div>
+                    )}
+
+                    {extItem.error && (
+                      <div className="py-12 text-center space-y-3 max-w-md mx-auto px-4 bg-red-950/20 border border-red-900/30 rounded-2xl">
+                        <p className="text-xs text-red-400 font-bold">{extItem.error}</p>
+                        <button
+                          onClick={loadNextContinuousChapter}
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg text-xs font-bold hover:bg-red-700 transition-colors cursor-pointer"
+                        >
+                          إعادة تجربة تحميل الفصل
+                        </button>
+                      </div>
+                    )}
+
+                    {!extItem.loading && !extItem.error && extItem.pages && (
+                      <div className="w-full space-y-0">
+                        {extItem.pages.map((pUrl, pIdx) => (
+                          <div key={`ext-${extItem.chapter.id}-p-${pIdx}`} className="relative w-full overflow-hidden bg-black flex justify-center">
+                            <img
+                              src={typeof pUrl === 'string' ? pUrl : URL.createObjectURL(pUrl as Blob)}
+                              alt={`صفحة ${pIdx + 1}`}
+                              className="w-full max-w-full md:max-w-2xl lg:max-w-3xl xl:max-w-4xl h-auto object-contain block mx-auto"
+                              loading="lazy"
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
+
+                {/* LOAD NEXT CONTINUOUS CHAPTER BUTTON IF CONTINUOUS MODE IS ACTIVE */}
+                {readerSettings.continuousMode && (
+                  <div className="py-10 text-center">
+                    {nextChapterAvailable ? (
+                      <button
+                        onClick={loadNextContinuousChapter}
+                        disabled={loadingNextChapter}
+                        className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white text-xs font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 mx-auto cursor-pointer disabled:opacity-50"
+                        id="load-next-continuous-ch-btn"
+                      >
+                        {loadingNextChapter ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>جاري تحميل الفصل التالي...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Layers className="w-4 h-4" />
+                            <span>تحميل الفصل التالي مباشرة (قراءة مسترسلة)</span>
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <div className="text-xs text-zinc-500 font-bold border border-dashed border-zinc-800 py-3 px-6 rounded-xl inline-block">
+                        وصلت إلى آخر فصل متوفر في المانهوا
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -657,7 +894,7 @@ export default function ReaderView({
             
             {/* Header Info Row */}
             <div className="flex items-center justify-between text-xs font-black">
-              <span className="text-zinc-400 bg-zinc-900/60 px-2.5 py-1 rounded-lg border border-zinc-850">الفصل {chapter.chapterNumber}</span>
+              <span className="text-zinc-400 bg-zinc-900/60 px-2.5 py-1 rounded-lg border border-zinc-850">الفصل {activeChapter.chapterNumber}</span>
               <div className="flex items-center gap-1.5 bg-zinc-900/60 px-2.5 py-1 rounded-lg border border-zinc-850">
                 <span className="text-zinc-400 font-medium text-[11px]">موضع القراءة:</span>
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-amber-400 font-black">
@@ -809,6 +1046,40 @@ export default function ReaderView({
                 </div>
               </div>
 
+              {/* Continuous Mode Toggle */}
+              <div className="flex items-center justify-between bg-black/20 p-3.5 rounded-xl border border-zinc-800/10">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs font-bold flex items-center gap-1.5">
+                    <Layers className="w-4 h-4 text-red-500" />
+                    فصول مسترسلة (متتالية)
+                  </span>
+                  <span className="text-[10px] opacity-60">تصفح الفصول متتالية تلقائياً بدون ضغط التالي</span>
+                </div>
+                <button
+                  onClick={() => {
+                    const nextMode = !readerSettings.continuousMode;
+                    updateReaderSettings({ continuousMode: nextMode });
+                    if (!nextMode) {
+                      if (activeChapter.id !== chapter.id) {
+                        onSelectChapter(activeChapter.id);
+                        setCurrentPageIndex(0);
+                      }
+                      setExtraChapters([]);
+                    }
+                  }}
+                  className={`w-10 h-5 rounded-full p-0.5 transition-colors duration-200 focus:outline-none shrink-0 cursor-pointer ${
+                    readerSettings.continuousMode ? 'bg-red-600' : 'bg-zinc-700'
+                  }`}
+                  id="reader-modal-continuous-toggle"
+                >
+                  <div
+                    className={`w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
+                      readerSettings.continuousMode ? 'transform -translate-x-5' : ''
+                    }`}
+                  />
+                </button>
+              </div>
+
               {/* Background Color themes */}
               <div className="space-y-2">
                 <label className="text-[11px] font-bold opacity-70">لون خلفية القارئ</label>
@@ -874,6 +1145,8 @@ export default function ReaderView({
               onClick={() => {
                 onSelectChapter(prevChapter.id);
                 setCurrentPageIndex(0);
+                setExtraChapters([]);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               className={`flex-1 py-3 px-4 border text-center flex items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer ${
                 bgColor === 'sepia'
@@ -898,6 +1171,8 @@ export default function ReaderView({
               onClick={() => {
                 onSelectChapter(nextChapter.id);
                 setCurrentPageIndex(0);
+                setExtraChapters([]);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               className="flex-1 py-3 px-4 rounded-xl text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 text-white active:scale-95 bg-red-600 hover:bg-red-700 shadow-md cursor-pointer"
               id="reader-next-chapter-btn"
@@ -912,125 +1187,6 @@ export default function ReaderView({
           )}
         </div>
       )}
-
-      {/* 9. DISCUSSION SECTION (Always visible at page end, togglable shortcut in settings drawer) */}
-      <div className="max-w-3xl mx-auto px-4 mt-12 border-t border-zinc-800/10" id="reader-comments-section">
-        <div className="flex items-center justify-between py-6">
-          <div className="flex items-center gap-2.5 border-r-4 border-red-500 pr-3">
-            <MessageSquare className="w-5 h-5 text-red-500" />
-            <h3 className="text-base font-black font-display">التعليقات والمناقشات</h3>
-            <span className="text-xs opacity-60">({comments.length} تعليق للفصل)</span>
-          </div>
-          
-          <button
-            onClick={() => setShowComments(!showComments)}
-            className={`text-xs font-bold py-1 px-3 rounded-lg border transition-all cursor-pointer ${
-              showComments 
-                ? 'bg-red-600/10 text-red-500 border-red-500/20' 
-                : 'bg-black/10 border-zinc-800/10 opacity-70 hover:opacity-100'
-            }`}
-          >
-            {showComments ? 'إخفاء التعليقات' : 'إظهار التعليقات'}
-          </button>
-        </div>
-
-        {showComments && (
-          <div className="space-y-6">
-            {/* Post comment input form */}
-            <form onSubmit={handlePostComment} className="flex gap-3 bg-black/10 p-4 rounded-xl border border-zinc-800/10">
-              <img 
-                src={(user && user.avatarUrl) ? user.avatarUrl : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80'} 
-                alt="Avatar"
-                className="w-10 h-10 rounded-full border border-red-500 object-cover shrink-0"
-                referrerPolicy="no-referrer"
-              />
-              <div className="flex-1 flex gap-2">
-                <input
-                  type="text"
-                  placeholder={user ? "اكتب تعليقك هنا..." : "سجل الدخول أولاً لتتمكن من التعليق..."}
-                  value={commentInput}
-                  onChange={(e) => setCommentInput(e.target.value)}
-                  disabled={!user}
-                  className={`flex-1 text-xs border rounded-lg px-4 py-2 focus:outline-none focus:border-red-500 disabled:opacity-50 disabled:cursor-not-allowed ${
-                    bgColor === 'light' || bgColor === 'sepia' 
-                      ? 'bg-white border-zinc-200 text-zinc-900 placeholder-zinc-400' 
-                      : 'bg-zinc-950 border-zinc-800/60 text-zinc-100 placeholder-zinc-500'
-                  }`}
-                  id="comment-text-input"
-                />
-                <button
-                  type="submit"
-                  disabled={!user || !commentInput.trim()}
-                  className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center justify-center cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                  id="post-comment-btn"
-                >
-                  <Send className="w-4 h-4 rotate-180" />
-                </button>
-              </div>
-            </form>
-
-            {/* Comments threads list */}
-            {comments.length > 0 ? (
-              <div className="space-y-4">
-                {comments.map((c) => (
-                  <div 
-                    key={c.id} 
-                    className={`flex gap-3 p-4 rounded-xl border transition-colors ${
-                      bgColor === 'light' || bgColor === 'sepia'
-                        ? 'bg-white/50 border-zinc-200 text-zinc-900'
-                        : 'bg-zinc-900/10 hover:bg-zinc-900/30 border-zinc-800/40 text-zinc-100'
-                    }`}
-                  >
-                    <img 
-                      src={c.userAvatar || undefined} 
-                      alt={c.userName} 
-                      className="w-9 h-9 rounded-full border border-zinc-800 object-cover shrink-0"
-                      referrerPolicy="no-referrer"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-xs font-black">
-                          {c.userName}
-                          {c.userEmail === 'rkieeamne@gmail.com' && (
-                            <span className="mr-1.5 text-[9px] bg-red-600/10 text-red-500 border border-red-500/20 px-1.5 py-0.25 rounded">
-                              مدير الموقع
-                            </span>
-                          )}
-                        </h4>
-                        <span className="text-[10px] opacity-50">{c.timestamp}</span>
-                      </div>
-                      
-                      <p className="text-xs opacity-90 mt-2 leading-relaxed">
-                        {c.content}
-                      </p>
-
-                      <div className="flex items-center gap-1.5 mt-3">
-                        <button 
-                          onClick={() => handleLikeComment(c.id)}
-                          className={`text-[10px] flex items-center gap-1 px-2.5 py-1 rounded-full border transition-all cursor-pointer ${
-                            c.hasLiked 
-                              ? 'bg-red-600/10 text-red-500 border-red-500/20' 
-                              : 'bg-black/15 text-zinc-400 border-zinc-800/10 hover:text-red-500'
-                          }`}
-                          id={`like-comment-${c.id}`}
-                        >
-                          <ThumbsUp className="w-3 h-3" />
-                          <span>{c.likes}</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-10 text-zinc-400">
-                <MessageSquare className="w-7 h-7 mx-auto opacity-30 mb-2" />
-                <p className="text-xs">لا توجد تعليقات بعد في هذا الفصل. كن أول من يكتب!</p>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
 
     </div>
   );

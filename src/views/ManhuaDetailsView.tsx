@@ -652,7 +652,9 @@ export default function ManhuaDetailsView({
             <div className="space-y-2 pt-2 text-right">
               <h3 className="text-xs font-extrabold text-red-500 border-r-2 border-red-500 pr-2">قصة {contentTypeName}</h3>
               <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed max-w-4xl text-justify">
-                {displayManhua.description}
+                {displayManhua.description && displayManhua.description.trim() && displayManhua.description !== 'لا يوجد ملخص متوفر.' && displayManhua.description !== 'لا يوجد وصف متاح.' 
+                  ? displayManhua.description 
+                  : `تابع قصة وأحداث ${displayManhua.title || contentTypeName} مترجمة بالكامل بأعلى جودة وبشكل حصري.`}
               </p>
             </div>
 

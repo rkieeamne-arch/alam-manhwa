@@ -190,7 +190,9 @@ export default function AnimeDetailsView({
               </div>
               <div className="bg-zinc-950/60 border border-zinc-850/80 p-5 rounded-2xl max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
                 <p className="text-xs sm:text-[13px] text-zinc-300 leading-relaxed font-medium text-justify">
-                  {anime.description}
+                  {anime.description && anime.description.trim() && anime.description !== 'لا يوجد وصف متاح.' 
+                    ? anime.description 
+                    : `شاهد وتابع قصة وأحداث أنمي ${anime.title} مترجمة بالكامل بأعلى جودة.`}
                 </p>
               </div>
             </div>

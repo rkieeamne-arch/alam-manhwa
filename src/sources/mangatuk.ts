@@ -366,6 +366,7 @@ export const mangatukSourceHandler: SourceHandler = {
 
     if (!description) {
       description = $('meta[property="og:description"]').attr('content') || 'لا يوجد وصف متاح.';
+      if (description.length > 500) description = description.substring(0, 500) + '...';
     }
 
     const htmlChapters: Chapter[] = [];

@@ -336,7 +336,8 @@ export const genericSourceHandler: SourceHandler = {
       description = $(source.detailDescSelector).first().text().trim();
     }
     if (!description) {
-      description = $('.description-summary, .manga-about, .entry-content, [itemProp="description"], div.summary-content, .description, .p-4.rounded-2xl.border.border-zinc-800').first().text().trim();
+      description = $('.description-summary, .manga-about, .entry-content, [itemProp="description"], div.summary-content, .description, .p-4.rounded-2xl.border.border-zinc-800, .post-content, .summary, .desc, .review-content, .story-info-right-extent').text().trim().replace(/\s+/g, ' ');
+      if (description.length > 500) description = description.substring(0, 500) + '...';
     }
     if (!description) {
       description = $('meta[property="og:description"]').attr('content') || '';

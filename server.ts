@@ -99,10 +99,15 @@ async function startServer() {
   app.get('/api/home', async (req, res) => {
     try {
       const source = { id: 'azorafly', baseUrl: 'https://azorafly.com', type: 'manga' } as any;
-      const data = await scrapePopularList(source, undefined, 1);
-      res.json(data);
+      let data = await scrapePopularList(source, undefined, 1);
+      if (!data || data.length === 0) {
+        const fallbackSource = { id: 'mangatuk', baseUrl: 'https://mangatuk.com', type: 'manga' } as any;
+        data = await scrapePopularList(fallbackSource, undefined, 1);
+      }
+      res.json(data || []);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to fetch home data' });
+      console.warn('[Server] /api/home failed:', err);
+      res.json([]);
     }
   });
 
@@ -111,10 +116,15 @@ async function startServer() {
     if (!query) return res.status(400).json({ error: 'Query required' });
     try {
       const source = { id: 'azorafly', baseUrl: 'https://azorafly.com', type: 'manga' } as any;
-      const data = await scrapePopularList(source, query, 1);
-      res.json(data);
+      let data = await scrapePopularList(source, query, 1);
+      if (!data || data.length === 0) {
+        const fallbackSource = { id: 'mangatuk', baseUrl: 'https://mangatuk.com', type: 'manga' } as any;
+        data = await scrapePopularList(fallbackSource, query, 1);
+      }
+      res.json(data || []);
     } catch (err) {
-      res.status(500).json({ error: 'Failed to search' });
+      console.warn('[Server] /api/search failed:', err);
+      res.json([]);
     }
   });
 
@@ -126,6 +136,7 @@ async function startServer() {
       const data = await scrapeMangaDetails(source, sourceUrl);
       res.json(data);
     } catch (err) {
+      console.warn('[Server] /api/manhwa/:id failed:', err);
       res.status(500).json({ error: 'Failed to fetch details' });
     }
   });
@@ -138,6 +149,7 @@ async function startServer() {
       const data = await scrapeChapterPages(source, chapterUrl);
       res.json(data);
     } catch (err) {
+      console.warn('[Server] /api/chapter/:id failed:', err);
       res.status(500).json({ error: 'Failed to fetch chapter pages' });
     }
   });

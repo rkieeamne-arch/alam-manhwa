@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Search, BookOpen, User, ShieldAlert, History, Home, Sparkles, Heart, FolderDown, Tv, MessageSquare,
-  Sun, Moon, Bell, BellOff, Check, Trash2
+  Sun, Moon, Bell, BellOff, Check, Trash2, Globe
 } from 'lucide-react';
 import { UserProfile, NotificationItem } from '../types';
 import logoImg from '../assets/images/manhua_logo_1783758713519.jpg';
@@ -41,7 +41,7 @@ export default function Header({
 }: HeaderProps) {
   const [searchVal, setSearchVal] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifTab, setNotifTab] = useState<'manga' | 'anime'>('manga');
+  const [notifTab, setNotifTab] = useState<'manga' | 'anime' | 'site'>('manga');
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,7 +51,7 @@ export default function Header({
 
   const isAnime = appMode === 'anime';
   const unreadCount = notifications.filter(n => n.isNew).length;
-  const filteredNotifications = notifications.filter(n => n.type === (notifTab === 'manga' ? 'manga' : 'anime'));
+  const filteredNotifications = notifications.filter(n => n.type === notifTab);
 
   return (
     <header className="z-40 bg-zinc-950/90 backdrop-blur-md border-b border-zinc-900 shadow-lg">
@@ -168,7 +168,7 @@ export default function Header({
                     </div>
 
                     {/* Tab Switcher */}
-                    <div className="flex bg-zinc-900/40 p-1 border-b border-zinc-900">
+                    <div className="flex bg-zinc-900/40 p-1 border-b border-zinc-900 gap-1">
                       <button
                         onClick={() => setNotifTab('manga')}
                         className={`flex-1 py-1.5 rounded-lg text-[10px] font-black transition-all flex items-center justify-center gap-1 cursor-pointer ${
@@ -192,6 +192,18 @@ export default function Header({
                         <Tv className="w-3 h-3" />
                         <span>أنمي ({notifications.filter(n => n.type === 'anime').length})</span>
                       </button>
+
+                      <button
+                        onClick={() => setNotifTab('site')}
+                        className={`flex-1 py-1.5 rounded-lg text-[10px] font-black transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                          notifTab === 'site'
+                            ? 'bg-pink-600 text-white shadow-sm'
+                            : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/30'
+                        }`}
+                      >
+                        <Globe className="w-3 h-3" />
+                        <span>موقع ({notifications.filter(n => n.type === 'site').length})</span>
+                      </button>
                     </div>
 
                     {/* Notifications List */}
@@ -214,7 +226,7 @@ export default function Header({
                             )}
                             
                             {/* Media thumbnail cover */}
-                            <div className="w-9 h-12 rounded bg-zinc-900 shrink-0 overflow-hidden border border-zinc-800 mr-2">
+                            <div className="w-9 h-12 rounded bg-zinc-900 shrink-0 overflow-hidden border border-zinc-800 mr-2 flex items-center justify-center">
                               {notif.cover ? (
                                 <img 
                                   src={notif.cover || undefined} 
@@ -224,7 +236,13 @@ export default function Header({
                                 />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center">
-                                  {notif.type === 'anime' ? <Tv className="w-4 h-4 text-zinc-600" /> : <BookOpen className="w-4 h-4 text-zinc-600" />}
+                                  {notif.type === 'anime' ? (
+                                    <Tv className="w-4 h-4 text-amber-500" />
+                                  ) : notif.type === 'site' ? (
+                                    <Globe className="w-4 h-4 text-pink-400" />
+                                  ) : (
+                                    <BookOpen className="w-4 h-4 text-red-500" />
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -240,13 +258,17 @@ export default function Header({
                               <p className="text-[10px] text-zinc-400 leading-snug mt-1 font-medium">
                                 {notif.content}
                               </p>
-                              {notif.chapterOrEp && (
+                              {notif.chapterOrEp ? (
                                 <span className={`inline-block mt-1 text-[9px] font-bold px-1.5 py-0.5 rounded ${
                                   notif.type === 'anime' ? 'bg-amber-500/10 text-amber-500' : 'bg-red-600/10 text-red-500'
                                 }`}>
                                   {notif.type === 'anime' ? `الحلقة ${notif.chapterOrEp}` : `الفصل ${notif.chapterOrEp}`}
                                 </span>
-                              )}
+                              ) : notif.type === 'site' ? (
+                                <span className="inline-block mt-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-pink-500/10 text-pink-400">
+                                  إشعار موقع
+                                </span>
+                              ) : null}
                             </div>
                           </div>
                         ))
