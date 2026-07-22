@@ -10,6 +10,8 @@ import { Home, Search, Heart, History, FolderDown, User, MessageSquare, Bell, Tv
 import Header from './components/Header';
 import SettingsDrawer from './components/SettingsDrawer';
 import BypassModal from './components/BypassModal';
+import AdBanner from './components/AdBanner';
+import { fetchAppwriteAds, fetchAppwriteNotifications, AppwriteAd } from './lib/appwrite';
 
 // Views
 import HomeView from './views/HomeView';
@@ -175,15 +177,48 @@ export default function App() {
     localStorage.setItem('user_notifications', JSON.stringify(notifications));
   }, [notifications]);
 
-  // Toast Auto-Dismiss
+  // Ads & Cloud Notifications State
+  const [ads, setAds] = useState<AppwriteAd[]>([]);
+  const [popupAd, setPopupAd] = useState<AppwriteAd | null>(null);
+
+  // Sync Ads and Notifications from Appwrite Cloud periodically for all users
   useEffect(() => {
-    if (activeToast) {
-      const dismiss = setTimeout(() => {
-        setActiveToast(null);
-      }, 7000);
-      return () => clearTimeout(dismiss);
-    }
-  }, [activeToast]);
+    let isMounted = true;
+    const syncAppwriteCloud = async () => {
+      try {
+        // 1. Fetch Ads
+        const fetchedAds = await fetchAppwriteAds();
+        if (isMounted) {
+          setAds(fetchedAds);
+          const popup = fetchedAds.find(a => a.position === 'popup' && a.isActive);
+          if (popup) setPopupAd(popup);
+        }
+
+        // 2. Fetch Cloud Notifications
+        const cloudNotifs = await fetchAppwriteNotifications();
+        if (isMounted && cloudNotifs && cloudNotifs.length > 0) {
+          setNotifications(prev => {
+            const existingIds = new Set(prev.map(n => n.id));
+            const newNotifs = cloudNotifs.filter(n => !existingIds.has(n.id));
+            if (newNotifs.length > 0) {
+              setActiveToast(newNotifs[0]);
+              return [...newNotifs, ...prev];
+            }
+            return prev;
+          });
+        }
+      } catch (e) {
+        console.warn('Appwrite cloud sync error:', e);
+      }
+    };
+
+    syncAppwriteCloud();
+    const interval = setInterval(syncAppwriteCloud, 12000); // Poll every 12 seconds
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   const handleNotificationClick = (notif: NotificationItem) => {
     // Mark as read
@@ -853,6 +888,7 @@ export default function App() {
             onToggleLayout={handleToggleLayout}
             appMode={appMode}
             onToggleAppMode={handleToggleAppMode}
+            ads={ads}
           />
         )}
 
@@ -891,6 +927,7 @@ export default function App() {
             user={user}
             sources={sources}
             appMode={appMode}
+            ads={ads}
           />
         )}
 
@@ -1290,6 +1327,49 @@ export default function App() {
           >
             <X className="w-3.5 h-3.5" />
           </button>
+        </div>
+      )}
+
+      {/* Cloud Popup Ad Modal */}
+      {popupAd && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in" dir="rtl">
+          <div className="relative max-w-md w-full bg-zinc-900 border border-pink-500/40 rounded-3xl overflow-hidden shadow-2xl space-y-4 p-5 text-center">
+            <button
+              onClick={() => setPopupAd(null)}
+              className="absolute top-3 left-3 p-2 bg-zinc-950/80 hover:bg-red-600 text-zinc-400 hover:text-white rounded-full transition-all border border-zinc-800 cursor-pointer"
+              title="إغلاق الإعلان"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <span className="inline-block px-3 py-1 bg-pink-950/80 border border-pink-800/50 text-pink-400 text-[10px] font-black rounded-lg">
+              إعلان متثبت من الإدارة
+            </span>
+
+            <h3 className="text-base sm:text-lg font-black text-white">{popupAd.title}</h3>
+
+            {popupAd.imageUrl && (
+              <div className="rounded-2xl overflow-hidden border border-zinc-800 max-h-60 bg-zinc-950 flex items-center justify-center">
+                <img
+                  src={popupAd.imageUrl}
+                  alt={popupAd.title}
+                  className="w-full h-auto object-cover"
+                />
+              </div>
+            )}
+
+            {popupAd.linkUrl && popupAd.linkUrl !== '#' && (
+              <a
+                href={popupAd.linkUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setPopupAd(null)}
+                className="block w-full py-3 bg-pink-600 hover:bg-pink-500 text-white font-bold text-xs rounded-xl transition-all shadow-lg shadow-pink-600/30"
+              >
+                انقر لزيارة الرابط
+              </a>
+            )}
+          </div>
         </div>
       )}
 

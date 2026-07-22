@@ -8,6 +8,7 @@ import { NotificationItem } from '../types';
 import { 
   getStoredAppwriteConfig, saveAppwriteConfig, 
   fetchAppwriteAds, createAppwriteAd, deleteAppwriteAd,
+  createAppwriteNotification,
   AppwriteConfig, AppwriteAd 
 } from '../lib/appwrite';
 
@@ -157,7 +158,7 @@ export default function AdminView({ onAddNotification }: AdminViewProps) {
     }
   };
 
-  const handleSendNotification = (e: React.FormEvent) => {
+  const handleSendNotification = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!notifTitle.trim() || !notifContent.trim()) {
       triggerError('يرجى إدخال عنوان ومحتوى الإشعار.');
@@ -173,13 +174,23 @@ export default function AdminView({ onAddNotification }: AdminViewProps) {
       targetId: 'site',
       sourceUrl: notifLink.trim() || undefined
     };
+
     if (onAddNotification) {
       onAddNotification(newNotif);
     }
+
+    // Publish to Appwrite Cloud so all users receive it instantly
+    await createAppwriteNotification({
+      title: notifTitle.trim(),
+      content: notifContent.trim(),
+      type: notifType,
+      linkUrl: notifLink.trim()
+    });
+
     setNotifTitle('');
     setNotifContent('');
     setNotifLink('');
-    triggerToast('تم إرسال الإشعار لجميع مستخدمي الموقع بنجاح!');
+    triggerToast('تم إرسال ونشر الإشعار لجميع مستخدمي الموقع بنجاح!');
   };
 
   // PIN Lock View

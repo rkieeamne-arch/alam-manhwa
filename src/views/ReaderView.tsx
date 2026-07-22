@@ -6,6 +6,8 @@ import {
 import { Manhua, Chapter, ReaderSettings, ManhuaComment, ReadingHistoryItem, ScraperSource } from '../types';
 import { mockComments } from '../data';
 import { scrapeChapterPages } from '../utils/scraper';
+import AdBanner from '../components/AdBanner';
+import { AppwriteAd } from '../lib/appwrite';
 
 interface ReaderViewProps {
   manhua: Manhua;
@@ -18,6 +20,7 @@ interface ReaderViewProps {
   user: any;
   sources?: ScraperSource[];
   appMode?: 'manga' | 'anime';
+  ads?: AppwriteAd[];
 }
 
 export default function ReaderView({
@@ -30,7 +33,8 @@ export default function ReaderView({
   onAddHistory,
   user,
   sources = [],
-  appMode = 'manga'
+  appMode = 'manga',
+  ads = []
 }: ReaderViewProps) {
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [comments, setComments] = useState<ManhuaComment[]>([]);
@@ -1136,6 +1140,11 @@ export default function ReaderView({
           </div>
         </div>
       )}
+
+      {/* Reader Bottom Cloud Ads */}
+      <div className="max-w-xl mx-auto px-4">
+        <AdBanner ads={ads} position="reader_bottom" />
+      </div>
 
       {/* 8. CHAPTER PAGINATION BUTTONS (Prev Chapter / Next Chapter) - Focus toggled */}
       {showUI && (

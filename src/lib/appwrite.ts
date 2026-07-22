@@ -58,7 +58,7 @@ export function saveLocalAds(ads: AppwriteAd[]) {
 export async function fetchAppwriteAds(): Promise<AppwriteAd[]> {
   const config = getStoredAppwriteConfig();
   if (!config.projectId || !config.databaseId || !config.adsCollectionId) {
-    return getLocalAds();
+    return getLocalAds().filter(a => a.position !== ('notification' as any));
   }
 
   try {
@@ -72,30 +72,107 @@ export async function fetchAppwriteAds(): Promise<AppwriteAd[]> {
     });
 
     if (!response.ok) {
-      console.warn('[Appwrite] Failed to fetch documents, returning local fallback:', response.statusText);
-      return getLocalAds();
+      console.warn('[Appwrite] Failed to fetch ads, returning local fallback:', response.statusText);
+      return getLocalAds().filter(a => a.position !== ('notification' as any));
     }
 
     const data = await response.json();
     if (data && Array.isArray(data.documents)) {
-      const fetchedAds = data.documents.map((doc: any) => ({
-        $id: doc.$id,
-        title: doc.title || 'إعلان',
-        imageUrl: doc.imageUrl || doc.image_url || '',
-        linkUrl: doc.linkUrl || doc.link_url || '#',
-        position: doc.position || 'top_banner',
-        isActive: doc.isActive ?? doc.is_active ?? true,
-        createdAt: doc.$createdAt || doc.createdAt
-      }));
+      const fetchedAds = data.documents
+        .filter((doc: any) => doc.position !== 'notification' && (doc.isActive ?? doc.is_active ?? true))
+        .map((doc: any) => ({
+          $id: doc.$id,
+          title: doc.title || 'إعلان',
+          imageUrl: doc.imageUrl || doc.image_url || '',
+          linkUrl: doc.linkUrl || doc.link_url || '#',
+          position: doc.position || 'top_banner',
+          isActive: doc.isActive ?? doc.is_active ?? true,
+          createdAt: doc.$createdAt || doc.createdAt
+        }));
       // Keep local backup synced
       saveLocalAds(fetchedAds);
       return fetchedAds;
     }
   } catch (err) {
-    console.warn('[Appwrite] Network or API error:', err);
+    console.warn('[Appwrite] Ads fetch network error:', err);
   }
 
-  return getLocalAds();
+  return getLocalAds().filter(a => a.position !== ('notification' as any));
+}
+
+// Fetch Notifications from Appwrite Cloud
+export async function fetchAppwriteNotifications(): Promise<any[]> {
+  const config = getStoredAppwriteConfig();
+  if (!config.projectId || !config.databaseId || !config.adsCollectionId) {
+    return [];
+  }
+
+  try {
+    const url = `${config.endpoint.replace(/\/$/, '')}/databases/${config.databaseId}/collections/${config.adsCollectionId}/documents`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'X-Appwrite-Project': config.projectId,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) return [];
+
+    const data = await response.json();
+    if (data && Array.isArray(data.documents)) {
+      const notifs = data.documents
+        .filter((doc: any) => doc.position === 'notification' || doc.type === 'site' || doc.type === 'manga' || doc.type === 'anime')
+        .map((doc: any) => ({
+          id: doc.$id || `notif-${Date.now()}`,
+          title: doc.title || 'إشعار جديد',
+          content: doc.content || doc.imageUrl || doc.image_url || '',
+          type: doc.type || 'site',
+          time: doc.$createdAt ? new Date(doc.$createdAt).toLocaleDateString('ar-EG') : 'الآن',
+          isNew: true,
+          targetId: 'site',
+          sourceUrl: doc.linkUrl || doc.link_url || undefined
+        }));
+      return notifs;
+    }
+  } catch (e) {
+    console.warn('[Appwrite] Notifications fetch error:', e);
+  }
+  return [];
+}
+
+// Create Notification in Appwrite Cloud
+export async function createAppwriteNotification(notif: { title: string; content: string; type: 'site' | 'manga' | 'anime'; linkUrl?: string }): Promise<void> {
+  const config = getStoredAppwriteConfig();
+  if (!config.projectId || !config.databaseId || !config.adsCollectionId) return;
+
+  const url = `${config.endpoint.replace(/\/$/, '')}/databases/${config.databaseId}/collections/${config.adsCollectionId}/documents`;
+  const documentId = `notif_${Date.now()}`;
+
+  const payload = {
+    title: notif.title,
+    content: notif.content,
+    type: notif.type,
+    linkUrl: notif.linkUrl || '#',
+    position: 'notification',
+    isActive: true
+  };
+
+  try {
+    await fetch(url, {
+      method: 'POST',
+      headers: {
+        'X-Appwrite-Project': config.projectId,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        documentId,
+        data: payload
+      })
+    });
+  } catch (err) {
+    console.warn('[Appwrite] Create notification error:', err);
+  }
 }
 
 // Create Ad in Appwrite Cloud or Local

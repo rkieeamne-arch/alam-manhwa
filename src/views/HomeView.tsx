@@ -8,6 +8,8 @@ import {
 } from 'lucide-react';
 import { Manhua, ScraperSource, UserProfile, ReadingListItem } from '../types';
 import ManhuaCard from '../components/ManhuaCard';
+import AdBanner from '../components/AdBanner';
+import { AppwriteAd } from '../lib/appwrite';
 import { scrapePopularList } from '../utils/scraper';
 import { fetchLatestEpisodes, fetchLatestSeries, searchAnime } from '../utils/animeScraper';
 
@@ -28,6 +30,7 @@ interface HomeViewProps {
   onToggleLayout?: () => void;
   appMode?: 'manga' | 'anime';
   onToggleAppMode: () => void;
+  ads?: AppwriteAd[];
 }
 
 // Deterministic pseudo-random scattering variants generator for explosive transition
@@ -63,7 +66,8 @@ export default function HomeView({
   homeLayout: homeLayoutProp,
   onToggleLayout,
   appMode = 'manga',
-  onToggleAppMode
+  onToggleAppMode,
+  ads = []
 }: HomeViewProps) {
   // Layout state (Modern vs Classic) - Fallback to local if props aren't provided
   const [localLayout, setLocalLayout] = useState<'classic' | 'modern'>(() => {
@@ -392,6 +396,9 @@ export default function HomeView({
           </button>
         </div>
       </div>
+
+      {/* Top Banner Cloud Ads */}
+      <AdBanner ads={ads} position="top_banner" />
 
       <AnimatePresence mode="wait">
         {homeLayout === 'modern' ? (
