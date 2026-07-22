@@ -98,12 +98,12 @@ export default function App() {
 
   // Core User Authentication State
   const [user, setUser] = useState<UserProfile>(() => {
+    localStorage.removeItem('admin_secret_unlocked');
     const saved = localStorage.getItem('manhua_user_profile');
-    const isAdminUnlocked = localStorage.getItem('admin_secret_unlocked') === 'true';
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (isAdminUnlocked) parsed.role = 'admin';
+        parsed.role = 'user'; // Strictly default to user
         return parsed;
       } catch (e) {}
     }
@@ -113,7 +113,7 @@ export default function App() {
       displayName: 'قارئ مخلص',
       avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
       bannerUrl: 'https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?w=1200&auto=format&fit=crop&q=80',
-      role: isAdminUnlocked ? 'admin' : 'user',
+      role: 'user',
       joinedAt: new Date().toLocaleDateString('ar-EG'),
       bio: 'عاشق للمانهو والمانجا',
       xp: 15,
@@ -340,9 +340,8 @@ export default function App() {
     const view = params.get('view');
     const secretAdmin = params.get('admin') || params.get('secret') || params.get('key') || params.get('pin') || params.get('secret_admin');
 
-    // Secret Admin Link Check (e.g. ?admin=28429625 or ?pin=28429625 or ?view=admin)
-    if (secretAdmin === '28429625' || secretAdmin === 'azora' || secretAdmin === 'admin' || secretAdmin === 'true' || secretAdmin === '1' || secretAdmin === 'secret') {
-      localStorage.setItem('admin_secret_unlocked', 'true');
+    // Secret Admin Link Check (e.g. ?admin=28429625 or ?pin=28429625)
+    if (secretAdmin === '28429625' || secretAdmin === 'azora' || secretAdmin === 'secret' || secretAdmin === '28429625') {
       sessionStorage.setItem('admin_unlocked', 'true');
       setUser(prev => ({ ...prev, role: 'admin' }));
       setCurrentView('admin');
@@ -361,10 +360,6 @@ export default function App() {
         'home', 'manhua', 'reader', 'search', 'account', 'history', 'admin', 'mylists', 'downloads'
       ];
       if (allowedViews.includes(view as any)) {
-        if (view === 'admin') {
-          localStorage.setItem('admin_secret_unlocked', 'true');
-          setUser(prev => ({ ...prev, role: 'admin' }));
-        }
         setCurrentView(view as any);
       }
     }
