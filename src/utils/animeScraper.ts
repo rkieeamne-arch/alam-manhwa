@@ -3,7 +3,7 @@ import { proxiedFetch, getProxiedUrl } from '../sources/fetch';
 import { extractNumber, cleanTitle, sortNumerically, deduplicate, validateItem, retryFetch } from './scraperUtils';
 
 // Based on the user's provided description, we need these helpers
-const ANIME_HOME_URL = 'https://ristoanime.com/';
+const ANIME_HOME_URL = 'https://ristoanime.me/';
 const SEARCH_BASE_URL = 'https://ristoanime.me/';
 
 // Safe URI decoding to prevent crashes on bad percent encoded data
@@ -297,7 +297,7 @@ export async function fetchAnimeDetails(animeUrl: string): Promise<Anime | null>
     let targetUrl = animeUrl;
     if (targetUrl && !targetUrl.startsWith('http')) {
       const slug = targetUrl.replace('series-', '');
-      targetUrl = `https://ristoanime.com/anime/${slug}/`;
+      targetUrl = `https://ristoanime.me/series/${slug}/`;
     }
     let res = await retryFetch(targetUrl);
     let text = await res.text();

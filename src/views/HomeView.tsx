@@ -178,9 +178,9 @@ export default function HomeView({
                 id: `ep-fallback-${pageNum}-${i}-${index + 1}`,
                 title: `الحلقة ${index + 1}`,
                 episodeNumber: index + 1,
-                url: `https://ristoanime.com/episode/fallback-${pageNum}-${i}-${index + 1}`
+                url: `https://ristoanime.me/episode/fallback-${pageNum}-${i}-${index + 1}`
               })),
-              sourceUrl: 'https://ristoanime.com',
+              sourceUrl: 'https://ristoanime.me',
               sourceId: 'witaanime'
             });
           }
