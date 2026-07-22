@@ -32,47 +32,18 @@ interface HomeViewProps {
 
 // Deterministic pseudo-random scattering variants generator for explosive transition
 const getScatteringVariants = (index: number) => {
-  const angle = (index * 73) % 360;
-  const distance = 300 + (index * 47) % 250;
-  const x = Math.cos(angle * Math.PI / 180) * distance;
-  const y = Math.sin(angle * Math.PI / 180) * distance;
-  const rotate = -180 + (index * 83) % 360;
-  
   return {
-    initial: {
-      opacity: 0,
-      x: x,
-      y: y,
-      rotate: rotate,
-      scale: 0.3,
-    },
+    initial: { opacity: 0, y: 10 },
     animate: {
       opacity: 1,
-      x: 0,
       y: 0,
-      rotate: 0,
-      scale: 1,
       transition: {
-        type: 'spring',
-        damping: 18,
-        stiffness: 90,
-        mass: 1.1,
-        delay: (index % 12) * 0.02,
+        duration: 0.3,
+        delay: Math.min((index % 12) * 0.03, 0.3),
+        ease: 'easeOut',
       }
     },
-    exit: {
-      opacity: 0,
-      x: x,
-      y: y,
-      rotate: rotate,
-      scale: 0.2,
-      transition: {
-        type: 'spring',
-        damping: 14,
-        stiffness: 110,
-        delay: (index % 12) * 0.015,
-      }
-    }
+    exit: { opacity: 0, scale: 0.95, transition: { duration: 0.2 } }
   };
 };
 
@@ -207,9 +178,9 @@ export default function HomeView({
                 id: `ep-fallback-${pageNum}-${i}-${index + 1}`,
                 title: `الحلقة ${index + 1}`,
                 episodeNumber: index + 1,
-                url: `https://witaanime.com/episode/fallback-${pageNum}-${i}-${index + 1}`
+                url: `https://ristoanime.com/episode/fallback-${pageNum}-${i}-${index + 1}`
               })),
-              sourceUrl: 'https://witaanime.com',
+              sourceUrl: 'https://ristoanime.com',
               sourceId: 'witaanime'
             });
           }
@@ -454,7 +425,7 @@ export default function HomeView({
                 {/* Background Image with sophisticated overlays */}
                 <div className="absolute inset-0 bg-zinc-950">
                   <img 
-                    src={featuredCover}
+                    src={featuredCover || undefined}
                     alt={featuredTitle}
                     className="w-full h-full object-cover object-top transition-transform duration-700 group-hover:scale-105"
                     referrerPolicy="no-referrer"
@@ -551,7 +522,7 @@ export default function HomeView({
                     >
                       <div className="relative aspect-[2/3] rounded-2xl overflow-hidden border border-zinc-900 group-hover:border-red-500/40 transition-all duration-300 bg-zinc-950 shadow-md">
                         <img 
-                          src={item.coverUrl} 
+                          src={item.coverUrl || undefined} 
                           alt={item.title}
                           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                           referrerPolicy="no-referrer"
@@ -626,10 +597,7 @@ export default function HomeView({
                 <div className="space-y-8">
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 sm:gap-6">
                     {displayManhuas.map((item, gridIdx) => (
-                      <motion.div 
-                        key={`grid-${item.id}-${gridIdx}`}
-                        variants={getScatteringVariants(19 + gridIdx)}
-                      >
+                      <div key={`grid-${item.id}-${gridIdx}`} className="animate-fade-in-up" style={{ animationDelay: `${(gridIdx % 12) * 50}ms` }}>
                         <ManhuaCard 
                           manhua={{
                             id: item.id,
@@ -656,7 +624,7 @@ export default function HomeView({
                           onRemoveFromList={onRemoveFromList}
                           onNavigate={onNavigate}
                         />
-                      </motion.div>
+                      </div>
                     ))}
                   </div>
 
@@ -762,10 +730,7 @@ export default function HomeView({
               <div className="space-y-8">
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 sm:gap-6">
                   {displayManhuas.map((item, classicIdx) => (
-                    <motion.div 
-                      key={`classic-grid-${item.id}`}
-                      variants={getScatteringVariants(1 + classicIdx)}
-                    >
+                    <div key={`classic-grid-${item.id}`} className="animate-fade-in-up" style={{ animationDelay: `${(classicIdx % 12) * 50}ms` }}>
                       <ManhuaCard 
                         manhua={{
                           id: item.id,
@@ -792,7 +757,7 @@ export default function HomeView({
                         onRemoveFromList={onRemoveFromList}
                         onNavigate={onNavigate}
                       />
-                    </motion.div>
+                    </div>
                   ))}
                 </div>
 

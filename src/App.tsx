@@ -1182,7 +1182,7 @@ export default function App() {
           <div className="w-12 h-16 rounded overflow-hidden shrink-0 bg-zinc-900 border border-zinc-800">
             {activeToast.cover ? (
               <img 
-                src={activeToast.cover} 
+                src={activeToast.cover || undefined} 
                 alt={activeToast.title} 
                 className="w-full h-full object-cover"
                 referrerPolicy="no-referrer"

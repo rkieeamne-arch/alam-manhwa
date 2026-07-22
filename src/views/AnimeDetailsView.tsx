@@ -108,7 +108,7 @@ export default function AnimeDetailsView({
         <div className="w-full md:w-64 shrink-0 flex flex-col items-center gap-4">
           <div className="relative w-48 md:w-full aspect-[2/3] rounded-2xl overflow-hidden border border-zinc-800/80 shadow-xl group">
             <img 
-              src={anime.coverUrl} 
+              src={anime.coverUrl || undefined} 
               alt={anime.title} 
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               referrerPolicy="no-referrer"

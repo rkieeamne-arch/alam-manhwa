@@ -91,7 +91,7 @@ export default function Header({
                 className="cursor-pointer flex items-center gap-2 group select-none justify-center"
               >
                 <div className={`w-9 h-9 rounded-full overflow-hidden border flex items-center justify-center shadow-md group-hover:scale-105 transition-all ${isAnime ? 'border-amber-500 shadow-amber-900/30' : 'border-red-500 shadow-red-900/30'}`}>
-                  <img src={logoImg} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  <img src={logoImg || undefined} alt="Logo" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 </div>
                 <h1 className={`text-xl md:text-2xl font-black text-white tracking-tight font-display transition-colors ${isAnime ? 'group-hover:text-amber-500' : 'group-hover:text-red-500'}`}>
                   عالم <span className={`${isAnime ? 'text-amber-500' : 'text-red-500'} font-extrabold`}>{isAnime ? 'الأنمي' : 'المانهو'}</span>
@@ -217,7 +217,7 @@ export default function Header({
                             <div className="w-9 h-12 rounded bg-zinc-900 shrink-0 overflow-hidden border border-zinc-800 mr-2">
                               {notif.cover ? (
                                 <img 
-                                  src={notif.cover} 
+                                  src={notif.cover || undefined} 
                                   alt={notif.title} 
                                   className="w-full h-full object-cover"
                                   referrerPolicy="no-referrer"

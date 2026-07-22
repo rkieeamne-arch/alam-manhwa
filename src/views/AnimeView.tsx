@@ -32,7 +32,7 @@ export default function AnimeView({ onSelectAnime }: AnimeViewProps) {
             className="cursor-pointer bg-zinc-900 rounded-lg overflow-hidden"
             onClick={() => onSelectAnime(anime)}
           >
-            <img src={anime.coverUrl} alt={anime.title} className="w-full aspect-[2/3] object-cover" />
+            <img src={anime.coverUrl || undefined} alt={anime.title} className="w-full aspect-[2/3] object-cover" />
             <div className="p-2">
               <h3 className="text-sm font-semibold text-white truncate">{anime.title}</h3>
             </div>

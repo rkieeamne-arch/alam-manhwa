@@ -3,7 +3,7 @@ import { proxiedFetch, getProxiedUrl } from '../sources/fetch';
 import { extractNumber, cleanTitle, sortNumerically, deduplicate, validateItem, retryFetch } from './scraperUtils';
 
 // Based on the user's provided description, we need these helpers
-const ANIME_HOME_URL = 'https://witaanime.com/';
+const ANIME_HOME_URL = 'https://ristoanime.com/';
 const SEARCH_BASE_URL = 'https://ristoanime.me/';
 
 // Safe URI decoding to prevent crashes on bad percent encoded data
@@ -154,7 +154,11 @@ export async function fetchLatestEpisodes(pageNum: number = 1): Promise<Anime[]>
       if (!titleRaw) return;
 
       const imgEl = $(el).find('img').first();
-      const rawCover = imgEl.attr('src') || imgEl.attr('data-src') || '';
+      let rawCover = imgEl.attr('src') || imgEl.attr('data-src') || '';
+      if (!rawCover) {
+        const style = $(el).find('.poster').attr('data-style') || $(el).find('.poster').attr('style') || '';
+        rawCover = style.match(/url\(['"]?(.*?)['"]?\)/)?.[1] || '';
+      }
       const coverUrl = getProxiedUrl(rawCover); 
       
       const epNum = parseEpisodeNumber(titleRaw);
@@ -207,7 +211,11 @@ export async function fetchLatestSeries(): Promise<Anime[]> {
       
       const img = $(el).find('img');
       const altTitle = img.attr('alt') || '';
-      const rawCover = img.attr('src') || img.attr('data-src') || '';
+      let rawCover = img.attr('src') || img.attr('data-src') || '';
+      if (!rawCover) {
+        const style = $(el).find('.poster').attr('data-style') || $(el).find('.poster').attr('style') || '';
+        rawCover = style.match(/url\(['"]?(.*?)['"]?\)/)?.[1] || '';
+      }
       const coverUrl = getProxiedUrl(rawCover);
       
       const titleRaw = $(el).find('h4').text().trim() || $(el).find('.title').text().trim() || a.text().trim();
@@ -256,8 +264,8 @@ export async function searchAnime(query: string, pageNum: number = 1): Promise<A
       if (!href) return;
 
       const titleRaw = $(el).find('.title h4').text().trim() || $(el).find('.title p').text().trim();
-      const style = $(el).find('.poster').attr('style') || '';
-      const rawCover = style.match(/url\(([^)]+)\)/)?.[1] || '';
+      const style = $(el).find('.poster').attr('data-style') || $(el).find('.poster').attr('style') || '';
+      const rawCover = style.match(/url\(['"]?(.*?)['"]?\)/)?.[1] || '';
       const coverUrl = getProxiedUrl(rawCover);
       const genre = $(el).find('.genre').text().trim() || 'عام';
       const yearStr = $(el).find('.year').text().trim();
@@ -289,7 +297,7 @@ export async function fetchAnimeDetails(animeUrl: string): Promise<Anime | null>
     let targetUrl = animeUrl;
     if (targetUrl && !targetUrl.startsWith('http')) {
       const slug = targetUrl.replace('series-', '');
-      targetUrl = `https://witaanime.com/anime/${slug}/`;
+      targetUrl = `https://ristoanime.com/anime/${slug}/`;
     }
     let res = await retryFetch(targetUrl);
     let text = await res.text();
@@ -297,11 +305,13 @@ export async function fetchAnimeDetails(animeUrl: string): Promise<Anime | null>
 
     // If this is an episode page instead of the anime details page,
     // let's locate the link to the full anime page so we can scrape the entire series details correctly.
-    if (targetUrl.includes('/episode/')) {
+    const isEpisodePage = $('ul.episodes-list, .List-Episodes, .episodes-card').length === 0 || targetUrl.includes('/episode/') || targetUrl.includes('%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9');
+    
+    if (isEpisodePage) {
       let foundAnimeUrl = '';
       $('a').each((_, el) => {
         const href = $(el).attr('href') || '';
-        if (href.includes('/anime/') && !href.includes('/episode/')) {
+        if ((href.includes('/series/') || href.includes('/anime/')) && href.split('/').filter(Boolean).length > 3) {
           foundAnimeUrl = href;
           return false; // break
         }
@@ -456,7 +466,15 @@ export async function fetchAnimeDetails(animeUrl: string): Promise<Anime | null>
       return a.episodeNumber - b.episodeNumber;
     });
 
-    const rawCover = $('img').first().attr('src') || '';
+    let rawCover = $('img').first().attr('src') || '';
+    if (!rawCover || rawCover.includes('logo')) {
+      const style = $('.Thumbnail .bg-image, .anime-poster, .poster').attr('data-style') || $('.Thumbnail .bg-image, .anime-poster, .poster').attr('style') || '';
+      const bgMatch = style.match(/url\(['"]?(.*?)['"]?\)/);
+      if (bgMatch) rawCover = bgMatch[1];
+      if (!rawCover) {
+          rawCover = $('.Thumbnail img, .anime-poster img').attr('src') || rawCover;
+      }
+    }
     return {
       id: `series-${slug}`,
       title: cleanAnimeTitle(titleText) || titleText || 'أنمي غير معروف',

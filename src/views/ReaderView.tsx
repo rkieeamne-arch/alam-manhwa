@@ -50,6 +50,7 @@ export default function ReaderView({
   const [scrapedPages, setScrapedPages] = useState<(string | Blob)[]>([]);
   const [loadingPages, setLoadingPages] = useState(false);
   const [pagesError, setPagesError] = useState<string | null>(null);
+  const [preloadProgress, setPreloadProgress] = useState({ current: 0, total: 0 });
   const [scrollProgress, setScrollProgress] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -88,6 +89,9 @@ export default function ReaderView({
         if (pages.length === 0) {
           throw new Error('فشل جلب الصفحات المصورة. قد تكون الصور محمية خلف جدار ناري أو نظام عرض تفاعلي خاص.');
         }
+
+
+
         setScrapedPages(pages);
         setCurrentPageIndex(0);
       } catch (err: any) {
@@ -108,6 +112,40 @@ export default function ReaderView({
     const [, name] = page.split('#');
     return decodeURIComponent(name || `سيرفر ${idx + 1}`);
   };
+  // Background sequential preloader for webtoon mode
+  useEffect(() => {
+    if (readerSettings.readingMode !== 'webtoon' || displayPages.length === 0 || isAnime) return;
+
+    let isCancelled = false;
+    
+    const preloadSequentially = async () => {
+      setPreloadProgress({ current: 0, total: displayPages.length });
+      let loaded = 0;
+      
+      for (let i = 0; i < displayPages.length; i++) {
+        if (isCancelled) break;
+        
+        const url = displayPages[i];
+        if (typeof url === 'string') {
+          await new Promise<void>((resolve) => {
+            const img = new Image();
+            img.onload = () => resolve();
+            img.onerror = () => resolve();
+            img.src = url;
+          });
+        }
+        loaded++;
+        setPreloadProgress({ current: loaded, total: displayPages.length });
+      }
+    };
+    
+    preloadSequentially();
+    
+    return () => {
+      isCancelled = true;
+    };
+  }, [displayPages, readerSettings.readingMode, isAnime]);
+
 
   // Sync scrolling progress in Webtoon continuous scrolling mode
   useEffect(() => {
@@ -141,12 +179,6 @@ export default function ReaderView({
           const img = new Image();
           img.src = typeof page === 'string' ? page : URL.createObjectURL(page);
         }
-      });
-    } else {
-      // Preload first 5 images in Webtoon mode
-      displayPages.slice(0, 5).forEach(page => {
-        const img = new Image();
-        img.src = typeof page === 'string' ? page : URL.createObjectURL(page);
       });
     }
   }, [currentPageIndex, displayPages, readerSettings.readingMode]);
@@ -476,7 +508,7 @@ export default function ReaderView({
         {loadingPages && (
           <div className="py-24 text-center space-y-4 max-w-sm mx-auto px-4" id="reader-pages-loading">
             <Loader2 className="w-10 h-10 text-red-500 animate-spin mx-auto" />
-            <h4 className="text-sm font-bold text-zinc-300">جاري كشط صور صفحات الفصل مباشرة...</h4>
+            <h4 className="text-sm font-bold text-zinc-300">جاري تحميل صور صفحات الفصل مباشرة...</h4>
             <p className="text-xs text-zinc-500">
               نقوم الآن بجلب الروابط وفك حظر السيرفرات لتجربة تصفح سريعة وخالية من الإعلانات.
             </p>
@@ -519,6 +551,15 @@ export default function ReaderView({
         {/* MAIN CONTENT AREA */}
         {!loadingPages && !pagesError && (
           <>
+            {preloadProgress.current < preloadProgress.total && !isAnime && (
+              <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-zinc-900/90 border border-zinc-800 backdrop-blur-sm text-xs text-zinc-400 px-4 py-2 rounded-full flex items-center gap-3 z-40 shadow-xl">
+                <Loader2 className="w-3.5 h-3.5 text-red-500 animate-spin" />
+                <span>جاري التحميل المسبق ({preloadProgress.current}/{preloadProgress.total})</span>
+                <div className="w-20 bg-zinc-800 rounded-full h-1 overflow-hidden">
+                  <div className="bg-red-500 h-full transition-all duration-300" style={{ width: `${(preloadProgress.current / preloadProgress.total) * 100}%` }}></div>
+                </div>
+              </div>
+            )}
             {/* WEBTOON MODE */}
             {readerSettings.readingMode === 'webtoon' && (
               <div className="w-full space-y-0">

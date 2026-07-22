@@ -158,7 +158,7 @@ export default function AnimePlayerView({
           >
             <iframe
               ref={iframeRef}
-              src={activeServer.url}
+              src={activeServer.url || undefined}
               title={`${anime.title} Episode ${episodeNumber}`}
               className="w-full h-full object-contain"
               allowFullScreen

@@ -194,7 +194,7 @@ export default function DownloadsView({
                 >
                   <div className="flex gap-4 items-center min-w-0">
                     <img 
-                      src={manhua.coverUrl} 
+                      src={manhua.coverUrl || undefined} 
                       alt={manhua.title} 
                       className="w-12 h-16 rounded-lg object-cover border border-zinc-800 bg-zinc-950 shadow-md shrink-0"
                       referrerPolicy="no-referrer"
