@@ -181,9 +181,10 @@ export default function App() {
   const [ads, setAds] = useState<AppwriteAd[]>([]);
   const [popupAd, setPopupAd] = useState<AppwriteAd | null>(null);
 
-  // Sync Ads and Notifications from Appwrite Cloud periodically for all users
+  // Sync Ads and Notifications from Appwrite Cloud & BroadcastChannel for all users
   useEffect(() => {
     let isMounted = true;
+
     const syncAppwriteCloud = async () => {
       try {
         // 1. Fetch Ads
@@ -213,10 +214,39 @@ export default function App() {
     };
 
     syncAppwriteCloud();
-    const interval = setInterval(syncAppwriteCloud, 12000); // Poll every 12 seconds
+    const interval = setInterval(syncAppwriteCloud, 6000); // Poll every 6 seconds
+
+    // BroadcastChannel for instant cross-tab & cross-window sync
+    let bc: BroadcastChannel | null = null;
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        bc = new BroadcastChannel('global_app_notifications');
+        bc.onmessage = (event) => {
+          if (!isMounted) return;
+          if (event.data?.type === 'NEW_NOTIFICATION' && event.data.notif) {
+            const notif = event.data.notif;
+            setNotifications(prev => {
+              if (prev.some(n => n.id === notif.id)) return prev;
+              setActiveToast(notif);
+              return [notif, ...prev];
+            });
+          } else if (event.data?.type === 'ADS_UPDATED') {
+            fetchAppwriteAds().then(newAds => {
+              if (isMounted) {
+                setAds(newAds);
+                const popup = newAds.find(a => a.position === 'popup' && a.isActive);
+                if (popup) setPopupAd(popup);
+              }
+            });
+          }
+        };
+      } catch (e) {}
+    }
+
     return () => {
       isMounted = false;
       clearInterval(interval);
+      if (bc) bc.close();
     };
   }, []);
 

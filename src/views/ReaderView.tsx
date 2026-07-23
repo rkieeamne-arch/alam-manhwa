@@ -133,34 +133,67 @@ export default function ReaderView({
     const [, name] = page.split('#');
     return decodeURIComponent(name || `سيرفر ${idx + 1}`);
   };
-  // Background sequential preloader for webtoon mode
+  // Background batch preloader for webtoon mode with automatic fallback timeouts
   useEffect(() => {
     if (readerSettings.readingMode !== 'webtoon' || displayPages.length === 0 || isAnime) return;
 
     let isCancelled = false;
     
-    const preloadSequentially = async () => {
+    const preloadBatchMode = async () => {
       setPreloadProgress({ current: 0, total: displayPages.length });
       let loaded = 0;
-      
-      for (let i = 0; i < displayPages.length; i++) {
+      const BATCH_SIZE = 5;
+
+      const getSrc = (pageItem: any): string => {
+        if (typeof pageItem === 'string') return pageItem;
+        if (pageItem instanceof Blob) return URL.createObjectURL(pageItem);
+        return '';
+      };
+
+      for (let i = 0; i < displayPages.length; i += BATCH_SIZE) {
         if (isCancelled) break;
-        
-        const url = displayPages[i];
-        if (typeof url === 'string') {
-          await new Promise<void>((resolve) => {
-            const img = new Image();
-            img.onload = () => resolve();
-            img.onerror = () => resolve();
-            img.src = url;
-          });
-        }
-        loaded++;
-        setPreloadProgress({ current: loaded, total: displayPages.length });
+
+        const chunk = displayPages.slice(i, i + BATCH_SIZE);
+        await Promise.all(
+          chunk.map((pageItem) => {
+            return new Promise<void>((resolve) => {
+              const src = getSrc(pageItem);
+              if (!src) {
+                loaded++;
+                if (!isCancelled) {
+                  setPreloadProgress({ current: Math.min(loaded, displayPages.length), total: displayPages.length });
+                }
+                return resolve();
+              }
+
+              let timer: any = null;
+              const img = new Image();
+
+              const onDone = () => {
+                if (timer) clearTimeout(timer);
+                loaded++;
+                if (!isCancelled) {
+                  setPreloadProgress({ current: Math.min(loaded, displayPages.length), total: displayPages.length });
+                }
+                resolve();
+              };
+
+              // 3.5s timeout safety so a stalled image never blocks the preloader
+              timer = setTimeout(onDone, 3500);
+              img.onload = onDone;
+              img.onerror = onDone;
+              img.src = src;
+            });
+          })
+        );
+      }
+
+      if (!isCancelled) {
+        setPreloadProgress({ current: displayPages.length, total: displayPages.length });
       }
     };
     
-    preloadSequentially();
+    preloadBatchMode();
     
     return () => {
       isCancelled = true;

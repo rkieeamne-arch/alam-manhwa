@@ -144,6 +144,28 @@ export async function fetchAppwriteNotifications(): Promise<any[]> {
 // Create Notification in Appwrite Cloud
 export async function createAppwriteNotification(notif: { title: string; content: string; type: 'site' | 'manga' | 'anime'; linkUrl?: string }): Promise<void> {
   const config = getStoredAppwriteConfig();
+
+  // Broadcast locally to all open tabs/windows
+  if (typeof BroadcastChannel !== 'undefined') {
+    try {
+      const bc = new BroadcastChannel('global_app_notifications');
+      bc.postMessage({
+        type: 'NEW_NOTIFICATION',
+        notif: {
+          id: `notif-${Date.now()}`,
+          title: notif.title,
+          content: notif.content,
+          type: notif.type,
+          time: 'الآن',
+          isNew: true,
+          targetId: 'site',
+          sourceUrl: notif.linkUrl
+        }
+      });
+      bc.close();
+    } catch (e) {}
+  }
+
   if (!config.projectId || !config.databaseId || !config.adsCollectionId) return;
 
   const url = `${config.endpoint.replace(/\/$/, '')}/databases/${config.databaseId}/collections/${config.adsCollectionId}/documents`;
@@ -167,7 +189,8 @@ export async function createAppwriteNotification(notif: { title: string; content
       },
       body: JSON.stringify({
         documentId,
-        data: payload
+        data: payload,
+        permissions: ['read("any")']
       })
     });
   } catch (err) {
@@ -178,11 +201,24 @@ export async function createAppwriteNotification(notif: { title: string; content
 // Create Ad in Appwrite Cloud or Local
 export async function createAppwriteAd(ad: Omit<AppwriteAd, '$id'>): Promise<AppwriteAd> {
   const config = getStoredAppwriteConfig();
+
+  // Helper function to broadcast ads update across windows/tabs
+  const broadcastAdsUpdate = () => {
+    if (typeof BroadcastChannel !== 'undefined') {
+      try {
+        const bc = new BroadcastChannel('global_app_notifications');
+        bc.postMessage({ type: 'ADS_UPDATED' });
+        bc.close();
+      } catch (e) {}
+    }
+  };
+
   if (!config.projectId || !config.databaseId || !config.adsCollectionId) {
     const local = getLocalAds();
     const newAd: AppwriteAd = { ...ad, $id: `local-${Date.now()}`, createdAt: new Date().toISOString() };
     const updated = [newAd, ...local];
     saveLocalAds(updated);
+    broadcastAdsUpdate();
     return newAd;
   }
 
@@ -206,7 +242,8 @@ export async function createAppwriteAd(ad: Omit<AppwriteAd, '$id'>): Promise<App
     },
     body: JSON.stringify({
       documentId,
-      data: payloadData
+      data: payloadData,
+      permissions: ['read("any")']
     })
   });
 
@@ -227,7 +264,8 @@ export async function createAppwriteAd(ad: Omit<AppwriteAd, '$id'>): Promise<App
       },
       body: JSON.stringify({
         documentId: `ad_${Date.now()}`,
-        data: altData
+        data: altData,
+        permissions: ['read("any")']
       })
     });
   }
@@ -239,6 +277,7 @@ export async function createAppwriteAd(ad: Omit<AppwriteAd, '$id'>): Promise<App
     const newAd: AppwriteAd = { ...ad, $id: `local-${Date.now()}`, createdAt: new Date().toISOString() };
     const updated = [newAd, ...local];
     saveLocalAds(updated);
+    broadcastAdsUpdate();
     return newAd;
   }
 
@@ -255,6 +294,7 @@ export async function createAppwriteAd(ad: Omit<AppwriteAd, '$id'>): Promise<App
 
   const local = getLocalAds();
   saveLocalAds([createdAd, ...local]);
+  broadcastAdsUpdate();
   return createdAd;
 }
 
@@ -279,4 +319,12 @@ export async function deleteAppwriteAd(id: string): Promise<void> {
   const local = getLocalAds();
   const filtered = local.filter(a => a.$id !== id);
   saveLocalAds(filtered);
+
+  if (typeof BroadcastChannel !== 'undefined') {
+    try {
+      const bc = new BroadcastChannel('global_app_notifications');
+      bc.postMessage({ type: 'ADS_UPDATED' });
+      bc.close();
+    } catch (e) {}
+  }
 }
