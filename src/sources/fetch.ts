@@ -1,6 +1,6 @@
 export function getProxiedUrl(url: string): string {
   if (!url) return '';
-  return `/api/proxy?url=${encodeURIComponent(url)}`;
+  return `/api/forward?url=${encodeURIComponent(url)}`;
 }
 
 export async function proxiedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {

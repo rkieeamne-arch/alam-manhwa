@@ -732,7 +732,10 @@ export default function App() {
     const isAnime = id.startsWith('series-') || 
                     id.startsWith('scr-witanime-') || 
                     id.startsWith('scr-anime4up-') || 
-                    optionalMangaShell?.type === 'anime';
+                    id.includes('anime') ||
+                    id.includes('witanime') ||
+                    optionalMangaShell?.type === 'anime' ||
+                    appMode === 'anime';
 
     if (optionalMangaShell) {
       setScrapedManhuaCache(optionalMangaShell);
@@ -964,6 +967,7 @@ export default function App() {
         {currentView === 'anime-details' && (
           <AnimeDetailsView 
             animeUrl={selectedManhuaId || ''} 
+            scrapedManhuaCache={scrapedManhuaCache}
             onBack={() => setCurrentView('home')} 
             onSelectEpisode={(epNum) => {
               setSelectedChapterId(epNum.toString());

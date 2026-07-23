@@ -7,6 +7,7 @@ import { UserProfile, ReadingListItem, Manhua } from '../types';
 
 interface AnimeDetailsViewProps {
   animeUrl: string;
+  scrapedManhuaCache?: Manhua | null;
   onBack: () => void;
   onSelectEpisode: (episodeNumber: number) => void;
   setAnime: (anime: Anime) => void;
@@ -17,8 +18,23 @@ interface AnimeDetailsViewProps {
   onNavigate?: (view: any) => void;
 }
 
+function extractCleanUrl(raw: string | undefined | null): string {
+  if (!raw) return '';
+  if (raw.includes('http://') || raw.includes('https://')) {
+    const httpIdx = raw.indexOf('http://');
+    const httpsIdx = raw.indexOf('https://');
+    let idx = -1;
+    if (httpIdx !== -1 && httpsIdx !== -1) idx = Math.min(httpIdx, httpsIdx);
+    else if (httpIdx !== -1) idx = httpIdx;
+    else idx = httpsIdx;
+    if (idx !== -1) return raw.substring(idx);
+  }
+  return raw;
+}
+
 export default function AnimeDetailsView({ 
   animeUrl, 
+  scrapedManhuaCache,
   onBack, 
   onSelectEpisode, 
   setAnime,
@@ -33,13 +49,108 @@ export default function AnimeDetailsView({
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
+    let isMounted = true;
     setLoading(true);
-    fetchAnimeDetails(animeUrl).then(data => {
-      setAnimeState(data);
-      if (data) setAnime(data);
-      setLoading(false);
-    });
-  }, [animeUrl, setAnime]);
+
+    const rawUrl = (scrapedManhuaCache?.sourceUrl && (scrapedManhuaCache.sourceUrl.includes('http://') || scrapedManhuaCache.sourceUrl.includes('https://')))
+      ? scrapedManhuaCache.sourceUrl
+      : animeUrl;
+
+    const targetUrl = extractCleanUrl(rawUrl) || rawUrl;
+
+    async function loadAnimeDetails() {
+      try {
+        let data: Anime | null = null;
+        if (targetUrl) {
+          data = await fetchAnimeDetails(targetUrl);
+        }
+
+        if (!isMounted) return;
+
+        if (data) {
+          // If fetched anime lacks episodes but scraped cache has chapters, merge them
+          if ((!data.episodes || data.episodes.length === 0) && scrapedManhuaCache?.chapters?.length) {
+            data.episodes = scrapedManhuaCache.chapters.map((ch, idx) => ({
+              id: ch.id || `ep-${idx}`,
+              animeId: data!.id,
+              title: (ch as any).name || ch.title || `الحلقة ${idx + 1}`,
+              episodeNumber: idx + 1,
+              servers: [],
+              url: (ch as any).url || ''
+            }));
+          }
+          setAnimeState(data);
+          // Only update parent if we fetched new data that differs from cache
+          if (!scrapedManhuaCache || scrapedManhuaCache.id !== data.id || !(scrapedManhuaCache as any).episodes) {
+             setAnime(data as any);
+          }
+        } else if (scrapedManhuaCache) {
+          const fallbackAnime: Anime = {
+            id: scrapedManhuaCache.id,
+            title: scrapedManhuaCache.title,
+            coverUrl: scrapedManhuaCache.coverUrl,
+            rawCoverUrl: scrapedManhuaCache.coverUrl,
+            description: scrapedManhuaCache.description || 'لا يوجد ملخص متاح حالياً لهذا الأنمي.',
+            rating: scrapedManhuaCache.rating || 8.8,
+            status: scrapedManhuaCache.status || 'مستمر',
+            categories: scrapedManhuaCache.categories?.length ? scrapedManhuaCache.categories : ['أنمي'],
+            releaseYear: scrapedManhuaCache.releaseYear || 2026,
+            episodes: (scrapedManhuaCache.chapters || []).map((ch, idx) => ({
+              id: ch.id || `ep-${idx}`,
+              animeId: scrapedManhuaCache.id,
+              title: (ch as any).name || ch.title || `الحلقة ${idx + 1}`,
+              episodeNumber: idx + 1,
+              servers: [],
+              url: (ch as any).url || ''
+            })),
+            sourceUrl: scrapedManhuaCache.sourceUrl || targetUrl,
+            sourceId: scrapedManhuaCache.sourceId || 'anime'
+          };
+          setAnimeState(fallbackAnime);
+          setAnime(fallbackAnime as any);
+        }
+      } catch (err) {
+        console.error('[AnimeDetailsView] Error fetching anime details:', err);
+        if (!isMounted) return;
+
+        if (scrapedManhuaCache) {
+          const fallbackAnime: Anime = {
+            id: scrapedManhuaCache.id,
+            title: scrapedManhuaCache.title,
+            coverUrl: scrapedManhuaCache.coverUrl,
+            rawCoverUrl: scrapedManhuaCache.coverUrl,
+            description: scrapedManhuaCache.description || 'لا يوجد ملخص متاح حالياً.',
+            rating: scrapedManhuaCache.rating || 8.8,
+            status: scrapedManhuaCache.status || 'مستمر',
+            categories: scrapedManhuaCache.categories?.length ? scrapedManhuaCache.categories : ['أنمي'],
+            releaseYear: scrapedManhuaCache.releaseYear || 2026,
+            episodes: (scrapedManhuaCache.chapters || []).map((ch, idx) => ({
+              id: ch.id || `ep-${idx}`,
+              animeId: scrapedManhuaCache.id,
+              title: (ch as any).name || ch.title || `الحلقة ${idx + 1}`,
+              episodeNumber: idx + 1,
+              servers: [],
+              url: (ch as any).url || ''
+            })),
+            sourceUrl: scrapedManhuaCache.sourceUrl || targetUrl,
+            sourceId: scrapedManhuaCache.sourceId || 'anime'
+          };
+          setAnimeState(fallbackAnime);
+          setAnime(fallbackAnime as any);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadAnimeDetails();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [animeUrl]); // REMOVE scrapedManhuaCache and setAnime from dependencies to prevent infinite loop
 
   if (loading) {
     return (

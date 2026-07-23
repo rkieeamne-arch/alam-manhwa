@@ -155,7 +155,7 @@ async function startServer() {
   });
 
   // CORS-bypassing proxy for dynamic scraper sources (supports GET, POST, etc.)
-  app.all('/api/proxy', async (req, res) => {
+  app.all('/api/forward', async (req, res) => {
     let targetUrl = req.query.url as string;
     if (!targetUrl) {
       return res.status(400).json({ error: 'URL is required' });

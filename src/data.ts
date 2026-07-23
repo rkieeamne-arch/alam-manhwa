@@ -57,6 +57,37 @@ export const categoriesList = [
   'حياة يومية'
 ];
 
+export const animeCategoriesList = [
+  'أكشن',
+  'مغامرة',
+  'خيال',
+  'كوميديا',
+  'دراما',
+  'رومنسي',
+  'غموض',
+  'إثارة',
+  'سحر',
+  'شياطين',
+  'إيسيكاي',
+  'خارق للطبيعة',
+  'حياة مدرسية',
+  'قوة خارقة',
+  'شريحة من الحياة',
+  'خيال علمي',
+  'ميكا',
+  'رياضة',
+  'تاريخي',
+  'رعب',
+  'تشويق',
+  'موسيقى',
+  'فضاء',
+  'عسكري',
+  'ألعاب',
+  'شونين',
+  'شوجو',
+  'سينين'
+];
+
 export const mockManhuas: Manhua[] = [];
 export const mockComments: ManhuaComment[] = [
   {
@@ -253,6 +284,31 @@ export const defaultScraperSources: ScraperSource[] = [
     detailChapterLinkSelector: 'a',
     detailChapterTitleSelector: 'span, h3, a, .title, .ep-title',
     pageImgSelector: 'iframe, .server-list li a, .episodes-links li a, #episode-servers li a, ul.servers li a, iframe[src]',
+    pageImgAttr: 'src'
+  },
+  {
+    id: 'witanime',
+    name: 'WitAnime',
+    baseUrl: 'https://ristoanime.me',
+    icon: 'https://ristoanime.me/wp-content/uploads/2021/03/wit-logo.png',
+    popularPath: '/series/',
+    type: 'anime',
+    lang: 'ar',
+    listCardSelector: '.MovieItem, .animiyat, a.CARTA, .anime-card, .col-md-2, .item',
+    listTitleSelector: 'h4, h3, .title, .anime-title',
+    listLinkSelector: 'a',
+    listCoverSelector: 'img',
+    listCoverAttr: 'src',
+    detailTitleSelector: 'h1.entry-title, h1',
+    detailDescSelector: '.StoryArea, .anime-story, .story-text, .post-content',
+    detailAuthorSelector: 'unknown',
+    detailArtistSelector: 'unknown',
+    detailStatusSelector: 'unknown',
+    detailGenreSelector: '.anime-genres a, .genres-list a',
+    detailChapterItemSelector: 'ul.episodes-list a, .List-Episodes a, a[href*="/episode/"]',
+    detailChapterLinkSelector: 'a',
+    detailChapterTitleSelector: 'span, h4, a',
+    pageImgSelector: 'iframe',
     pageImgAttr: 'src'
   }
 ];

@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio';
 import { proxiedFetch, getProxiedUrl } from '../sources/fetch';
 import { extractNumber, cleanTitle, sortNumerically, deduplicate, validateItem, retryFetch } from './scraperUtils';
+import { sources } from '../sources';
 
 // Based on the user's provided description, we need these helpers
 const ANIME_HOME_URL = 'https://ristoanime.me/';
@@ -295,11 +296,54 @@ export async function searchAnime(query: string, pageNum: number = 1): Promise<A
 export async function fetchAnimeDetails(animeUrl: string): Promise<Anime | null> {
   try {
     let targetUrl = animeUrl;
-    if (targetUrl && !targetUrl.startsWith('http')) {
-      const slug = targetUrl.replace('series-', '');
+    if (targetUrl && (targetUrl.includes('http://') || targetUrl.includes('https://'))) {
+      const httpIdx = targetUrl.indexOf('http://');
+      const httpsIdx = targetUrl.indexOf('https://');
+      let idx = -1;
+      if (httpIdx !== -1 && httpsIdx !== -1) idx = Math.min(httpIdx, httpsIdx);
+      else if (httpIdx !== -1) idx = httpIdx;
+      else idx = httpsIdx;
+      if (idx !== -1) targetUrl = targetUrl.substring(idx);
+    } else if (targetUrl && !targetUrl.startsWith('http')) {
+      const slug = targetUrl.replace('series-', '').replace('scr-witanime-', '').replace('scr-anime4up-', '');
       targetUrl = `https://ristoanime.me/series/${slug}/`;
     }
+
+    if (targetUrl.includes('anime4up')) {
+      try {
+        const m = await sources.anime4up.parseMangaDetails(targetUrl);
+        if (m && m.title) {
+          return {
+            id: m.id,
+            title: m.title,
+            coverUrl: getProxiedUrl(m.cover),
+            rawCoverUrl: m.cover,
+            description: m.description || 'لا يوجد ملخص متاح.',
+            rating: 8.8,
+            status: 'مستمر',
+            categories: ['أنمي'],
+            releaseYear: 2026,
+            episodes: (m.chapters || []).map((ch, idx) => ({
+              id: ch.id,
+              animeId: m.id,
+              title: ch.name || `الحلقة ${idx + 1}`,
+              episodeNumber: parseEpisodeNumber(ch.name) || (idx + 1),
+              servers: [],
+              url: ch.url
+            })),
+            sourceUrl: targetUrl,
+            sourceId: 'anime4up'
+          };
+        }
+      } catch (e) {
+        console.warn('[Anime Scraper] anime4up parseMangaDetails fallback:', e);
+      }
+    }
+
     let res = await retryFetch(targetUrl);
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
     let text = await res.text();
     let $ = cheerio.load(text);
 
@@ -497,41 +541,53 @@ export async function fetchAnimeDetails(animeUrl: string): Promise<Anime | null>
 
 export async function fetchWatchServers(watchUrl: string): Promise<{ name: string; url: string }[]> {
   try {
-    let targetUrl = watchUrl;
-    if (!targetUrl.endsWith('/watch') && !targetUrl.endsWith('/watch/')) {
-      targetUrl = targetUrl.replace(/\/$/, '') + '/watch';
+    let urlsToTry = [watchUrl];
+    if (!watchUrl.endsWith('/watch') && !watchUrl.endsWith('/watch/')) {
+      urlsToTry.unshift(watchUrl.replace(/\/$/, '') + '/watch');
     }
-
-    const res = await retryFetch(targetUrl);
-    if (!res.ok) throw new Error(`Status: ${res.status}`);
-    const text = await res.text();
-    const $ = cheerio.load(text);
 
     const servers: { name: string; url: string }[] = [];
 
-    $('li[data-watch]').each((_, el) => {
-      const url = $(el).attr('data-watch') || '';
-      if (!url) return;
+    for (const urlCandidate of urlsToTry) {
+      try {
+        const res = await retryFetch(urlCandidate);
+        if (!res.ok) continue;
+        const text = await res.text();
+        const $ = cheerio.load(text);
 
-      const serverText = $(el).text().trim();
-      const cleanName = serverText.replace(/^\d+/, '').replace('سيرفر', 'سيرفر ').replace(/\s+/g, ' ').trim();
+        $('li[data-watch], li[data-url], a[data-url]').each((_, el) => {
+          const rawUrl = $(el).attr('data-watch') || $(el).attr('data-url') || '';
+          if (!rawUrl) return;
 
-      servers.push({
-        name: cleanName || 'سيرفر مشاهدة',
-        url
-      });
-    });
+          const serverText = $(el).text().trim();
+          const cleanName = serverText.replace(/^\d+/, '').replace('سيرفر', 'سيرفر ').replace(/\s+/g, ' ').trim();
 
-    if (servers.length === 0) {
-      $('iframe').each((i, el) => {
-        const src = $(el).attr('src') || '';
-        if (src) {
-          servers.push({
-            name: `سيرفر رئيسي ${i + 1}`,
-            url: src
-          });
+          if (!servers.some(s => s.url === rawUrl)) {
+            servers.push({
+              name: cleanName || `سيرفر ${servers.length + 1}`,
+              url: rawUrl
+            });
+          }
+        });
+
+        $('iframe[src]').each((i, el) => {
+          const src = $(el).attr('src') || '';
+          if (src && !src.includes('facebook') && !src.includes('google') && !src.includes('twitter')) {
+            if (!servers.some(s => s.url === src)) {
+              servers.push({
+                name: `سيرفر ${servers.length + 1}`,
+                url: src
+              });
+            }
+          }
+        });
+
+        if (servers.length > 0) {
+          break; // Found servers, stop trying candidates
         }
-      });
+      } catch (e) {
+        console.warn('[Anime Scraper] Candidate failed:', urlCandidate, e);
+      }
     }
 
     return servers;

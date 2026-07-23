@@ -38,6 +38,7 @@ export const CATEGORY_ENGLISH_MAP: Record<string, string[]> = {
   'فنون قتالية': ['martial', 'cultivation'],
   'زراعة (Cultivation)': ['cultivation', 'martial'],
   'إيسيكاي (Isekai)': ['isekai'],
+  'إيسيكاي': ['isekai'],
   'نظام (System)': ['system'],
   'زمن (Regression)': ['regression', 'regress'],
   'كوميديا': ['comedy'],
@@ -53,8 +54,8 @@ export const CATEGORY_ENGLISH_MAP: Record<string, string[]> = {
   'سحر': ['magic'],
   'شياطين': ['demon', 'demons'],
   'ويب تون': ['webtoon'],
-  'شريحة من الحياة': ['slice'],
-  'تشويق': ['suspense'],
+  'شريحة من الحياة': ['slice-of-life', 'slice'],
+  'تشويق': ['suspense', 'thriller'],
   'رعب': ['horror'],
   'حريم': ['harem'],
   'إعادة تجسيد': ['reincarnation', 'reincarnated'],
@@ -67,6 +68,9 @@ export const CATEGORY_ENGLISH_MAP: Record<string, string[]> = {
   'شونين': ['shounen'],
   'سينين': ['seinen'],
   'مأساة': ['tragedy'],
-  'حياة يومية': ['slice', 'daily']
+  'حياة يومية': ['slice', 'daily'],
+  'موسيقى': ['music'],
+  'فضاء': ['space'],
+  'عسكري': ['military']
 };
 
