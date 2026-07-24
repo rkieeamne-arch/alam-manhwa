@@ -26,6 +26,7 @@ import DownloadsView from './views/DownloadsView';
 import AnimeDetailsView from './views/AnimeDetailsView';
 import AnimePlayerView from './views/AnimePlayerView';
 import { fetchAnimeDetails } from './utils/animeScraper';
+import { scrapeMangaDetails } from './utils/scraper';
 
 
 function getUniqueId(url: string): string {
@@ -778,6 +779,18 @@ export default function App() {
         sourceUrl: historyItem.sourceUrl,
       };
       setScrapedManhuaCache(reconstructed);
+
+      // Prefetch manhua details in background to load all chapters
+      if (historyItem.sourceUrl) {
+        const source = defaultScraperSources.find(s => historyItem.sourceUrl?.includes(new URL(s.baseUrl).hostname)) || defaultScraperSources[0];
+        scrapeMangaDetails(source, historyItem.sourceUrl).then(details => {
+          if (details) {
+            setScrapedManhuaCache(details);
+          }
+        }).catch(err => {
+          console.warn('Failed to prefetch manhua details:', err);
+        });
+      }
     }
     
     setCurrentView('reader');
