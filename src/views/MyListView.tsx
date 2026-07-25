@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { Heart, Play, Clock, Bookmark, Trash2, LogIn, Compass, ListPlus } from 'lucide-react';
+import { Heart, Play, Clock, Bookmark, Trash2, LogIn, Compass, ListPlus, ImageOff } from 'lucide-react';
 import { ReadingListItem, UserProfile, Manhua } from '../types';
+import { resolveCoverUrl } from '../sources/fetch';
 
 interface MyListViewProps {
   user: UserProfile | null;
   readingList: ReadingListItem[];
   onRemoveFromList: (manhuaId: string) => void;
   onSelectManhua: (id: string) => void;
-  onNavigate: (view: 'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'admin' | 'mylists') => void;
+  onNavigate: (view: 'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'mylists') => void;
 }
 
 export default function MyListView({
@@ -159,14 +160,18 @@ export default function MyListView({
                 {/* Cover Image */}
                 <div 
                   onClick={() => onSelectManhua(item.manhuaId)}
-                  className="relative aspect-[2/3] overflow-hidden bg-zinc-950 cursor-pointer"
+                  className="relative aspect-[2/3] overflow-hidden bg-zinc-950 cursor-pointer flex items-center justify-center text-zinc-700"
                 >
+                  <ImageOff className="w-8 h-8 absolute z-0" />
                   <img 
-                    src={item.manhuaCover || undefined} 
-                    alt={item.manhuaTitle}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    src={resolveCoverUrl(item.manhuaCover) || undefined} 
+                    alt={item.manhuaTitle || 'بدون اسم'}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 relative z-10 text-transparent"
                     loading="lazy"
                     referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      e.currentTarget.style.opacity = '0';
+                    }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent opacity-80" />
                   
@@ -183,7 +188,7 @@ export default function MyListView({
                     onClick={() => onSelectManhua(item.manhuaId)}
                     className="font-bold text-xs text-zinc-100 group-hover:text-red-500 transition-colors line-clamp-2 cursor-pointer leading-relaxed"
                   >
-                    {item.manhuaTitle}
+                    {item.manhuaTitle || 'بدون اسم'}
                   </h3>
 
                   <button

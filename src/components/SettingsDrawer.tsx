@@ -19,7 +19,7 @@ interface SettingsDrawerProps {
   onClearHistory: () => void;
   readerSettings: ReaderSettings;
   updateReaderSettings: (settings: Partial<ReaderSettings>) => void;
-  onNavigate: (view: 'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'admin' | 'mylists' | 'downloads') => void;
+  onNavigate: (view: 'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'mylists' | 'downloads') => void;
   currentView: string;
 }
 
@@ -134,12 +134,6 @@ export default function SettingsDrawer({
                 <div className="flex items-center gap-2 text-red-400 font-bold border-b border-zinc-800 pb-2">
                   <User className="w-5 h-5" />
                   <span>1. الحساب المحلي للتطبيق</span>
-                  {user && user.role === 'admin' && (
-                    <span className="mr-auto text-xs bg-red-500/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded-full flex items-center gap-1">
-                      <ShieldAlert className="w-3 h-3" />
-                      مسؤول الموقع
-                    </span>
-                  )}
                 </div>
 
                 {user ? (
@@ -174,19 +168,6 @@ export default function SettingsDrawer({
                       <span>تخصيص الحساب والنسخ الاحتياطية</span>
                     </button>
 
-                    {user.role === 'admin' && (
-                      <button
-                        onClick={() => {
-                          onNavigate('admin');
-                          onClose();
-                        }}
-                        className="w-full py-2 bg-red-950/40 hover:bg-red-950/60 border border-red-800/40 text-red-400 rounded-lg text-xs font-semibold transition-all mt-2 flex items-center justify-center gap-1 cursor-pointer"
-                        id="go-admin-btn"
-                      >
-                        <ShieldAlert className="w-4 h-4" />
-                        <span>لوحة الإدارة (مسؤول)</span>
-                      </button>
-                    )}
                   </div>
                 ) : null}
               </div>
@@ -335,6 +316,30 @@ export default function SettingsDrawer({
                     <div
                       className={`w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
                         readerSettings.continuousMode ? 'transform -translate-x-5' : ''
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Enhance Images Toggle */}
+                <div className="flex items-center justify-between bg-zinc-950 p-3 rounded-lg border border-zinc-800">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-bold text-zinc-300 flex items-center gap-2">
+                      <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+                      تحسين دقة الصور (Super-Res)
+                    </span>
+                    <span className="text-[10px] text-zinc-500">رفع دقة ووضوح المانجا (يستهلك إنترنت أكثر قليلاً)</span>
+                  </div>
+                  <button
+                    onClick={() => updateReaderSettings({ enhanceImages: !readerSettings.enhanceImages })}
+                    className={`w-10 h-5 rounded-full p-0.5 transition-colors duration-200 focus:outline-none shrink-0 ${
+                      readerSettings.enhanceImages ? 'bg-red-600' : 'bg-zinc-700'
+                    }`}
+                    id="enhance-images-toggle-btn"
+                  >
+                    <div
+                      className={`w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
+                        readerSettings.enhanceImages ? 'transform -translate-x-5' : ''
                       }`}
                     />
                   </button>

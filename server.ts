@@ -347,8 +347,41 @@ async function startServer() {
       if (contentType.includes('image') || contentType.includes('video') || contentType.includes('application/octet-stream')) {
         // Pipe binary content directly
         const arrayBuffer = await response.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        res.setHeader('Content-Type', contentType);
+        let buffer = Buffer.from(arrayBuffer);
+        
+        let finalContentType = contentType;
+        
+        // Image Super Resolution / Enhancement
+        const enhanceMode = req.query.enhance === '1' || req.query.enhance === 'true';
+        if (enhanceMode && contentType.includes('image') && !contentType.includes('gif')) {
+          try {
+            const sharp = (await import('sharp')).default;
+            const image = sharp(buffer);
+            const metadata = await image.metadata();
+            
+            if (metadata.width && metadata.width < 1200) {
+              // Apply Super Resolution Pipeline (Lanczos Upscale + Unsharp Mask)
+              buffer = await image
+                .resize({ width: metadata.width * 2, kernel: 'lanczos3' })
+                .sharpen({ sigma: 0.8, m1: 1.5 }) // Unsharp mask for flat and jagged areas
+                .webp({ quality: 85 }) // Output as WebP for smaller size and speed
+                .toBuffer();
+              finalContentType = 'image/webp';
+            } else {
+              // Just apply sharpen if already large
+              buffer = await image
+                .sharpen({ sigma: 0.8, m1: 1.2 })
+                .webp({ quality: 85 })
+                .toBuffer();
+              finalContentType = 'image/webp';
+            }
+          } catch (sharpErr) {
+            console.error('[Proxy] Sharp processing error:', sharpErr);
+            // Fallback to original buffer
+          }
+        }
+        
+        res.setHeader('Content-Type', finalContentType);
         res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
         return res.send(buffer);
       } else {

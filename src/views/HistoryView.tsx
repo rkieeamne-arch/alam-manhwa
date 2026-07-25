@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { BookOpen, Trash2, Clock, Play, Sparkles, Tv, Eye } from 'lucide-react';
+import { BookOpen, Trash2, Clock, Play, Sparkles, Tv, Eye, ImageOff } from 'lucide-react';
 import { ReadingHistoryItem, AnimeWatchHistoryItem } from '../types';
+import { resolveCoverUrl } from '../sources/fetch';
 
 interface HistoryViewProps {
   history: ReadingHistoryItem[];
@@ -128,14 +129,18 @@ export default function HistoryView({
                   {/* Cover thumbnail */}
                   <div 
                     onClick={() => onNavigateToManhua && onNavigateToManhua(item.manhuaId)}
-                    className="w-16 h-24 rounded-lg overflow-hidden bg-zinc-950 shrink-0 border border-zinc-800 cursor-pointer hover:opacity-90 transition-opacity"
+                    className="w-16 h-24 rounded-lg overflow-hidden bg-zinc-950 shrink-0 border border-zinc-800 cursor-pointer hover:opacity-90 transition-opacity flex items-center justify-center text-zinc-700 relative"
                     title="الانتقال إلى صفحة العمل"
                   >
+                    <ImageOff className="w-6 h-6 absolute z-0" />
                     <img 
-                      src={item.manhuaCover || undefined} 
-                      alt={item.manhuaTitle} 
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      src={resolveCoverUrl(item.manhuaCover) || undefined} 
+                      alt={item.manhuaTitle || 'بدون اسم'} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform relative z-10 text-transparent"
                       referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        e.currentTarget.style.opacity = '0';
+                      }}
                     />
                   </div>
 
@@ -148,7 +153,7 @@ export default function HistoryView({
                           className="text-xs font-extrabold text-zinc-300 hover:text-red-400 cursor-pointer truncate max-w-[200px] transition-colors"
                           title="الانتقال إلى صفحة العمل"
                         >
-                          {item.manhuaTitle}
+                          {item.manhuaTitle || 'بدون اسم'}
                         </h3>
                         
                         <button
@@ -240,14 +245,18 @@ export default function HistoryView({
                   {/* Cover thumbnail */}
                   <div 
                     onClick={() => onNavigateToAnime && onNavigateToAnime(item.animeId)}
-                    className="w-16 h-24 rounded-lg overflow-hidden bg-zinc-950 shrink-0 border border-zinc-800 cursor-pointer hover:opacity-90 transition-opacity"
+                    className="w-16 h-24 rounded-lg overflow-hidden bg-zinc-950 shrink-0 border border-zinc-800 cursor-pointer hover:opacity-90 transition-opacity flex items-center justify-center text-zinc-700 relative"
                     title="الانتقال إلى صفحة العمل"
                   >
+                    <ImageOff className="w-6 h-6 absolute z-0" />
                     <img 
-                      src={item.animeCover || undefined} 
-                      alt={item.animeTitle} 
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      src={resolveCoverUrl(item.animeCover) || undefined} 
+                      alt={item.animeTitle || 'بدون اسم'} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform relative z-10 text-transparent"
                       referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        e.currentTarget.style.opacity = '0';
+                      }}
                     />
                   </div>
 
@@ -260,7 +269,7 @@ export default function HistoryView({
                           className="text-xs font-extrabold text-zinc-300 hover:text-amber-400 cursor-pointer truncate max-w-[200px] transition-colors"
                           title="الانتقال إلى صفحة العمل"
                         >
-                          {item.animeTitle}
+                          {item.animeTitle || 'بدون اسم'}
                         </h3>
                         
                         <button

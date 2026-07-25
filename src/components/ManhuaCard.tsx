@@ -1,7 +1,8 @@
 import React from 'react';
-import { Star, Eye, BookOpen } from 'lucide-react';
+import { Star, Eye, BookOpen, ImageOff } from 'lucide-react';
 import { Manhua, UserProfile, ReadingListItem } from '../types';
 import AddToListPicker from './AddToListPicker';
+import { resolveCoverUrl } from '../sources/fetch';
 
 interface ManhuaCardProps {
   key?: React.Key | string;
@@ -54,13 +55,17 @@ export default function ManhuaCard({
       id={`manhua-card-${manhua.id}`}
     >
       {/* Cover Image container with badges */}
-      <div className="relative aspect-[2/3] overflow-hidden bg-zinc-950">
+      <div className="relative aspect-[2/3] overflow-hidden bg-zinc-950 flex items-center justify-center text-zinc-700">
+        <ImageOff className="w-8 h-8 absolute z-0" />
         <img 
-          src={manhua.coverUrl || undefined} 
+          src={resolveCoverUrl(manhua.coverUrl) || undefined} 
           alt={manhua.title}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 relative z-10 text-transparent"
           loading="lazy"
           referrerPolicy="no-referrer"
+          onError={(e) => {
+            e.currentTarget.style.opacity = '0';
+          }}
         />
         
         {/* Dark vignette gradient overlay */}

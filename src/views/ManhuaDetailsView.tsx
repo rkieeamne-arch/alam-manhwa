@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowRight, Star, Eye, Calendar, User, Palette, Bookmark, BookOpen, Clock, Loader2, RefreshCw, Lock, Download, CheckCircle, DownloadCloud, Trash2, AlertCircle, Play, ArrowUpDown, ChevronDown } from 'lucide-react';
+import { ArrowRight, Star, Eye, Calendar, User, Palette, Bookmark, BookOpen, Clock, Loader2, RefreshCw, Lock, Download, CheckCircle, DownloadCloud, Trash2, AlertCircle, Play, ArrowUpDown, ChevronDown, ImageOff } from 'lucide-react';
 import { Manhua, Chapter, ScraperSource, UserProfile, ReadingListItem } from '../types';
 import { scrapeMangaDetails, scrapeMangaChapters, scrapeChapterPages } from '../utils/scraper';
 import { extractNumber } from '../utils/scraperUtils';
 import AddToListPicker from '../components/AddToListPicker';
 import { saveManhuaOffline, saveChapterOffline, getOfflineChaptersForManhua, convertUrlToBase64, deleteChapterOffline, fetchAsBlob } from '../utils/offlineDb';
+import { resolveCoverUrl } from '../sources/fetch';
 
 interface ManhuaDetailsViewProps {
   manhua: Manhua;
@@ -533,10 +534,13 @@ export default function ManhuaDetailsView({
         {/* Background blur overlay */}
         <div className="absolute inset-0 z-0">
           <img 
-            src={displayManhua.coverUrl || undefined} 
+            src={resolveCoverUrl(displayManhua.coverUrl) || undefined} 
             alt="Blur background" 
             className="w-full h-full object-cover filter blur-xl opacity-20 scale-110"
             referrerPolicy="no-referrer"
+            onError={(e) => {
+              e.currentTarget.style.opacity = '0';
+            }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/70 to-transparent" />
         </div>
@@ -545,12 +549,16 @@ export default function ManhuaDetailsView({
         <div className="relative z-10 p-4 sm:p-6 grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
           
           {/* Cover Art - Column (4 cols on md) */}
-          <div className="md:col-span-4 lg:col-span-3 mx-auto md:mx-0 w-full max-w-[280px] aspect-[2/3] rounded-2xl overflow-hidden border border-zinc-700 shadow-2xl shrink-0 bg-zinc-950 transition-transform duration-300 hover:scale-[1.02] hover:border-red-500/50">
+          <div className="md:col-span-4 lg:col-span-3 mx-auto md:mx-0 w-full max-w-[280px] aspect-[2/3] rounded-2xl overflow-hidden border border-zinc-700 shadow-2xl shrink-0 bg-zinc-950 transition-transform duration-300 hover:scale-[1.02] hover:border-red-500/50 flex items-center justify-center text-zinc-700 relative">
+            <ImageOff className="w-12 h-12 absolute z-0" />
             <img 
-              src={displayManhua.coverUrl || undefined} 
-              alt={displayManhua.title} 
-              className="w-full h-full object-cover"
+              src={resolveCoverUrl(displayManhua.coverUrl) || undefined} 
+              alt={displayManhua.title || 'بدون اسم'} 
+              className="w-full h-full object-cover relative z-10 text-transparent"
               referrerPolicy="no-referrer"
+              onError={(e) => {
+                e.currentTarget.style.opacity = '0';
+              }}
             />
           </div>
 

@@ -14,7 +14,7 @@ import { Manhua, Chapter } from '../types';
 
 interface DownloadsViewProps {
   onSelectChapterOffline: (manhua: Manhua, chapter: Chapter) => void;
-  onNavigate: (view: 'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'admin' | 'mylists' | 'downloads') => void;
+  onNavigate: (view: 'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'mylists' | 'downloads') => void;
 }
 
 export default function DownloadsView({

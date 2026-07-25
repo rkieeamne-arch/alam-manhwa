@@ -6,8 +6,6 @@ import {
 import { Manhua, Chapter, ReaderSettings, ManhuaComment, ReadingHistoryItem, ScraperSource } from '../types';
 import { mockComments } from '../data';
 import { scrapeChapterPages } from '../utils/scraper';
-import AdBanner from '../components/AdBanner';
-import { AppwriteAd } from '../lib/appwrite';
 
 interface ReaderViewProps {
   manhua: Manhua;
@@ -20,7 +18,6 @@ interface ReaderViewProps {
   user: any;
   sources?: ScraperSource[];
   appMode?: 'manga' | 'anime';
-  ads?: AppwriteAd[];
 }
 
 export default function ReaderView({
@@ -34,7 +31,6 @@ export default function ReaderView({
   user,
   sources = [],
   appMode = 'manga',
-  ads = []
 }: ReaderViewProps) {
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [comments, setComments] = useState<ManhuaComment[]>([]);
@@ -581,6 +577,14 @@ export default function ReaderView({
     light: 'bg-zinc-50'
   }[bgColor];
 
+  const resolvePageUrl = (pageUrl: string | Blob) => {
+    if (typeof pageUrl !== 'string') return URL.createObjectURL(pageUrl as Blob);
+    if (readerSettings.enhanceImages && pageUrl.includes('/api/forward')) {
+       return `${pageUrl}&enhance=1`;
+    }
+    return pageUrl;
+  };
+
   return (
     <div 
       onClick={handleStageClick}
@@ -759,7 +763,7 @@ export default function ReaderView({
                   {displayPages.map((pageUrl, idx) => (
                     <div key={`main-p-${idx}`} className="relative w-full overflow-hidden bg-black flex justify-center">
                       <img
-                        src={typeof pageUrl === 'string' ? pageUrl : URL.createObjectURL(pageUrl as Blob)}
+                        src={resolvePageUrl(pageUrl)}
                         alt={`صفحة ${idx + 1}`}
                         className="w-full max-w-full md:max-w-2xl lg:max-w-3xl xl:max-w-4xl h-auto object-contain block mx-auto"
                         loading="lazy"
@@ -806,7 +810,7 @@ export default function ReaderView({
                         {extItem.pages.map((pUrl, pIdx) => (
                           <div key={`ext-${extItem.chapter.id}-p-${pIdx}`} className="relative w-full overflow-hidden bg-black flex justify-center">
                             <img
-                              src={typeof pUrl === 'string' ? pUrl : URL.createObjectURL(pUrl as Blob)}
+                              src={resolvePageUrl(pUrl)}
                               alt={`صفحة ${pIdx + 1}`}
                               className="w-full max-w-full md:max-w-2xl lg:max-w-3xl xl:max-w-4xl h-auto object-contain block mx-auto"
                               loading="lazy"
@@ -856,7 +860,7 @@ export default function ReaderView({
               <div className="w-full flex flex-col items-center space-y-4">
                 <div className="relative w-full max-w-3xl mx-auto overflow-hidden bg-black/10 flex justify-center">
                   <img
-                    src={displayPages[currentPageIndex] || undefined}
+                    src={displayPages[currentPageIndex] ? resolvePageUrl(displayPages[currentPageIndex]) : undefined}
                     alt={`الصفحة ${currentPageIndex + 1}`}
                     className="w-full h-auto object-contain mx-auto max-h-[90vh]"
                     referrerPolicy="no-referrer"
@@ -890,7 +894,7 @@ export default function ReaderView({
               <div className="w-full flex flex-col items-center space-y-4">
                 <div className="relative w-full max-w-3xl mx-auto overflow-hidden bg-black/10 flex justify-center">
                   <img
-                    src={displayPages[currentPageIndex] || undefined}
+                    src={displayPages[currentPageIndex] ? resolvePageUrl(displayPages[currentPageIndex]) : undefined}
                     alt={`الصفحة ${currentPageIndex + 1}`}
                     className="w-full h-auto object-contain mx-auto max-h-[90vh]"
                     referrerPolicy="no-referrer"
@@ -1176,7 +1180,6 @@ export default function ReaderView({
 
       {/* Reader Bottom Cloud Ads */}
       <div className="max-w-xl mx-auto px-4">
-        <AdBanner ads={ads} position="reader_bottom" />
       </div>
 
       {/* 8. CHAPTER PAGINATION BUTTONS (Prev Chapter / Next Chapter) - Focus toggled */}

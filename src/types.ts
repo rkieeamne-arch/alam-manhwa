@@ -41,7 +41,7 @@ export interface UserProfile {
   avatarUrl: string;
   bannerUrl?: string;
   bio?: string;
-  role: 'admin' | 'user';
+  role: 'user';
   joinedAt: string;
   xp?: number;
   totalXp?: number;
@@ -91,6 +91,7 @@ export interface ReaderSettings {
   navColor: string; // hex color for navigation buttons
   autoSync: boolean;
   continuousMode?: boolean; // قراءة الفصول بشكل مسترسل متتالي
+  enhanceImages?: boolean; // تحسين دقة الصور (Super Resolution)
 }
 
 export interface ManhuaComment {

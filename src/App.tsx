@@ -10,8 +10,6 @@ import { Home, Search, Heart, History, FolderDown, User, MessageSquare, Bell, Tv
 import Header from './components/Header';
 import SettingsDrawer from './components/SettingsDrawer';
 import BypassModal from './components/BypassModal';
-import AdBanner from './components/AdBanner';
-import { fetchAppwriteAds, fetchAppwriteNotifications, AppwriteAd } from './lib/appwrite';
 
 // Views
 import HomeView from './views/HomeView';
@@ -20,7 +18,6 @@ import ReaderView from './views/ReaderView';
 import SearchView from './views/SearchView';
 import AccountView from './views/AccountView';
 import HistoryView from './views/HistoryView';
-import AdminView from './views/AdminView';
 import MyListView from './views/MyListView';
 import DownloadsView from './views/DownloadsView';
 import AnimeDetailsView from './views/AnimeDetailsView';
@@ -52,7 +49,7 @@ function getUniqueId(url: string): string {
 
 export default function App() {
   // Navigation Router state
-  const [currentView, setCurrentView] = useState<'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'admin' | 'mylists' | 'downloads' | 'anime-details' | 'anime-player'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'mylists' | 'downloads' | 'anime-details' | 'anime-player'>('home');
   const [selectedManhuaId, setSelectedManhuaId] = useState<string | null>(null);
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
   
@@ -101,7 +98,6 @@ export default function App() {
 
   // Core User Authentication State
   const [user, setUser] = useState<UserProfile>(() => {
-    localStorage.removeItem('admin_secret_unlocked');
     const saved = localStorage.getItem('manhua_user_profile');
     if (saved) {
       try {
@@ -178,78 +174,6 @@ export default function App() {
     localStorage.setItem('user_notifications', JSON.stringify(notifications));
   }, [notifications]);
 
-  // Ads & Cloud Notifications State
-  const [ads, setAds] = useState<AppwriteAd[]>([]);
-  const [popupAd, setPopupAd] = useState<AppwriteAd | null>(null);
-
-  // Sync Ads and Notifications from Appwrite Cloud & BroadcastChannel for all users
-  useEffect(() => {
-    let isMounted = true;
-
-    const syncAppwriteCloud = async () => {
-      try {
-        // 1. Fetch Ads
-        const fetchedAds = await fetchAppwriteAds();
-        if (isMounted) {
-          setAds(fetchedAds);
-          const popup = fetchedAds.find(a => a.position === 'popup' && a.isActive);
-          if (popup) setPopupAd(popup);
-        }
-
-        // 2. Fetch Cloud Notifications
-        const cloudNotifs = await fetchAppwriteNotifications();
-        if (isMounted && cloudNotifs && cloudNotifs.length > 0) {
-          setNotifications(prev => {
-            const existingIds = new Set(prev.map(n => n.id));
-            const newNotifs = cloudNotifs.filter(n => !existingIds.has(n.id));
-            if (newNotifs.length > 0) {
-              setActiveToast(newNotifs[0]);
-              return [...newNotifs, ...prev];
-            }
-            return prev;
-          });
-        }
-      } catch (e) {
-        console.warn('Appwrite cloud sync error:', e);
-      }
-    };
-
-    syncAppwriteCloud();
-    const interval = setInterval(syncAppwriteCloud, 6000); // Poll every 6 seconds
-
-    // BroadcastChannel for instant cross-tab & cross-window sync
-    let bc: BroadcastChannel | null = null;
-    if (typeof BroadcastChannel !== 'undefined') {
-      try {
-        bc = new BroadcastChannel('global_app_notifications');
-        bc.onmessage = (event) => {
-          if (!isMounted) return;
-          if (event.data?.type === 'NEW_NOTIFICATION' && event.data.notif) {
-            const notif = event.data.notif;
-            setNotifications(prev => {
-              if (prev.some(n => n.id === notif.id)) return prev;
-              setActiveToast(notif);
-              return [notif, ...prev];
-            });
-          } else if (event.data?.type === 'ADS_UPDATED') {
-            fetchAppwriteAds().then(newAds => {
-              if (isMounted) {
-                setAds(newAds);
-                const popup = newAds.find(a => a.position === 'popup' && a.isActive);
-                if (popup) setPopupAd(popup);
-              }
-            });
-          }
-        };
-      } catch (e) {}
-    }
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-      if (bc) bc.close();
-    };
-  }, []);
 
   const handleNotificationClick = (notif: NotificationItem) => {
     // Mark as read
@@ -404,15 +328,6 @@ export default function App() {
     const mangaId = params.get('manga');
     const chapterId = params.get('chapter');
     const view = params.get('view');
-    const secretAdmin = params.get('admin') || params.get('secret') || params.get('key') || params.get('pin') || params.get('secret_admin');
-
-    // Secret Admin Link Check (e.g. ?admin=28429625 or ?pin=28429625)
-    if (secretAdmin === '28429625' || secretAdmin === 'azora' || secretAdmin === 'secret' || secretAdmin === '28429625') {
-      sessionStorage.setItem('admin_unlocked', 'true');
-      setUser(prev => ({ ...prev, role: 'admin' }));
-      setCurrentView('admin');
-      return;
-    }
 
     if (mangaId && chapterId) {
       setSelectedManhuaId(mangaId);
@@ -422,8 +337,8 @@ export default function App() {
       setSelectedManhuaId(mangaId);
       setCurrentView('manhua');
     } else if (view) {
-      const allowedViews: ('home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'admin' | 'mylists' | 'downloads')[] = [
-        'home', 'manhua', 'reader', 'search', 'account', 'history', 'admin', 'mylists', 'downloads'
+      const allowedViews: ('home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'mylists' | 'downloads')[] = [
+        'home', 'manhua', 'reader', 'search', 'account', 'history', 'mylists', 'downloads'
       ];
       if (allowedViews.includes(view as any)) {
         setCurrentView(view as any);
@@ -785,6 +700,12 @@ export default function App() {
         const source = defaultScraperSources.find(s => historyItem.sourceUrl?.includes(new URL(s.baseUrl).hostname)) || defaultScraperSources[0];
         scrapeMangaDetails(source, historyItem.sourceUrl).then(details => {
           if (details) {
+            details.id = manhuaId; // Ensure ID matches perfectly
+            // Ensure the currently reading chapter is in the list
+            const chapterExists = details.chapters.find(c => c.id === chapterId);
+            if (!chapterExists) {
+               details.chapters.push(reconstructed.chapters[0]);
+            }
             setScrapedManhuaCache(details);
           }
         }).catch(err => {
@@ -809,7 +730,7 @@ export default function App() {
   };
 
   // Navigation targets
-  const handleNavigate = (view: 'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'admin' | 'mylists' | 'downloads') => {
+  const handleNavigate = (view: 'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'mylists' | 'downloads') => {
     setCurrentView(view);
   };
 
@@ -934,7 +855,6 @@ export default function App() {
             onToggleLayout={handleToggleLayout}
             appMode={appMode}
             onToggleAppMode={handleToggleAppMode}
-            ads={ads}
           />
         )}
 
@@ -973,7 +893,6 @@ export default function App() {
             user={user}
             sources={sources}
             appMode={appMode}
-            ads={ads}
           />
         )}
 
@@ -1108,21 +1027,6 @@ export default function App() {
           />
         )}
 
-        {currentView === 'admin' && (
-          <AdminView 
-            manhuas={manhuas}
-            onAddManhua={handleAddManhua}
-            onUpdateManhua={handleUpdateManhua}
-            onDeleteManhua={handleDeleteManhua}
-            onRestoreDefaults={handleRestoreDefaults}
-            onClearAllManhuas={handleClearAllManhuas}
-            sources={sources}
-            onAddSource={handleAddSource}
-            onDeleteSource={handleDeleteSource}
-            onRestoreSources={handleRestoreSources}
-            onAddNotification={(notif) => setNotifications(prev => [notif, ...prev])}
-          />
-        )}
 
         {currentView === 'downloads' && (
           <DownloadsView 
@@ -1377,48 +1281,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Cloud Popup Ad Modal */}
-      {popupAd && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in" dir="rtl">
-          <div className="relative max-w-md w-full bg-zinc-900 border border-pink-500/40 rounded-3xl overflow-hidden shadow-2xl space-y-4 p-5 text-center">
-            <button
-              onClick={() => setPopupAd(null)}
-              className="absolute top-3 left-3 p-2 bg-zinc-950/80 hover:bg-red-600 text-zinc-400 hover:text-white rounded-full transition-all border border-zinc-800 cursor-pointer"
-              title="إغلاق الإعلان"
-            >
-              <X className="w-4 h-4" />
-            </button>
-
-            <span className="inline-block px-3 py-1 bg-pink-950/80 border border-pink-800/50 text-pink-400 text-[10px] font-black rounded-lg">
-              إعلان متثبت من الإدارة
-            </span>
-
-            <h3 className="text-base sm:text-lg font-black text-white">{popupAd.title}</h3>
-
-            {popupAd.imageUrl && (
-              <div className="rounded-2xl overflow-hidden border border-zinc-800 max-h-60 bg-zinc-950 flex items-center justify-center">
-                <img
-                  src={popupAd.imageUrl}
-                  alt={popupAd.title}
-                  className="w-full h-auto object-cover"
-                />
-              </div>
-            )}
-
-            {popupAd.linkUrl && popupAd.linkUrl !== '#' && (
-              <a
-                href={popupAd.linkUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => setPopupAd(null)}
-                className="block w-full py-3 bg-pink-600 hover:bg-pink-500 text-white font-bold text-xs rounded-xl transition-all shadow-lg shadow-pink-600/30"
-              >
-                انقر لزيارة الرابط
-              </a>
-            )}
-          </div>
-        </div>
-      )}
 
     </div>
   );

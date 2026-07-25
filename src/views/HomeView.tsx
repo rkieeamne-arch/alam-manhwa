@@ -4,12 +4,10 @@ import {
   Flame, Star, Award, TrendingUp, Compass, Grid, Loader2, RefreshCw, 
   Globe, Wifi, Cpu, ExternalLink, Plus, Trash2, Layers, X, Sparkles, 
   BookOpen, Clock, Heart, Zap, Shield, ArrowRight, Check, Search, Play, Tv,
-  ChevronDown
+  ChevronDown, FolderDown
 } from 'lucide-react';
 import { Manhua, ScraperSource, UserProfile, ReadingListItem } from '../types';
 import ManhuaCard from '../components/ManhuaCard';
-import AdBanner from '../components/AdBanner';
-import { AppwriteAd } from '../lib/appwrite';
 import { scrapePopularList } from '../utils/scraper';
 import { fetchLatestEpisodes, fetchLatestSeries, searchAnime } from '../utils/animeScraper';
 
@@ -30,7 +28,6 @@ interface HomeViewProps {
   onToggleLayout?: () => void;
   appMode?: 'manga' | 'anime';
   onToggleAppMode: () => void;
-  ads?: AppwriteAd[];
 }
 
 // Deterministic pseudo-random scattering variants generator for explosive transition
@@ -67,7 +64,6 @@ export default function HomeView({
   onToggleLayout,
   appMode = 'manga',
   onToggleAppMode,
-  ads = []
 }: HomeViewProps) {
   // Layout state (Modern vs Classic) - Fallback to local if props aren't provided
   const [localLayout, setLocalLayout] = useState<'classic' | 'modern'>(() => {
@@ -256,7 +252,7 @@ export default function HomeView({
         if (query) {
           setScrapedError('لم يتم العثور على نتائج للبحث.');
         } else {
-          setScrapedError('تعذر جلب الأعمال. جرب التحديث مرة أخرى.');
+          setScrapedError('فشل جلب الاعمال تأكد من اتصالك بالإنترنت');
         }
       } else if (!isSilent && !isLoadMore) {
         triggerToast('تم تحديث قائمة الأعمال بنجاح!');
@@ -398,7 +394,6 @@ export default function HomeView({
       </div>
 
       {/* Top Banner Cloud Ads */}
-      <AdBanner ads={ads} position="top_banner" />
 
       <AnimatePresence mode="wait">
         {homeLayout === 'modern' ? (
@@ -588,16 +583,14 @@ export default function HomeView({
                   </div>
                   <p className="text-zinc-200 text-sm font-bold leading-relaxed">{scrapedError}</p>
                   <p className="text-zinc-400 text-xs leading-relaxed">
-                    لحماية خصوصية الخدمة وتخطي حجب Cloudflare ومشاكل الكابتشا فوراً، يمكنك تفعيل مساعد تخطي الحظر ليدمج متصفحك الحقيقي تلقائياً مع السيرفر!
+                    هل تريد مشاهدة من الاعمال المثبتة علي جهازك؟
                   </p>
                   <button
-                    onClick={() => {
-                      window.dispatchEvent(new CustomEvent('open-bypass-modal'));
-                    }}
-                    className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black transition-all flex items-center gap-2 mx-auto shadow-lg shadow-red-600/20 cursor-pointer"
+                    onClick={() => onNavigate('downloads')}
+                    className="px-6 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-xs font-black transition-all flex items-center gap-2 mx-auto shadow-lg cursor-pointer"
                   >
-                    <Sparkles className="w-4 h-4 animate-pulse" />
-                    تفعيل مساعد تخطي الكابتشا والاتصال المباشر
+                    <FolderDown className="w-4 h-4" />
+                    الذهاب إلى التنزيلات
                   </button>
                 </div>
               ) : (
@@ -705,16 +698,14 @@ export default function HomeView({
                 </div>
                 <p className="text-zinc-200 text-sm font-bold leading-relaxed">{scrapedError}</p>
                 <p className="text-zinc-400 text-xs leading-relaxed">
-                  لحماية خصوصية الخدمة وتخطي حجب Cloudflare ومشاكل الكابتشا فوراً، يمكنك تفعيل مساعد تخطي الحظر ليدمج متصفحك الحقيقي تلقائياً مع السيرفر!
+                  هل تريد مشاهدة من الاعمال المثبتة علي جهازك؟
                 </p>
                 <button
-                  onClick={() => {
-                    window.dispatchEvent(new CustomEvent('open-bypass-modal'));
-                  }}
-                  className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black transition-all flex items-center gap-2 mx-auto shadow-lg shadow-red-600/20 cursor-pointer"
+                  onClick={() => onNavigate('downloads')}
+                  className="px-6 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-xs font-black transition-all flex items-center gap-2 mx-auto shadow-lg cursor-pointer"
                 >
-                  <Sparkles className="w-4 h-4 animate-pulse" />
-                  تفعيل مساعد تخطي الكابتشا والاتصال المباشر
+                  <FolderDown className="w-4 h-4" />
+                  الذهاب إلى التنزيلات
                 </button>
               </div>
             ) : !loadingScraped && displayManhuas.length === 0 ? (

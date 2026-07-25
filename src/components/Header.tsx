@@ -9,8 +9,8 @@ import logoImg from '../assets/images/manhua_logo_1783758713519.jpg';
 interface HeaderProps {
   onOpenSettings: () => void;
   user: UserProfile | null;
-  onNavigate: (view: 'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'admin' | 'mylists' | 'downloads') => void;
-  currentView: 'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'admin' | 'mylists' | 'downloads';
+  onNavigate: (view: 'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'mylists' | 'downloads') => void;
+  currentView: 'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'mylists' | 'downloads';
   onSearch: (query: string) => void;
   homeLayout?: 'classic' | 'modern';
   appMode?: 'manga' | 'anime';
@@ -333,16 +333,6 @@ export default function Header({
               </button>
             )}
 
-            {user && user.role === 'admin' && (
-              <button
-                onClick={() => onNavigate('admin')}
-                className={`p-2 rounded-full transition-colors ${isAnime ? 'bg-amber-950/20 hover:bg-amber-950/50 text-amber-400 hover:text-amber-300 border border-amber-900/30' : 'bg-red-950/20 hover:bg-red-950/50 text-red-400 hover:text-red-300 border border-red-900/30'}`}
-                title="لوحة الإدارة"
-                id="header-admin-quick"
-              >
-                <ShieldAlert className="w-4 h-4" />
-              </button>
-            )}
           </div>
 
         </div>
@@ -439,22 +429,6 @@ export default function Header({
             الحساب الشخصي
           </button>
 
-          {user && user.role === 'admin' && (
-            <button
-              onClick={() => onNavigate('admin')}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                currentView === 'admin'
-                  ? isAnime
-                    ? 'bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20'
-                    : 'bg-red-600 text-white shadow-md shadow-red-900/20'
-                  : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900'
-              }`}
-              id="nav-admin-btn"
-            >
-              <ShieldAlert className="w-3.5 h-3.5" />
-              لوحة الإدارة
-            </button>
-          )}
         </nav>
 
       </div>
