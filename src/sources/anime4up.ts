@@ -32,7 +32,7 @@ function getCoverFromElement($: cheerio.CheerioAPI, el: any): string {
     return match ? match[1] : '';
   }
 
-  const attrs = ['data-src', 'data-lazy-src', 'data-original', 'data-srcset', 'src', 'srcset'];
+  const attrs = ['data-image', 'data-src', 'data-lazy-src', 'data-original', 'data-srcset', 'src', 'srcset'];
   for (const attr of attrs) {
     const val = img.attr(attr);
     if (val && !val.startsWith('data:image/svg') && !val.startsWith('data:image/gif')) {

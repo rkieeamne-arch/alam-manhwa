@@ -112,9 +112,13 @@ export const witanimeSourceHandler: SourceHandler = {
       if (rawLink.includes('/anime-genre/') || rawLink.includes('/tag/') || rawLink.includes('/category/')) return;
 
       const rawCoverUrl = getCoverFromElement($, el);
-      let title = $(el).find('h4, h3, .title, .anime-title, .entry-title').first().text();
-      if (!title) title = linkEl.attr('title') || $(el).find('img').first().attr('alt') || '';
-      title = cleanText(title);
+      let title = $(el).find('h4, h3, .anime-title, .entry-title').first().text();
+      if (!title) title = $(el).find('img').first().attr('alt') || linkEl.attr('title') || '';
+      title = cleanText(title)
+        .replace(/^قائمة الانمي.*?انمي\s+/i, 'انمي ')
+        .replace(/مترجم\s+اونلاين/i, '')
+        .replace(/مترجم\s+اون\s+لاين/i, '')
+        .trim();
 
       if (
         title === 'الرئيسية' || 
@@ -148,29 +152,39 @@ export const witanimeSourceHandler: SourceHandler = {
     const html = await response.text();
     const $ = cheerio.load(html);
 
-    const title = cleanText($('h1.entry-title, h1').first().text()) || 'أنمي';
-    const rawCover = $('.anime-poster img, .poster img').attr('src') || $('meta[property="og:image"]').attr('content') || '';
+    const rawTitle = $('h1').filter((_, e) => !$(e).text().includes('RISTO')).first().text() || $('meta[property="og:title"]').attr('content') || '';
+    let title = cleanText(rawTitle)
+      .replace(/^انمي\s+/i, '')
+      .replace(/مترجم\s+اونلاين/i, '')
+      .replace(/مترجم\s+اون\s+لاين/i, '')
+      .trim() || 'أنمي';
+      
+    const rawCover = $('.anime-poster img, .poster img').attr('src') || 
+                     $('.anime-poster img, .poster img').attr('data-src') ||
+                     $('meta[property="og:image"]').attr('content') || '';
+                     
     const description = cleanText($('.StoryArea, .anime-story, .story-text, .post-content').text());
 
     const episodes: Chapter[] = [];
-    const episodeSelectors = [
-      'ul.episodes-list a',
-      '.List-Episodes a',
-      '.episodes-card a',
-      'a[href*="/episode/"]',
-      'a[href*="%d8%a7%d9%84%d8%ad%d9%82%d8%a9"]'
-    ].join(', ');
 
-    $(episodeSelectors).each((_idx, el) => {
-      const episodeName = cleanText($(el).text());
+    $('a').each((_idx, el) => {
       const episodeUrl = $(el).attr('href');
+      if (!episodeUrl) return;
 
-      if (episodeName && episodeUrl && !episodes.some(e => e.url === episodeUrl)) {
-        episodes.push({
-          id: getUniqueId(episodeUrl),
-          name: episodeName,
-          url: normalizeUrl(episodeUrl, BASE_URL),
-        });
+      let decodedUrl = '';
+      try { decodedUrl = decodeURIComponent(episodeUrl); } catch { decodedUrl = episodeUrl; }
+
+      if (decodedUrl.includes('الحلقة') || decodedUrl.includes('/episode/') || episodeUrl.includes('%d8%a7%d9%84%d8%ad%d9%82%d8%a9') || episodeUrl.includes('%d8%a7%d9%84%d8%ad%d9%84%d9%82%d8%a9')) {
+        const fullUrl = normalizeUrl(episodeUrl, BASE_URL);
+        const episodeName = cleanText($(el).text()) || 'الحلقة';
+        
+        if (!episodes.some(e => e.url === fullUrl)) {
+          episodes.push({
+            id: getUniqueId(fullUrl),
+            name: episodeName,
+            url: fullUrl,
+          });
+        }
       }
     });
 

@@ -228,11 +228,20 @@ export const azoraflySourceHandler: SourceHandler = {
 
       const $first = cheerio.load(html);
       
-      const title = $first('h1').text().trim() || getSlugTitle(mangaUrl);
+      let rawTitle = $first('h1').text().trim() || getSlugTitle(mangaUrl);
+      let title = rawTitle.replace(/^(الحالة|النوع|الفصول|آخر تحديث|\s)+/gi, '').replace(/(تحديث|مستمر|مكتمل)/gi, '').trim();
+      if (!title || title.length < 2) title = getSlugTitle(mangaUrl);
+
       let description = $first('div[id*="description"], .summary, .description, .post-content, .entry-content').text().trim().replace(/\s+/g, ' ');
       if (!description) description = $first('meta[property="og:description"]').attr('content') || '';
       if (description.length > 500) description = description.substring(0, 500) + '...';
-      const cover = $first('img[src*="storage"]').first().attr('src') || '';
+
+      let rawCover = $first('img[src*="storage"], img[src*="upload"], img[src*="series"]').first().attr('src') ||
+                     $first('meta[property="og:image"]').attr('content') ||
+                     $first('.summary_image img, .manga-poster img, .series-poster img, .poster img').first().attr('src') ||
+                     $first('.summary_image img, .manga-poster img, .series-poster img, .poster img').first().attr('data-src') ||
+                     '';
+      const cover = rawCover ? normalizeUrl(rawCover, BASE_URL) : '';
 
       let allChapters: Chapter[] = [];
       

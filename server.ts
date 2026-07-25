@@ -353,7 +353,7 @@ async function startServer() {
         
         // Image Super Resolution / Enhancement
         const enhanceMode = req.query.enhance === '1' || req.query.enhance === 'true';
-        if (enhanceMode && contentType.includes('image') && !contentType.includes('gif')) {
+        if (enhanceMode && (contentType.includes('image') || isImage) && !contentType.includes('gif')) {
           try {
             const sharp = (await import('sharp')).default;
             const image = sharp(buffer);
@@ -363,20 +363,20 @@ async function startServer() {
               // Apply Super Resolution Pipeline (Lanczos Upscale + Unsharp Mask)
               buffer = await image
                 .resize({ width: metadata.width * 2, kernel: 'lanczos3' })
-                .sharpen({ sigma: 0.8, m1: 1.5 }) // Unsharp mask for flat and jagged areas
+                .sharpen({ sigma: 0.8 }) // Clean sharpening
                 .webp({ quality: 85 }) // Output as WebP for smaller size and speed
                 .toBuffer();
               finalContentType = 'image/webp';
             } else {
               // Just apply sharpen if already large
               buffer = await image
-                .sharpen({ sigma: 0.8, m1: 1.2 })
+                .sharpen({ sigma: 0.8 })
                 .webp({ quality: 85 })
                 .toBuffer();
               finalContentType = 'image/webp';
             }
           } catch (sharpErr) {
-            console.error('[Proxy] Sharp processing error:', sharpErr);
+            console.warn('[Proxy] Sharp processing fallback to original buffer:', sharpErr?.message || sharpErr);
             // Fallback to original buffer
           }
         }

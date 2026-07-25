@@ -93,17 +93,23 @@ export const rocksMangaSourceHandler: SourceHandler = {
     const mangas: Manga[] = [];
 
     const addMangaItem = (el: any) => {
-      const linkEl = $(el).find('a').first();
-      const titleEl = $(el).find('span, h3, h4, h5, .post-title, a, b').first();
+      const linkEl = $(el).find('a[href*="/manga/"], a[href*="/series/"], a').first();
+      const titleEl = $(el).find('.post-title a, .post-title h3, .post-title h4, h3 a, h4 a, .item-summary h3, .item-summary a, .manga-heading a, h3, h4').first();
       const coverEl = $(el).find('img').first();
 
-      const rawLink = linkEl.attr('href');
+      const rawLink = linkEl.attr('href') || $(el).find('a').first().attr('href');
       const rawCoverUrl = coverEl.attr('src') || coverEl.attr('data-src') || coverEl.attr('data-lazy-src') || '';
 
       if (rawLink) {
         const sourceUrl = normalizeUrl(rawLink, BASE_URL);
         const coverUrl = rawCoverUrl ? normalizeUrl(rawCoverUrl, BASE_URL) : 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=300';
-        const title = titleEl.text().trim() || $(el).find('b').text().trim() || 'مانجا';
+        let title = titleEl.text().trim() || linkEl.attr('title') || $(el).find('b').text().trim() || '';
+
+        if (!title || title === 'مانجا' || title.length < 2) {
+          const parts = sourceUrl.replace(/\/$/, '').split('/');
+          const slug = parts.pop() || '';
+          title = slug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        }
 
         const id = getUniqueId(sourceUrl);
         if (id && !mangas.some(m => m.id === id)) {
@@ -159,7 +165,7 @@ export const rocksMangaSourceHandler: SourceHandler = {
     if (description.length > 500) description = description.substring(0, 500) + '...';
 
     const chapters: Chapter[] = [];
-    $('ul.scroll-sm li.item, .scroll-sm li, ul.cl li, .eplister li').each((_idx, el) => {
+    $('li.wp-manga-chapter, li.chapter-item, ul.main.version-chap li, ul.scroll-sm li.item, .scroll-sm li, ul.cl li, .eplister li').each((_idx, el) => {
       const chapterLink = $(el).find('a').first();
       const chapterName = chapterLink.find('.chapternum, .lchx').text().trim() || chapterLink.text().trim().replace(/\s+/g, ' ');
       const chapterUrl = chapterLink.attr('href');

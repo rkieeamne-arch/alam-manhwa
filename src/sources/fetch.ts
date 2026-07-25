@@ -6,10 +6,7 @@ export function getProxiedUrl(url: string, enhance: boolean = false): string {
 export function resolveCoverUrl(url: string | undefined): string | undefined {
   if (!url) return undefined;
   if (url.startsWith('http') && !url.includes('/api/forward')) {
-    return getProxiedUrl(url, true);
-  }
-  if (url.includes('/api/forward') && !url.includes('enhance=')) {
-    return `${url}&enhance=1`;
+    return getProxiedUrl(url);
   }
   return url;
 }
