@@ -89,7 +89,6 @@ export default function HomeView({
   const [scrapedError, setScrapedError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
-  const [selectedSourceId, setSelectedSourceId] = useState<string>('all');
 
   // Toast state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -116,27 +115,54 @@ export default function HomeView({
       try {
         if (appMode === 'anime') {
           const animeSources = sources.filter(s => s.type === 'anime');
-          const targetSource = selectedSourceId !== 'all' ? animeSources.find(s => s.id === selectedSourceId) : null;
           
-          if (targetSource) {
-            results = await scrapePopularList(targetSource, query, pageNum);
-          }
+          // Fetch from all active anime scrapers in parallel
+          const scraperPromises = animeSources.map(s => scrapePopularList(s, query, pageNum));
           
-          // Fallback to default anime scraper if specific source returned no results or 'all' is selected
-          if (!results || results.length === 0) {
-            if (query) {
-              results = await searchAnime(query, pageNum);
-            } else {
-              results = await fetchLatestEpisodes(pageNum);
+          // Also fetch from default anime API
+          const defaultApiPromise = query ? searchAnime(query, pageNum) : fetchLatestEpisodes(pageNum);
+
+          const settled = await Promise.allSettled([...scraperPromises, defaultApiPromise]);
+          let combined: any[] = [];
+
+          settled.forEach(res => {
+            if (res.status === 'fulfilled' && Array.isArray(res.value)) {
+              combined.push(...res.value);
             }
-          }
+          });
+
+          // Deduplicate by normalized title
+          const seen = new Set();
+          results = combined.filter(item => {
+            if (!item || !item.title) return false;
+            const normKey = item.title.trim().toLowerCase();
+            if (seen.has(normKey)) return false;
+            seen.add(normKey);
+            return true;
+          });
         } else {
           // Manhua
           const manhuaSources = sources.filter(s => s.type === 'manga');
-          const targetSource = selectedSourceId !== 'all' ? manhuaSources.find(s => s.id === selectedSourceId) : manhuaSources[0];
-          if (targetSource) {
-            results = await scrapePopularList(targetSource, query, pageNum);
-          }
+          const scraperPromises = manhuaSources.map(s => scrapePopularList(s, query, pageNum));
+
+          const settled = await Promise.allSettled(scraperPromises);
+          let combined: any[] = [];
+
+          settled.forEach(res => {
+            if (res.status === 'fulfilled' && Array.isArray(res.value)) {
+              combined.push(...res.value);
+            }
+          });
+
+          // Deduplicate by normalized title
+          const seen = new Set();
+          results = combined.filter(item => {
+            if (!item || !item.title) return false;
+            const normKey = item.title.trim().toLowerCase();
+            if (seen.has(normKey)) return false;
+            seen.add(normKey);
+            return true;
+          });
         }
       } catch (scrapingError: any) {
         console.warn('Scraping failed, trying backup:', scrapingError.message || scrapingError);
@@ -560,7 +586,7 @@ export default function HomeView({
 
             {/* 4. آخر التحديثات (Browse Grid) */}
             <div className="space-y-4 pt-4 border-t border-zinc-900/40">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 flex-row-reverse">
+              <div className="flex items-center justify-between flex-row-reverse">
                 <div className="flex items-center gap-2 flex-row-reverse">
                   <div className="p-1.5 bg-red-500/10 rounded-lg">
                     <Compass className="w-4 h-4 text-red-500" />
@@ -574,46 +600,14 @@ export default function HomeView({
                   </motion.h3>
                 </div>
 
-                {/* Source Selection Pills */}
-                <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-1 flex-row-reverse max-w-full">
-                  <span className="text-[11px] text-zinc-400 font-bold flex items-center gap-1 shrink-0 flex-row-reverse">
-                    <Globe className="w-3 h-3 text-amber-500" />
-                    <span>المصدر:</span>
-                  </span>
-                  <button
-                    onClick={() => { setSelectedSourceId('all'); handleFetchAllSources(1, searchQuery); }}
-                    className={`px-3 py-1 rounded-xl text-[11px] font-black transition-all shrink-0 cursor-pointer ${
-                      selectedSourceId === 'all'
-                        ? appMode === 'anime' ? 'bg-amber-500 text-black shadow-md' : 'bg-red-600 text-white shadow-md'
-                        : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white'
-                    }`}
-                  >
-                    الكل
-                  </button>
-                  {sources
-                    .filter(s => appMode === 'anime' ? s.type === 'anime' : s.type === 'manga')
-                    .map(src => (
-                      <button
-                        key={src.id}
-                        onClick={() => { setSelectedSourceId(src.id); handleFetchAllSources(1, searchQuery); }}
-                        className={`px-3 py-1 rounded-xl text-[11px] font-black transition-all shrink-0 cursor-pointer flex items-center gap-1 ${
-                          selectedSourceId === src.id
-                            ? appMode === 'anime' ? 'bg-amber-500 text-black shadow-md' : 'bg-red-600 text-white shadow-md'
-                            : 'bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white'
-                        }`}
-                      >
-                        <span>{src.name}</span>
-                      </button>
-                    ))}
-
-                  <button 
-                    onClick={() => handleFetchAllSources(1, searchQuery)}
-                    className="flex items-center gap-1.5 text-zinc-400 hover:text-white transition-colors text-[11px] flex-row-reverse cursor-pointer px-2.5 py-1 bg-zinc-900 rounded-xl border border-zinc-800"
-                    title="تحديث القائمة"
-                  >
-                    <RefreshCw className={`w-3 h-3 ${loadingScraped ? 'animate-spin' : ''}`} />
-                  </button>
-                </div>
+                <button 
+                  onClick={() => handleFetchAllSources(1, searchQuery)}
+                  className="flex items-center gap-1.5 text-zinc-300 hover:text-white transition-colors text-xs font-bold flex-row-reverse cursor-pointer px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 rounded-xl border border-zinc-800"
+                  title="تحديث القائمة"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingScraped ? 'animate-spin text-red-500' : ''}`} />
+                  <span>تحديث</span>
+                </button>
               </div>
 
               {loadingScraped && page === 1 && displayManhuas.length === 0 ? (
