@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { fetchWatchServers, Anime, Episode } from '../utils/animeScraper';
+import ArtPlayer from '../components/ArtPlayer';
 import { 
   Loader2, 
   ShieldCheck, 
@@ -55,6 +56,7 @@ export default function AnimePlayerView({
   const [servers, setServers] = useState<{ name: string; url: string }[]>([]);
   const [activeServer, setActiveServer] = useState<{ name: string; url: string } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [directVideoUrl, setDirectVideoUrl] = useState<{ url: string, type: 'video/mp4' | 'application/x-mpegurl' } | null>(null);
   const [isRotated, setIsRotated] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
@@ -157,9 +159,10 @@ export default function AnimePlayerView({
       setLoading(false);
       return;
     }
-    const episode = anime.episodes.find(e => e.episodeNumber === episodeNumber);
+    const safeEpNum = isNaN(episodeNumber) ? 1 : episodeNumber;
+    const episode = anime.episodes.find(e => e.episodeNumber === safeEpNum) || anime.episodes[0];
     const episodeUrl = episode?.url || '';
-    if (!episodeUrl) {
+    if (!episodeUrl || episodeUrl.includes('NaN')) {
       setLoading(false);
       return;
     }
@@ -176,6 +179,36 @@ export default function AnimePlayerView({
         setLoading(false);
       });
   }, [anime, episodeNumber]);
+
+  // Extract direct video URL if possible
+  useEffect(() => {
+    if (!activeServer?.url) {
+      setDirectVideoUrl(null);
+      return;
+    }
+
+    const url = activeServer.url;
+    if (url.includes('.m3u8')) {
+      setDirectVideoUrl({ url, type: 'application/x-mpegurl' });
+      return;
+    }
+    if (url.includes('.mp4')) {
+      setDirectVideoUrl({ url, type: 'video/mp4' });
+      return;
+    }
+
+    // Attempt to extract
+    setDirectVideoUrl(null); // Reset while fetching
+    fetch(`/api/extract-video?url=${encodeURIComponent(url)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.url) {
+          setDirectVideoUrl({ url: data.url, type: data.type === 'm3u8' ? 'application/x-mpegurl' : 'video/mp4' });
+        }
+      })
+      .catch(err => console.warn('Failed to extract video url:', err));
+
+  }, [activeServer]);
 
   // Auto-hide controls logic (2.5 seconds timeout)
   const resetControlsTimeout = () => {
@@ -286,8 +319,8 @@ export default function AnimePlayerView({
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-black text-amber-500 gap-4" dir="rtl">
-        <Loader2 className="animate-spin w-12 h-12 text-amber-500" />
-        <p className="text-sm font-bold text-zinc-400">جاري تجهيز مشغل أنمي سينمائي...</p>
+        <Loader2 className="w-10 h-10 animate-spin text-red-500" />
+        <p className="text-white font-bold text-base">جاري تجهيز مشغل أنمي سينمائي...</p>
       </div>
     );
   }
@@ -316,16 +349,29 @@ export default function AnimePlayerView({
             } : {}}
             onClick={toggleControls}
           >
-            <iframe
-              ref={iframeRef}
-              src={activeServer.url || undefined}
-              title={`${anime.title} Episode ${episodeNumber}`}
-              className="w-full h-full object-contain pointer-events-auto"
-              allowFullScreen
-              referrerPolicy="no-referrer"
-              scrolling="no"
-              sandbox="allow-scripts allow-same-origin allow-presentation allow-forms"
-            />
+            {directVideoUrl ? (
+              <div className="w-full h-full z-10 relative">
+                <ArtPlayer
+                  key={directVideoUrl.url}
+                  url={directVideoUrl.url}
+                  title={`${anime.title} - الحلقة ${episodeNumber}`}
+                  poster={anime.coverUrl}
+                  currentTime={initialStoppedSeconds || 0}
+                  onTimeUpdate={handleStoppedSecondsChange}
+                />
+              </div>
+            ) : (
+              <iframe
+                ref={iframeRef}
+                src={activeServer.url || undefined}
+                title={`${anime.title} Episode ${episodeNumber}`}
+                className="w-full h-full object-contain pointer-events-auto z-10"
+                allowFullScreen
+                referrerPolicy="no-referrer"
+                scrolling="no"
+                sandbox="allow-scripts allow-same-origin allow-presentation allow-forms"
+              />
+            )}
 
             {/* Screen Lock Overlay Badge when Locked */}
             {isLocked && (
@@ -474,28 +520,30 @@ export default function AnimePlayerView({
             </div>
 
             {/* --- BOTTOM BAR (PROGRESS & ACTION CONTROLS) --- */}
-            <div className="space-y-3 pointer-events-auto">
-              {/* Progress Scrubber */}
-              <div className="space-y-1 bg-zinc-950/80 backdrop-blur-md p-3 rounded-2xl border border-zinc-800/80">
-                <div className="flex items-center justify-between text-xs font-bold text-zinc-400">
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-3.5 h-3.5 text-amber-500" />
-                    <span>موضع المشاهدة المحفوظ: <strong className="text-amber-400 font-black">{formatTime(stoppedSeconds)}</strong></span>
+            <div className={`space-y-3 pointer-events-auto ${directVideoUrl ? 'pb-14' : ''}`}>
+              {/* Progress Scrubber (Only show if iframe is used, as Vidstack provides its own) */}
+              {!directVideoUrl && (
+                <div className="space-y-1 bg-zinc-950/80 backdrop-blur-md p-3 rounded-2xl border border-zinc-800/80">
+                  <div className="flex items-center justify-between text-xs font-bold text-zinc-400">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-3.5 h-3.5 text-amber-500" />
+                      <span>موضع المشاهدة المحفوظ: <strong className="text-amber-400 font-black">{formatTime(stoppedSeconds)}</strong></span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-zinc-500 text-[10px] sm:text-xs font-bold">تسجيل وقت التوقف:</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-zinc-500 text-[10px] sm:text-xs font-bold">تسجيل وقت التوقف:</span>
-                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="3600"
+                    step="5"
+                    value={stoppedSeconds}
+                    onChange={(e) => handleStoppedSecondsChange(parseInt(e.target.value))}
+                    className="w-full h-2 bg-zinc-800 hover:h-3 accent-amber-500 rounded-lg appearance-none cursor-pointer transition-all"
+                  />
                 </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="3600"
-                  step="5"
-                  value={stoppedSeconds}
-                  onChange={(e) => handleStoppedSecondsChange(parseInt(e.target.value))}
-                  className="w-full h-2 bg-zinc-800 hover:h-3 accent-amber-500 rounded-lg appearance-none cursor-pointer transition-all"
-                />
-              </div>
+              )}
 
               {/* Bottom Control Buttons */}
               <div className="flex items-center justify-between gap-2 pt-1">

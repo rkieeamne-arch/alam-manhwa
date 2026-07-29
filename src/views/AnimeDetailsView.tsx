@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { fetchAnimeDetails, Anime } from '../utils/animeScraper';
-import { Loader2, ArrowRight, Play, Calendar, Star, Tag, Award, Film, MessageSquare, ChevronLeft, ArrowUpDown } from 'lucide-react';
-import { motion } from 'motion/react';
+import { Loader2, ArrowRight, Play, Calendar, Star, Tag, Award, Film, MessageSquare, ChevronLeft, ArrowUpDown, Layers, Tv, Sparkles, X, Search } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import AddToListPicker from '../components/AddToListPicker';
 import { UserProfile, ReadingListItem, Manhua } from '../types';
 
@@ -16,6 +16,7 @@ interface AnimeDetailsViewProps {
   onAddToList: (manhua: Manhua, type: 'favorite' | 'reading' | 'plan') => Promise<void>;
   onRemoveFromList: (manhuaId: string) => Promise<void>;
   onNavigate?: (view: any) => void;
+  onSelectAnimeUrl?: (url: string) => void;
 }
 
 function extractCleanUrl(raw: string | undefined | null): string {
@@ -42,11 +43,14 @@ export default function AnimeDetailsView({
   readingList,
   onAddToList,
   onRemoveFromList,
-  onNavigate
+  onNavigate,
+  onSelectAnimeUrl
 }: AnimeDetailsViewProps) {
   const [anime, setAnimeState] = useState<Anime | null>(null);
   const [loading, setLoading] = useState(true);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [showSeasonsModal, setShowSeasonsModal] = useState(false);
+  const [seasonsSearch, setSeasonsSearch] = useState('');
 
   useEffect(() => {
     let isMounted = true;
@@ -154,20 +158,21 @@ export default function AnimeDetailsView({
 
   if (loading) {
     return (
-      <div className="flex flex-col justify-center items-center h-[70vh] gap-4" dir="rtl">
-        <Loader2 className="animate-spin w-12 h-12 text-amber-500" />
-        <p className="text-zinc-400 text-sm font-semibold animate-pulse">جاري تحميل تفاصيل الأنمي...</p>
+      <div className="flex flex-col justify-center items-center h-[70vh] gap-3" dir="rtl">
+        <Loader2 className="w-10 h-10 text-red-500 animate-spin" />
+        <p className="text-zinc-400 font-bold text-sm">جاري تحميل تفاصيل الأنمي...</p>
       </div>
     );
   }
 
   if (!anime) {
     return (
-      <div className="flex flex-col justify-center items-center h-[60vh] gap-4 p-6 text-center" dir="rtl">
-        <div className="text-red-500 text-5xl">⚠️</div>
-        <h2 className="text-white text-lg font-black">تعذر تحميل تفاصيل الأنمي</h2>
-        <p className="text-zinc-500 text-xs max-w-xs">قد يكون الرابط غير متوفر حالياً أو هناك مشكلة في المصدر.</p>
-        <button onClick={onBack} className="mt-2 px-6 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-bold rounded-xl border border-zinc-800 cursor-pointer transition-all flex items-center gap-2">
+      <div className="flex flex-col justify-center items-center h-[60vh] gap-4 p-6 text-center max-w-md mx-auto" dir="rtl">
+        <div className="p-4 bg-red-950/40 border border-red-800/50 rounded-2xl text-center space-y-1 w-full">
+          <p className="text-red-400 font-bold text-base">تعذر تحميل تفاصيل الأنمي</p>
+          <p className="text-zinc-400 text-xs">قد يكون الرابط غير متوفر حالياً أو هناك مشكلة في المصدر.</p>
+        </div>
+        <button onClick={onBack} className="mt-2 px-6 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-bold rounded-xl border border-zinc-800 cursor-pointer transition-all flex items-center gap-2 shadow-lg">
           <ArrowRight className="w-4 h-4" />
           <span>العودة للرئيسية</span>
         </button>
@@ -273,21 +278,33 @@ export default function AnimeDetailsView({
               ))}
             </div>
 
-            {/* List picker row */}
-            {animeAsManhua && (
-              <div className="flex items-center gap-2.5 bg-zinc-950/40 border border-zinc-850/50 rounded-2xl px-4 py-2 w-fit">
-                <AddToListPicker
-                  user={user}
-                  manhua={animeAsManhua}
-                  readingList={readingList}
-                  onAddToList={onAddToList}
-                  onRemoveFromList={onRemoveFromList}
-                  onNavigate={onNavigate}
-                  className="w-8 h-8"
-                />
-                <span className="text-xs font-bold text-zinc-300 pr-1 select-none">حفظ هذا الأنمي في قائمتك الشخصية ✨</span>
-              </div>
-            )}
+            {/* Action Buttons Row */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              {animeAsManhua && (
+                <div className="flex items-center gap-2.5 bg-zinc-950/40 border border-zinc-850/50 rounded-2xl px-4 py-2">
+                  <AddToListPicker
+                    user={user}
+                    manhua={animeAsManhua}
+                    readingList={readingList}
+                    onAddToList={onAddToList}
+                    onRemoveFromList={onRemoveFromList}
+                    onNavigate={onNavigate}
+                    className="w-8 h-8"
+                  />
+                  <span className="text-xs font-bold text-zinc-300 pr-1 select-none">حفظ في القائمة</span>
+                </div>
+              )}
+
+              {anime.relatedSeasons && anime.relatedSeasons.length > 0 && (
+                <button
+                  onClick={() => setShowSeasonsModal(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500/15 via-amber-500/20 to-orange-500/15 hover:from-amber-500/25 hover:to-orange-500/25 border border-amber-500/35 hover:border-amber-500/60 text-amber-400 hover:text-amber-300 rounded-2xl text-xs font-black transition-all cursor-pointer shadow-md active:scale-95 group"
+                >
+                  <Layers className="w-4 h-4 text-amber-500 group-hover:rotate-12 transition-transform" />
+                  <span>المواسم والأجزاء ({anime.relatedSeasons.length})</span>
+                </button>
+              )}
+            </div>
 
             {/* Description/Synopsis in beautiful structured box */}
             <div className="space-y-3">
@@ -356,6 +373,100 @@ export default function AnimeDetailsView({
         </div>
 
       </div>
+
+      {/* Related Seasons Popover Modal */}
+      <AnimatePresence>
+        {showSeasonsModal && anime.relatedSeasons && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md" dir="rtl">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="bg-zinc-950 border border-zinc-800 rounded-3xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden"
+            >
+              {/* Header */}
+              <div className="p-4 sm:p-5 border-b border-zinc-850 flex items-center justify-between bg-zinc-900/50">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-amber-500/10 rounded-xl text-amber-500 border border-amber-500/20">
+                    <Layers className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-white font-display">
+                      مواسم وأجزاء أنمي {anime.title}
+                    </h3>
+                    <p className="text-xs text-zinc-400 font-medium">
+                      تم العثور على {anime.relatedSeasons.length} عمل متعلق مباشرة بالأنمي
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowSeasonsModal(false)}
+                  className="p-2 text-zinc-400 hover:text-white bg-zinc-900 hover:bg-zinc-800 rounded-xl border border-zinc-850 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Search input if more than 4 items */}
+              {anime.relatedSeasons.length > 4 && (
+                <div className="p-3.5 border-b border-zinc-850 bg-zinc-900/30">
+                  <div className="relative">
+                    <Search className="w-4 h-4 text-zinc-500 absolute right-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="تصفية المواسم والأجزاء..."
+                      value={seasonsSearch}
+                      onChange={(e) => setSeasonsSearch(e.target.value)}
+                      className="w-full pl-4 pr-9 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500 transition-colors"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Seasons Grid */}
+              <div className="p-4 sm:p-5 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-3 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent flex-1">
+                {anime.relatedSeasons
+                  .filter(s => !seasonsSearch || s.title.toLowerCase().includes(seasonsSearch.toLowerCase()))
+                  .map((season) => (
+                    <button
+                      key={season.id}
+                      onClick={() => {
+                        setShowSeasonsModal(false);
+                        if (onSelectAnimeUrl && season.url) {
+                          onSelectAnimeUrl(season.url);
+                        }
+                      }}
+                      className="group relative p-3 bg-zinc-900/70 hover:bg-amber-500/10 border border-zinc-850 hover:border-amber-500/50 rounded-2xl transition-all flex items-center gap-3.5 text-right cursor-pointer shadow-md active:scale-[0.98] overflow-hidden"
+                    >
+                      {season.coverUrl ? (
+                        <img
+                          src={season.coverUrl}
+                          alt={season.title}
+                          className="w-12 h-16 rounded-xl object-cover shrink-0 border border-zinc-800 group-hover:scale-105 transition-transform"
+                          referrerPolicy="no-referrer"
+                          onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                        />
+                      ) : (
+                        <div className="w-12 h-16 rounded-xl bg-zinc-950 border border-zinc-800 flex items-center justify-center shrink-0 text-amber-500">
+                          <Tv className="w-5 h-5" />
+                        </div>
+                      )}
+
+                      <div className="flex-1 min-w-0 space-y-1.5">
+                        <span className="inline-block px-2 py-0.5 text-[10px] font-extrabold rounded-md bg-zinc-950 text-amber-400 border border-zinc-800">
+                          {season.type || 'موسم'}
+                        </span>
+                        <p className="text-xs font-bold text-zinc-100 group-hover:text-amber-400 line-clamp-2 leading-snug transition-colors">
+                          {season.title}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

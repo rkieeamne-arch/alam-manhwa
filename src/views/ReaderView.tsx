@@ -6,6 +6,8 @@ import {
 import { Manhua, Chapter, ReaderSettings, ManhuaComment, ReadingHistoryItem, ScraperSource } from '../types';
 import { mockComments } from '../data';
 import { scrapeChapterPages } from '../utils/scraper';
+import ChapterPreloader from '../components/ChapterPreloader';
+import { getProxiedUrl } from '../sources/fetch';
 
 interface ReaderViewProps {
   manhua: Manhua;
@@ -64,11 +66,13 @@ export default function ReaderView({
   const [extraChapters, setExtraChapters] = useState<ExtraChapterItem[]>([]);
   const [loadingNextChapter, setLoadingNextChapter] = useState(false);
   const [activeChapter, setActiveChapter] = useState<Chapter>(chapter);
+  const [forceShowPages, setForceShowPages] = useState(false);
 
   // Sync activeChapter when root chapter prop changes
   useEffect(() => {
     setActiveChapter(chapter);
     setExtraChapters([]);
+    setForceShowPages(false);
   }, [chapter.id]);
 
   const isScrapedChapter = chapter.id.startsWith('ch-');
@@ -141,7 +145,12 @@ export default function ReaderView({
       const BATCH_SIZE = 5;
 
       const getSrc = (pageItem: any): string => {
-        if (typeof pageItem === 'string') return pageItem;
+        if (typeof pageItem === 'string') {
+          if ((pageItem.startsWith('http://') || pageItem.startsWith('https://')) && !pageItem.includes('/api/forward')) {
+            return getProxiedUrl(pageItem);
+          }
+          return pageItem;
+        }
         if (pageItem instanceof Blob) return URL.createObjectURL(pageItem);
         return '';
       };
@@ -579,10 +588,14 @@ export default function ReaderView({
 
   const resolvePageUrl = (pageUrl: string | Blob) => {
     if (typeof pageUrl !== 'string') return URL.createObjectURL(pageUrl as Blob);
-    if (readerSettings.enhanceImages && pageUrl.includes('/api/forward')) {
-       return `${pageUrl}&enhance=1`;
+    let resolved = pageUrl;
+    if ((resolved.startsWith('http://') || resolved.startsWith('https://')) && !resolved.includes('/api/forward')) {
+      resolved = getProxiedUrl(resolved);
     }
-    return pageUrl;
+    if (readerSettings.enhanceImages && resolved.includes('/api/forward') && !resolved.includes('enhance=')) {
+       return `${resolved}&enhance=1`;
+    }
+    return resolved;
   };
 
   return (
@@ -702,24 +715,22 @@ export default function ReaderView({
         id="comic-stage"
       >
         {loadingPages && (
-          <div className="py-24 text-center space-y-4 max-w-sm mx-auto px-4" id="reader-pages-loading">
-            <Loader2 className="w-10 h-10 text-red-500 animate-spin mx-auto" />
-            <h4 className="text-sm font-bold text-zinc-300">جاري تحميل صور صفحات الفصل مباشرة...</h4>
-            <p className="text-xs text-zinc-500">
-              نقوم الآن بجلب الروابط وفك حظر السيرفرات لتجربة تصفح سريعة وخالية من الإعلانات.
-            </p>
+          <div className="w-full py-8 flex justify-center" id="reader-pages-loading">
+            <ChapterPreloader 
+              current={0} 
+              total={1} 
+              message="جاري جلب صور صفحات الفصل مباشرة..." 
+              chapterTitle={chapter.title || `الفصل ${chapter.chapterNumber}`} 
+            />
           </div>
         )}
 
         {pagesError && (
-          <div className="py-20 text-center space-y-4 max-w-md mx-auto px-4" id="reader-pages-error">
-            <div className="w-12 h-12 bg-red-950/20 text-red-500 border border-red-900/30 rounded-full flex items-center justify-center mx-auto">
-              <RefreshCw className="w-6 h-6 animate-spin" style={{ animationDuration: '4s' }} />
+          <div className="py-20 flex flex-col items-center justify-center space-y-4 max-w-md mx-auto px-4" id="reader-pages-error">
+            <div className="p-4 bg-red-950/40 border border-red-800/50 rounded-2xl text-center space-y-2">
+              <p className="text-red-400 font-bold text-base">فشل تحميل صور الفصل</p>
+              <p className="text-zinc-400 text-xs">{pagesError}</p>
             </div>
-            <h4 className="text-sm font-bold text-zinc-200">فشل تحميل صور الفصل</h4>
-            <p className="text-xs text-zinc-400">
-              {pagesError}
-            </p>
             <button
               onClick={() => {
                 setLoadingPages(true);
@@ -737,15 +748,29 @@ export default function ReaderView({
                   setLoadingPages(false);
                 }
               }}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
+              className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-lg flex items-center gap-2 cursor-pointer"
             >
+              <RefreshCw className="w-4 h-4" />
               إعادة محاولة جلب الصور
             </button>
           </div>
         )}
 
-        {/* MAIN CONTENT AREA */}
-        {!loadingPages && !pagesError && (
+        {/* PRELOADING BANNER AT TOP */}
+        {!loadingPages && !pagesError && preloadProgress.total > 0 && preloadProgress.current < preloadProgress.total && !isAnime && (
+          <div className="w-full py-4 flex justify-center" id="reader-preloading-banner">
+            <ChapterPreloader
+              current={preloadProgress.current}
+              total={preloadProgress.total}
+              message={`جاري التحميل المسبق للفصل ${chapter.chapterNumber}...`}
+              chapterTitle={chapter.title || `الفصل ${chapter.chapterNumber}`}
+              onSkip={() => setForceShowPages(true)}
+            />
+          </div>
+        )}
+
+        {/* MAIN CONTENT AREA (Render pages directly) */}
+        {!loadingPages && !pagesError && displayPages.length > 0 && (
           <>
             {preloadProgress.current < preloadProgress.total && !isAnime && (
               <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-zinc-900/90 border border-zinc-800 backdrop-blur-sm text-xs text-zinc-400 px-4 py-2 rounded-full flex items-center gap-3 z-40 shadow-xl">
@@ -787,19 +812,22 @@ export default function ReaderView({
                     </div>
 
                     {extItem.loading && (
-                      <div className="py-16 text-center space-y-3 max-w-md mx-auto">
-                        <Loader2 className="w-8 h-8 text-red-500 animate-spin mx-auto" />
-                        <p className="text-xs font-bold text-zinc-300">جاري تحميل صور الفصل {extItem.chapter.chapterNumber}...</p>
+                      <div className="py-12 flex justify-center">
+                        <ChapterPreloader isCompact current={0} total={1} message={`جاري تحميل الفصل ${extItem.chapter.chapterNumber}...`} />
                       </div>
                     )}
 
                     {extItem.error && (
-                      <div className="py-12 text-center space-y-3 max-w-md mx-auto px-4 bg-red-950/20 border border-red-900/30 rounded-2xl">
-                        <p className="text-xs text-red-400 font-bold">{extItem.error}</p>
+                      <div className="py-12 flex flex-col items-center justify-center space-y-4 max-w-md mx-auto px-4">
+                        <div className="p-4 bg-red-950/40 border border-red-800/50 rounded-2xl text-center space-y-1">
+                          <p className="text-red-400 font-bold text-sm">فشل التحميل</p>
+                          <p className="text-zinc-400 text-xs">{extItem.error}</p>
+                        </div>
                         <button
                           onClick={loadNextContinuousChapter}
-                          className="px-4 py-2 bg-red-600 text-white rounded-lg text-xs font-bold hover:bg-red-700 transition-colors cursor-pointer"
+                          className="px-6 py-2.5 bg-red-600 text-white rounded-xl text-xs font-bold hover:bg-red-700 transition-colors shadow-lg cursor-pointer flex items-center gap-2"
                         >
+                          <RefreshCw className="w-4 h-4" />
                           إعادة تجربة تحميل الفصل
                         </button>
                       </div>

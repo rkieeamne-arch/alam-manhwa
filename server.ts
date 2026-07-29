@@ -7,7 +7,6 @@ import { createServer as createViteServer } from 'vite';
 import { mockManhuas } from './src/data';
 import { scrapePopularList, scrapeMangaDetails, scrapeMangaChapters, scrapeChapterPages } from './src/utils/scraper';
 import { sources } from './src/sources';
-
 // Caching for dynamic sitemap generator
 let sitemapSlugsCache: string[] = [];
 let lastSitemapFetchTime = 0;
@@ -95,6 +94,64 @@ async function startServer() {
     res.json({ success: true });
   });
 
+  // Support Ticket route
+  app.post('/api/support/ticket', async (req, res) => {
+    const { name, email, type, subject, message, imageBase64, imageName } = req.body;
+
+    if (!name || !email || !subject) {
+      return res.status(400).json({ error: 'الرجاء تعبئة جميع الحقول المطلوبة (الاسم، البريد الإلكتروني، والموضوع).' });
+    }
+
+    try {
+      const typeLabel = type === 'complaint' ? 'شكوى ⚠️' : type === 'suggestion' ? 'اقتراح 💡' : 'سؤال ❓';
+      
+      // Construct email body content
+      let emailMessage = `الاسم الكامل: ${name}\n` +
+                         `البريد الإلكتروني للارسال: ${email}\n` +
+                         `نوع التذكرة: ${typeLabel}\n\n` +
+                         `الموضوع والتفاصيل:\n-------------------------\n${subject}\n-------------------------\n`;
+                         
+      if (imageBase64) {
+        emailMessage += `\n[ملاحظة: تم إرفاق صورة مع التذكرة باسم "${imageName || 'صورة_توضيحية.png'}"]\n`;
+      }
+
+      const formSubmitData: any = {
+        _subject: `[تذكرة دعم - عالم المانهو] ${typeLabel}: ${subject.slice(0, 40)}`,
+        name: name,
+        email: email,
+        message: emailMessage,
+        _honey: "" // Spam protection honeypot field
+      };
+
+      // Add attached base64 image if exists and valid size
+      if (imageBase64) {
+        formSubmitData.attachment = imageBase64;
+      }
+
+      // Call FormSubmit API securely from the server
+      const response = await fetch('https://formsubmit.co/ajax/rkieeamne@gmail.com', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(formSubmitData)
+      });
+
+      if (response.ok) {
+        return res.json({ success: true, message: 'تم إرسال التذكرة بنجاح!' });
+      } else {
+        const errorText = await response.text();
+        console.error('[Support API] FormSubmit error:', errorText);
+        // Fallback or retry or report error
+        return res.status(500).json({ error: 'حدث خطأ أثناء معالجة الطلب على السيرفر الخارجي.' });
+      }
+    } catch (err: any) {
+      console.error('[Support API] Exception:', err);
+      return res.status(500).json({ error: `فشل الاتصال بسيرفر الإرسال: ${err.message}` });
+    }
+  });
+
   // API routes
   app.get('/api/home', async (req, res) => {
     try {
@@ -154,6 +211,43 @@ async function startServer() {
     }
   });
 
+  app.get('/api/extract-video', async (req, res) => {
+    const url = req.query.url as string;
+    if (!url) return res.status(400).json({ error: 'url required' });
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Referer': url
+        }
+      });
+      const text = await response.text();
+      
+      // Try to find m3u8 or mp4 in the source
+      const m3u8Match = text.match(/(https?:\/\/[^\s"'<>]+\.m3u8[^\s"'<>]*)/i);
+      if (m3u8Match && m3u8Match[1]) {
+        return res.json({ url: m3u8Match[1], type: 'm3u8' });
+      }
+
+      const mp4Match = text.match(/(https?:\/\/[^\s"'<>]+\.mp4[^\s"'<>]*)/i);
+      if (mp4Match && mp4Match[1]) {
+        return res.json({ url: mp4Match[1], type: 'mp4' });
+      }
+
+      // Sometimes base64 encoded urls are inside scripts
+      // Check for common jwplayer file: "..." structures
+      const jwMatch = text.match(/file\s*:\s*["'](https?:\/\/[^"']+)["']/i);
+      if (jwMatch && jwMatch[1]) {
+        return res.json({ url: jwMatch[1], type: jwMatch[1].includes('.m3u8') ? 'm3u8' : 'video/mp4' });
+      }
+      
+      res.json({ url: null });
+    } catch (err) {
+      console.warn('[Server] /api/extract-video failed:', err);
+      res.json({ url: null });
+    }
+  });
+
   // CORS-bypassing proxy for dynamic scraper sources (supports GET, POST, etc.)
   app.all('/api/forward', async (req, res) => {
     let targetUrl = req.query.url as string;
@@ -161,18 +255,41 @@ async function startServer() {
       return res.status(400).json({ error: 'URL is required' });
     }
 
-    // Reconstruct targetUrl if other query parameters were passed to the proxy directly
+    // Unwrap nested proxy URLs if passed accidentally
+    while (targetUrl && (targetUrl.includes('/api/forward?url=') || targetUrl.includes('/api/forward%3Furl%3D'))) {
+      try {
+        const decoded = decodeURIComponent(targetUrl);
+        const match = decoded.match(/\/api\/forward\?url=(.+)$/);
+        if (match && match[1]) {
+          targetUrl = match[1];
+        } else {
+          break;
+        }
+      } catch {
+        break;
+      }
+    }
+
+    if (targetUrl.startsWith('//')) {
+      targetUrl = 'https:' + targetUrl;
+    }
+
+    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+      return res.status(400).json({ error: 'الرابط المطلوب يجب أن يبدأ بـ http:// أو https://' });
+    }
+
+    // Reconstruct targetUrl if other query parameters were passed to the proxy directly (excluding proxy controls)
     try {
       const urlObj = new URL(targetUrl);
       Object.keys(req.query).forEach((key) => {
-        if (key !== 'url') {
+        if (key !== 'url' && key !== 'enhance') {
           urlObj.searchParams.set(key, req.query[key] as string);
         }
       });
       targetUrl = urlObj.toString();
-    } catch (e) {
+    } catch {
       const extraParams = Object.keys(req.query)
-        .filter((key) => key !== 'url')
+        .filter((key) => key !== 'url' && key !== 'enhance')
         .map((key) => `${encodeURIComponent(key)}=${encodeURIComponent(req.query[key] as string)}`)
         .join('&');
       if (extraParams) {
@@ -186,14 +303,14 @@ async function startServer() {
       const parsedUrl = new URL(targetUrl);
       
       // Dynamically select a Referer that bypasses anti-hotlinking
-      let referer = parsedUrl.origin;
+      let referer = parsedUrl.origin + '/';
       if (targetUrl.includes('azorafly.com')) {
         referer = 'https://azorafly.com/';
       } else if (targetUrl.includes('olympustaff.com')) {
         referer = 'https://olympustaff.com/';
       }
 
-      const isImage = targetUrl.match(/\.(jpeg|jpg|gif|png|webp|avif)$/i) != null;
+      const isImage = targetUrl.match(/\.(jpeg|jpg|gif|png|webp|avif)($|\?)/i) != null;
 
       // Real-world modern desktop User-Agents to bypass simple agent blocking
       const USER_AGENTS = [
@@ -213,18 +330,23 @@ async function startServer() {
 
       const headers: Record<string, string> = {
         'User-Agent': userAgent,
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'Accept': isImage 
+          ? 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
+          : 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'ar,en-US;q=0.9,en;q=0.8',
-        'Referer': isImage ? referer : 'https://www.google.com/', 
+        'Referer': referer, 
         'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
         'Sec-Ch-Ua-Mobile': '?0',
         'Sec-Ch-Ua-Platform': '"Windows"',
         'Sec-Fetch-Dest': isImage ? 'image' : 'document',
         'Sec-Fetch-Mode': isImage ? 'no-cors' : 'navigate',
-        'Sec-Fetch-Site': 'cross-site',
-        'Sec-Fetch-User': '?1',
-        'Upgrade-Insecure-Requests': '1'
+        'Sec-Fetch-Site': isImage ? 'cross-site' : 'same-origin',
       };
+
+      if (!isImage && req.method === 'GET') {
+        headers['Sec-Fetch-User'] = '?1';
+        headers['Upgrade-Insecure-Requests'] = '1';
+      }
 
       if (req.headers['x-proxy-cookie']) {
         headers['Cookie'] = req.headers['x-proxy-cookie'] as string;

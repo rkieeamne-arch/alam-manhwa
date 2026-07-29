@@ -62,7 +62,7 @@ export default function ManhuaDetailsView({
   };
 
   const currentSource = resolveSource(displayManhua);
-  const isAnime = currentSource?.type === 'anime' || manhua.id.includes('witanime');
+  const isAnime = currentSource?.type === 'anime' || manhua.id.includes('witanime') || manhua.id.includes('animerco') || manhua.id.includes('anime4up') || manhua.sourceId === 'animerco' || manhua.sourceId === 'anime4up' || manhua.sourceId === 'witanime';
   
   const contentTypeName = isAnime ? 'أنمي' : 'مانهو';
   const actionName = isAnime ? 'مشاهدة' : 'قراءة';
@@ -436,29 +436,25 @@ export default function ManhuaDetailsView({
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto py-24 text-center space-y-4 animate-fade-in" id="details-loader">
-        <Loader2 className="w-12 h-12 text-red-500 animate-spin mx-auto" />
-        <h3 className="text-sm font-black text-zinc-300">جاري تحميل فصول</h3>
+      <div className="py-24 flex flex-col items-center justify-center space-y-3" id="details-loader">
+        <Loader2 className="w-10 h-10 text-red-500 animate-spin" />
+        <p className="text-zinc-400 font-bold text-sm">جاري تحميل التفاصيل والفصول...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="max-w-xl mx-auto py-16 text-center space-y-6 animate-fade-in" id="details-error-container">
-        <div className="w-16 h-16 bg-red-950/30 border border-red-500/30 rounded-full flex items-center justify-center mx-auto text-red-500">
-          <RefreshCw className="w-8 h-8" />
+      <div className="py-16 flex flex-col items-center justify-center text-center space-y-4 max-w-md mx-auto" id="details-error-container">
+        <div className="p-4 bg-red-950/40 border border-red-800/50 rounded-2xl text-center space-y-1 w-full">
+          <p className="text-red-400 font-bold text-base">فشل تحديث البيانات ديناميكياً</p>
+          <p className="text-zinc-400 text-xs">{error}</p>
         </div>
-        <div className="space-y-2">
-          <h2 className="text-base font-black text-zinc-200">فشل تحديث البيانات ديناميكياً</h2>
-          <p className="text-xs text-zinc-400 leading-relaxed max-w-md mx-auto">
-            {error}
-          </p>
-        </div>
+        
         <div className="flex flex-wrap justify-center gap-3">
           <button
             onClick={onBack}
-            className="px-5 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 rounded-xl text-xs font-bold cursor-pointer transition-all"
+            className="px-6 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-lg"
           >
             الرجوع للرئيسية
           </button>
@@ -466,7 +462,7 @@ export default function ManhuaDetailsView({
           {onSearch && (
             <button
               onClick={() => onSearch(manhua.title)}
-              className="px-5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-amber-400 hover:text-amber-300 border border-zinc-700 rounded-xl text-xs font-bold cursor-pointer transition-all"
+              className="px-6 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-amber-400 hover:text-amber-300 border border-zinc-700 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-lg flex items-center gap-2"
             >
               البحث في مصادر أخرى 🔍
             </button>
@@ -715,8 +711,8 @@ export default function ManhuaDetailsView({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
             {[...displayManhua.chapters]
               .sort((a, b) => {
-                 const extractedA = extractNumber(a.name);
-                 const extractedB = extractNumber(b.name);
+                 const extractedA = extractNumber(a.title);
+                 const extractedB = extractNumber(b.title);
                  const numA = extractedA !== null ? extractedA : (displayManhua.chapters.length - displayManhua.chapters.indexOf(a));
                  const numB = extractedB !== null ? extractedB : (displayManhua.chapters.length - displayManhua.chapters.indexOf(b));
                  return sortOrder === 'asc' ? numA - numB : numB - numA;

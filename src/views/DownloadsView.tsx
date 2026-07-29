@@ -298,15 +298,17 @@ export default function DownloadsView({
           })}
         </div>
       ) : (
-        <div className="bg-zinc-900/10 border border-dashed border-zinc-800 rounded-2xl py-20 text-center space-y-4">
-          <WifiOff className="w-14 h-14 mx-auto text-zinc-800 stroke-1" />
-          <h3 className="text-sm font-bold text-zinc-300">لم تقم بتحميل أي فصول بعد!</h3>
-          <p className="text-xs text-zinc-500 max-w-sm mx-auto">
+        <div className="py-20 flex flex-col items-center justify-center text-center space-y-4 max-w-md mx-auto">
+          <div className="w-16 h-16 rounded-3xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-red-500 shadow-xl">
+            <FolderDown className="w-8 h-8 opacity-80" />
+          </div>
+          <h3 className="text-lg font-bold text-white">لم تقم بتحميل أي فصول بعد!</h3>
+          <p className="text-zinc-400 text-xs sm:text-sm leading-relaxed">
             انقر على زر التحميل المتواجد بجانب الفصول في واجهة المانهو لحفظها وقراءتها في أي وقت دون اتصال بالإنترنت.
           </p>
           <button
             onClick={() => onNavigate('home')}
-            className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer"
+            className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-lg flex items-center gap-2"
           >
             الذهاب لتصفح المانهو المتوفرة
           </button>

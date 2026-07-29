@@ -39,8 +39,10 @@ export default function BypassModal({ isOpen, onClose }: BypassModalProps) {
       return;
     }
 
-    localStorage.setItem('manhua_bypass_cookie', cookie.trim());
-    localStorage.setItem('manhua_bypass_user_agent', userAgent.trim() || navigator.userAgent);
+    const safeCookie = cookie.replace(/[^\x20-\x7E]/g, '').trim();
+    const safeUA = userAgent.replace(/[^\x20-\x7E]/g, '').trim();
+    localStorage.setItem('manhua_bypass_cookie', safeCookie);
+    localStorage.setItem('manhua_bypass_user_agent', safeUA || navigator.userAgent);
     setIsActive(true);
     setTestResult(null);
     
@@ -62,16 +64,18 @@ export default function BypassModal({ isOpen, onClose }: BypassModalProps) {
     setIsTesting(true);
     setTestResult(null);
     try {
-      // Temp save to localStorage so the proxiedFetch uses it
-      localStorage.setItem('manhua_bypass_cookie', cookie.trim());
-      localStorage.setItem('manhua_bypass_user_agent', userAgent.trim() || navigator.userAgent);
+      const safeCookie = cookie.replace(/[^\x20-\x7E]/g, '').trim();
+      const safeUA = userAgent.replace(/[^\x20-\x7E]/g, '').trim();
+      localStorage.setItem('manhua_bypass_cookie', safeCookie);
+      localStorage.setItem('manhua_bypass_user_agent', safeUA || navigator.userAgent);
 
       // We fetch Azora's home or a simple endpoint through our proxy
-      const testUrl = '/api/proxy?url=' + encodeURIComponent('https://azorafly.com/series?page=1');
+      const testUrl = '/api/forward?url=' + encodeURIComponent('https://azorafly.com/series?page=1');
+      
       const res = await fetch(testUrl, {
         headers: {
-          'X-Proxy-Cookie': cookie.trim(),
-          'X-Proxy-User-Agent': userAgent.trim() || navigator.userAgent
+          ...(safeCookie ? { 'X-Proxy-Cookie': safeCookie } : {}),
+          'X-Proxy-User-Agent': safeUA || navigator.userAgent
         }
       });
       

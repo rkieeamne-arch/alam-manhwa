@@ -8,9 +8,10 @@ import logoImg from '../assets/images/manhua_logo_1783758713519.jpg';
 
 interface HeaderProps {
   onOpenSettings: () => void;
+  onOpenCompanionModal?: () => void;
   user: UserProfile | null;
-  onNavigate: (view: 'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'mylists' | 'downloads') => void;
-  currentView: 'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'mylists' | 'downloads';
+  onNavigate: (view: 'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'mylists' | 'downloads' | 'anime-details' | 'anime-player') => void;
+  currentView: 'home' | 'manhua' | 'reader' | 'search' | 'account' | 'history' | 'mylists' | 'downloads' | 'anime-details' | 'anime-player';
   onSearch: (query: string) => void;
   homeLayout?: 'classic' | 'modern';
   appMode?: 'manga' | 'anime';
@@ -26,6 +27,7 @@ interface HeaderProps {
 
 export default function Header({
   onOpenSettings,
+  onOpenCompanionModal = () => {},
   user,
   onNavigate,
   currentView,
@@ -69,7 +71,7 @@ export default function Header({
           <div className="order-1 md:order-2 flex flex-col items-center justify-center gap-2 py-1">
             <div className="flex items-center justify-center gap-4 sm:gap-6 w-full max-w-md relative">
               
-              {/* Day Mode / Night Mode Toggle (X mark on the left) */}
+              {/* Day Mode / Night Mode Toggle */}
               <button
                 onClick={onToggleNightMode}
                 className={`p-2.5 rounded-full border transition-all hover:scale-110 active:scale-95 cursor-pointer flex items-center justify-center ${
@@ -85,6 +87,16 @@ export default function Header({
                 ) : (
                   <Moon className="w-4 h-4" />
                 )}
+              </button>
+
+              {/* Reading Companion Button */}
+              <button
+                onClick={onOpenCompanionModal}
+                className="p-2.5 rounded-full border transition-all hover:scale-110 active:scale-95 cursor-pointer flex items-center justify-center bg-zinc-900 border-zinc-800 text-amber-400 hover:text-amber-300 hover:border-amber-500/40"
+                title="رفيق القراءة (العناية والتطوير والمكافآت)"
+                id="header-companion-btn"
+              >
+                <Sparkles className="w-4 h-4 fill-amber-400/20" />
               </button>
 
               {/* Logo text & emblem */}
@@ -427,6 +439,15 @@ export default function Header({
           >
             <User className="w-3.5 h-3.5" />
             الحساب الشخصي
+          </button>
+
+          <button
+            onClick={onOpenCompanionModal}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all text-amber-400 hover:text-amber-300 hover:bg-zinc-900 border border-amber-500/20"
+            id="nav-companion-btn"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            رفيق القراءة
           </button>
 
         </nav>

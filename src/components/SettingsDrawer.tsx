@@ -9,6 +9,7 @@ import { UserProfile, ReadingHistoryItem, ReaderSettings } from '../types';
 interface SettingsDrawerProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenCompanionModal?: () => void;
   user: UserProfile | null;
   onLogin: (email: string, password: string) => Promise<any>;
   onSignup: (email: string, password: string) => Promise<any>;
@@ -34,6 +35,7 @@ const colorPresets = [
 export default function SettingsDrawer({
   isOpen,
   onClose,
+  onOpenCompanionModal = () => {},
   user,
   onLogin,
   onSignup,
@@ -295,6 +297,24 @@ export default function SettingsDrawer({
                       أفقي (يمين-يسار)
                     </button>
                   </div>
+                </div>
+
+                {/* Reading Companion Entry */}
+                <div 
+                  onClick={() => {
+                    onClose();
+                    onOpenCompanionModal && onOpenCompanionModal();
+                  }}
+                  className="flex items-center justify-between bg-zinc-950 p-3 rounded-lg border border-amber-500/30 hover:border-amber-500/60 transition-all cursor-pointer group"
+                >
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-amber-400" />
+                      رفيق القراءة الجانبي (التطوير والجوائز)
+                    </span>
+                    <span className="text-[10px] text-zinc-400">تفقيس البيضة، فتح الأزياء، العناية والجوائز التجميلية</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-amber-400 group-hover:translate-x-1 transition-transform" />
                 </div>
 
                 {/* Continuous Mode Toggle */}

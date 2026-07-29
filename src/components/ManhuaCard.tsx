@@ -25,7 +25,8 @@ export default function ManhuaCard({
   onNavigate
 }: ManhuaCardProps) {
   // Format views to look attractive (e.g., 1.2M or 520K)
-  const formatViews = (views: number) => {
+  const formatViews = (views: number | null | undefined) => {
+    if (views === null || views === undefined) return '0';
     if (views >= 1000000) {
       return (views / 1000000).toFixed(1) + ' مليون';
     }

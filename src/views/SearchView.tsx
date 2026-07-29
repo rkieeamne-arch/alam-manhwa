@@ -663,17 +663,17 @@ export default function SearchView({
           });
           return !group.loading && displayed.length === 0;
         }) && (
-          <div className="bg-zinc-900/10 border border-dashed border-zinc-800 rounded-2xl py-16 text-center space-y-3">
-            <Compass className="w-12 h-12 mx-auto text-zinc-700 stroke-1 animate-pulse" />
-            <h3 className="text-sm font-bold text-zinc-300">لم يتم العثور على أي نتائج مطابقة في أي مصدر!</h3>
-            <p className="text-xs text-zinc-500 max-w-md mx-auto">
-              تأكد من كتابة اسم {appMode === 'anime' ? 'الأنمي' : 'المانهو'} بشكل صحيح، أو جرب تصفح تصنيف آخر أو تصفية حالة {appMode === 'anime' ? 'عرض' : 'نشر'} مختلفة.
+          <div className="py-16 flex flex-col items-center justify-center text-center space-y-4 max-w-md mx-auto">
+            <p className="text-zinc-200 font-bold text-base">لم يتم العثور على أي نتائج مطابقة في أي مصدر!</p>
+            <p className="text-zinc-400 text-xs">
+              {`تأكد من كتابة اسم ${appMode === 'anime' ? 'الأنمي' : 'المانهو'} بشكل صحيح، أو جرب تصفح تصنيف آخر أو تصفية حالة ${appMode === 'anime' ? 'عرض' : 'نشر'} مختلفة.`}
             </p>
             <button
               onClick={resetFilters}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-all mt-2 active:scale-95"
+              className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-lg cursor-pointer flex items-center gap-2"
               id="reset-empty-btn"
             >
+              <RefreshCw className="w-4 h-4" />
               إعادة تعيين والبدء من جديد
             </button>
           </div>

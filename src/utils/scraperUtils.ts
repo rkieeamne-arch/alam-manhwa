@@ -66,42 +66,52 @@ export function extractNumber(title: string, fallback: number | null = null): nu
 export function cleanTitle(title: string): string {
   if (!title) return '';
   
+  let cleaned = title.trim();
+
   // Remove "RISTO" prefix
-  let cleaned = title.replace(/^RISTO\s*/i, '');
-  
-  // Comprehensive list of metadata terms that often get concatenated at the beginning or end of titles
-  const metadataTerms = [
-    'الحالةالنوعالفصولآخرتحديث', 'الحالةالنوعالفصولآخر\\s*تحديث', 'الحالةالنوعالفصول',
-    'الحالة', 'النوع', 'الفصول', 'آخر\\s*تحديث', 'آخر', 'تحديث',
-    'التصنيف', 'المؤلف', 'الرسام', 'القصة', 'الاسم', 'اسم',
-    'مانجا', 'مانهو', 'سلسلة', 'الفصل', 'الحلقة', 'مشاهدة',
-    'تحميل', 'شاهد', 'كامل', 'مترجم', 'مترجمة', 'اون\\s*لاين',
-    'مستمر', 'منتهي', 'متوقف', 'مكتمل', 'منتهية', 'مكتملة', 'العرض',
-    'rating', 'status', 'type', 'chapters', 'author', 'artist', 'genre'
+  cleaned = cleaned.replace(/^RISTO\s*/i, '');
+
+  // Remove site header metadata blocks like "الحالةالنوعالفصولآخرتحديث" if attached at the start
+  cleaned = cleaned.replace(/^(الحالةالنوعالفصولآخرتحديث|الحالةالنوعالفصول|الحالة\s*النوع\s*الفصول)\s*/gi, '');
+
+  // Split on common Arabic SEO suffixes / actions to only keep the actual title
+  // e.g. "انمي اسم مترجم اونلاين وتحميل ..." -> "انمي اسم"
+  const splitKeywords = [
+    'مترجم', 
+    'مترجمه', 
+    'مترجمة', 
+    'تحميل', 
+    'وتحميل', 
+    'مشاهدة', 
+    'اونلاين', 
+    'اون لاين', 
+    'بجودة', 
+    'باعلي', 
+    'بأعلى',
+    'كامل'
   ];
 
-  // We build a regex that matches any sequence of these words (including spaces, colons, vertical bars, hyphens, slashes, or brackets) at the start
-  const cleanPrefixRegex = new RegExp(`^(${metadataTerms.join('|')}|\\d+|[\\s|:./\\\\_\\-()!])+`, 'i');
-  cleaned = cleaned.replace(cleanPrefixRegex, '').trim();
+  for (const kw of splitKeywords) {
+    const idx = cleaned.indexOf(kw);
+    // If the keyword is found, and it's not at the very beginning of the string
+    if (idx > 3) {
+      cleaned = cleaned.substring(0, idx).trim();
+    }
+  }
 
-  // Remove duplicate concatenated texts
-  cleaned = cleaned.split('....')[0];
-  
-  // Clean prefix
-  cleaned = cleaned.replace(/^(مشاهدة\s*انمي|جميع\s*حلقات\s*انمي|جميع\s*حلقات|انمي\s*|تحميل\s*انمي|مسلسل\s*انمي)/gi, '');
-  
-  // Split by common suffixes
-  const parts = cleaned.split(/(?:الموسم|الحلقة|مترجم|مترجمة|مترجمه|كامل|اون\s?لاين|بجودة|جودة|شاهد)/i);
-  
-  cleaned = parts[0];
-  
-  // Clean prefixes/metadata again after splitting
-  cleaned = cleaned.replace(cleanPrefixRegex, '').trim();
-  
-  // Remove trailing non-alphanumeric/Arabic characters
-  cleaned = cleaned.replace(/[-,\s.:|]+$/g, '').trim();
-  
-  return cleaned || title;
+  // Remove site branding suffixes e.g. " | مانجاتك", " - ازورا مانجا", " | WitAnime"
+  cleaned = cleaned.replace(/\s*[\-\|•·]\s*(مانجاتك|أزورا|ازورا|روكس|انمي4اب|ويت انمي|Mangatuk|Azora|WitAnime|Anime4Up|3asq|مانجا|أنمي|انمي).*$/i, '');
+
+  // Remove common prefix noise like "مشاهدة انمي ", "جميع حلقات انمي "
+  cleaned = cleaned.replace(/^(مشاهدة\s*انمي|جميع\s*حلقات\s*انمي|جميع\s*حلقات|تحميل\s*انمي|مسلسل\s*انمي)\s+/gi, '');
+
+  // Remove trailing site/release descriptors at the end of title ONLY
+  cleaned = cleaned.replace(/\s+(مترجم|مترجمة|مترجمه|كامل|كاملة|اون\s?لاين|بجودة\s*عالية|جودة\s*عالية|شاهد\s*اونلاين)$/gi, '');
+
+  // Clean trailing punctuation / separators
+  cleaned = cleaned.replace(/[\s\-_:|./\\]+$/g, '').replace(/^[\s\-_:|./\\]+/g, '').trim();
+
+  return cleaned || title.trim();
 }
 
 /**
@@ -109,8 +119,8 @@ export function cleanTitle(title: string): string {
  */
 export function sortNumerically<T extends { chapterNumber?: number; episodeNumber?: number; title?: string; name?: string }>(items: T[]): T[] {
   return [...items].sort((a, b) => {
-    const numA = a.chapterNumber ?? a.episodeNumber ?? extractNumber(a.title || a.name || '');
-    const numB = b.chapterNumber ?? b.episodeNumber ?? extractNumber(b.title || b.name || '');
+    const numA = a.chapterNumber ?? a.episodeNumber ?? extractNumber(a.title || a.name || '') ?? 0;
+    const numB = b.chapterNumber ?? b.episodeNumber ?? extractNumber(b.title || b.name || '') ?? 0;
     return numA - numB;
   });
 }

@@ -16,6 +16,7 @@ export interface Manhua {
   title: string;
   englishTitle?: string;
   coverUrl: string;
+  rawCoverUrl?: string;
   bannerUrl?: string;
   description: string;
   rating: number; // out of 5
@@ -32,6 +33,7 @@ export interface Manhua {
   latestChapter?: string;
   sourceUrl?: string;
   sourceId?: string;
+  relatedSeasons?: any[];
 }
 
 export interface UserProfile {
@@ -154,5 +156,46 @@ export interface NotificationItem {
   chapterOrEp?: string | number;
   cover?: string;
   sourceUrl?: string;
+}
+
+export type CompanionType = 'wolf' | 'dragon' | 'fox' | 'spirit';
+export type CompanionStage = 'egg' | 'baby' | 'teen' | 'adult';
+export type CompanionMood = 'happy' | 'sleepy' | 'reading' | 'coffee' | 'sad' | 'excited';
+
+export interface CosmeticItem {
+  id: string;
+  name: string;
+  category: 'hat' | 'prop' | 'aura' | 'background';
+  icon: string;
+  description: string;
+  rarity: 'common' | 'rare' | 'epic' | 'legendary';
+  levelRequired?: number;
+}
+
+export interface CompanionState {
+  enabled: boolean;
+  hatched: boolean;
+  type: CompanionType;
+  name: string;
+  stage: CompanionStage;
+  level: number;
+  xp: number;
+  maxXp: number;
+  chaptersRead: number;
+  episodesWatched: number;
+  unopenedChests: number;
+  happiness: number; // 0 - 100
+  lastCareTime: string;
+  lastInteractionTime: string;
+  inventory: string[]; // unlocked item IDs
+  equipped: {
+    hat?: string;
+    prop?: string;
+    aura?: string;
+    background?: string;
+  };
+  minimized: boolean;
+  hidden: boolean;
+  resetRequestedAt?: string;
 }
 

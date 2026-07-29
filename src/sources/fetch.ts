@@ -1,11 +1,20 @@
 export function getProxiedUrl(url: string, enhance: boolean = false): string {
   if (!url) return '';
+  if (url.includes('/api/forward')) {
+    if (enhance && !url.includes('enhance=')) {
+      return `${url}&enhance=1`;
+    }
+    return url;
+  }
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    return url;
+  }
   return `/api/forward?url=${encodeURIComponent(url)}${enhance ? '&enhance=1' : ''}`;
 }
 
 export function resolveCoverUrl(url: string | undefined): string | undefined {
   if (!url) return undefined;
-  if (url.startsWith('http') && !url.includes('/api/forward')) {
+  if ((url.startsWith('http://') || url.startsWith('https://')) && !url.includes('/api/forward')) {
     return getProxiedUrl(url);
   }
   return url;
@@ -13,7 +22,7 @@ export function resolveCoverUrl(url: string | undefined): string | undefined {
 
 export async function proxiedFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   let url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
-  if (url.startsWith('http')) {
+  if ((url.startsWith('http://') || url.startsWith('https://')) && !url.includes('/api/forward')) {
     url = getProxiedUrl(url);
   }
   
@@ -28,10 +37,24 @@ export async function proxiedFetch(input: RequestInfo | URL, init?: RequestInit)
     const bypassCookie = localStorage.getItem('manhua_bypass_cookie');
     const bypassUserAgent = localStorage.getItem('manhua_bypass_user_agent');
     if (bypassCookie) {
-      headers.set('X-Proxy-Cookie', bypassCookie);
+      const safeCookie = bypassCookie.replace(/[^\x20-\x7E]/g, '').trim();
+      if (safeCookie) {
+        try {
+          headers.set('X-Proxy-Cookie', safeCookie);
+        } catch {
+          // Ignore invalid header values
+        }
+      }
     }
     if (bypassUserAgent) {
-      headers.set('X-Proxy-User-Agent', bypassUserAgent);
+      const safeUA = bypassUserAgent.replace(/[^\x20-\x7E]/g, '').trim();
+      if (safeUA) {
+        try {
+          headers.set('X-Proxy-User-Agent', safeUA);
+        } catch {
+          // Ignore invalid header values
+        }
+      }
     }
   }
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Heart, Play, Clock, Bookmark, Trash2, LogIn, Compass, ListPlus, ImageOff } from 'lucide-react';
+import { Heart, Play, Clock, Bookmark, Trash2, LogIn, Compass, ListPlus, ImageOff, BookmarkX } from 'lucide-react';
 import { ReadingListItem, UserProfile, Manhua } from '../types';
 import { resolveCoverUrl } from '../sources/fetch';
 
@@ -131,19 +131,19 @@ export default function MyListView({
 
       {/* Main List Grid */}
       {filteredList.length === 0 ? (
-        <div className="bg-zinc-900/20 border border-dashed border-zinc-800 rounded-2xl py-16 text-center">
-          <div className="w-16 h-16 bg-zinc-950 border border-zinc-900 text-zinc-600 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Compass className="w-8 h-8" />
+        <div className="py-20 flex flex-col items-center justify-center text-center space-y-4 max-w-md mx-auto">
+          <div className="w-16 h-16 rounded-3xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-amber-500 shadow-xl">
+            <BookmarkX className="w-8 h-8 opacity-80" />
           </div>
-          <h3 className="text-lg font-bold text-zinc-300 mb-1">القائمة فارغة</h3>
-          <p className="text-zinc-500 text-xs max-w-sm mx-auto mb-6">
+          <h3 className="text-lg font-bold text-white">القائمة فارغة</h3>
+          <p className="text-zinc-400 text-xs sm:text-sm leading-relaxed">
             {activeTab === 'all' 
               ? 'لم تقم بإضافة أي أعمال إلى قائمتك الشخصية حتى الآن.' 
               : `لا توجد مانهوات مضافة إلى قائمة "${getListBadge(activeTab as any).label}" حالياً.`}
           </p>
           <button
             onClick={() => onNavigate('home')}
-            className="bg-zinc-900 hover:bg-zinc-800 text-zinc-200 hover:text-white border border-zinc-800 hover:border-zinc-700 font-bold text-xs px-6 py-2.5 rounded-full transition-all"
+            className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold transition-all shadow-lg flex items-center gap-2 cursor-pointer"
           >
             استكشف المانهوا الآن
           </button>

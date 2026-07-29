@@ -221,11 +221,13 @@ export default function HistoryView({
             </div>
           </div>
         ) : (
-          <div className="bg-zinc-900/10 border border-dashed border-zinc-800 rounded-2xl py-20 text-center space-y-4">
-            <BookOpen className="w-14 h-14 mx-auto text-zinc-800 stroke-1" />
-            <h3 className="text-sm font-bold text-zinc-300 font-display">سجل قراءة المانهو فارغ!</h3>
-            <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-              لم نجد أي مانهو في سجلاتك بعد. ابدأ بقراءة فصولك المفضلة وسنقوم بحفظ تقدمك تلقائياً هنا وبشكل جذاب.
+          <div className="py-20 flex flex-col items-center justify-center text-center space-y-3 max-w-md mx-auto">
+            <div className="w-16 h-16 rounded-3xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-amber-500 shadow-xl">
+              <Clock className="w-8 h-8 opacity-80" />
+            </div>
+            <h3 className="text-lg font-bold text-white">سجل قراءة المانهو فارغ!</h3>
+            <p className="text-zinc-400 text-xs sm:text-sm leading-relaxed">
+              لم نجد أي مانهو في سجلاتك بعد. ابدأ بقراءة فصولك المفضلة وسنقوم بحفظ تقدمك تلقائياً هنا.
             </p>
           </div>
         )
@@ -337,10 +339,12 @@ export default function HistoryView({
             </div>
           </div>
         ) : (
-          <div className="bg-zinc-900/10 border border-dashed border-zinc-800 rounded-2xl py-20 text-center space-y-4">
-            <Tv className="w-14 h-14 mx-auto text-zinc-800 stroke-1" />
-            <h3 className="text-sm font-bold text-zinc-300 font-display">سجل مشاهدة الأنمي فارغ!</h3>
-            <p className="text-xs text-zinc-500 max-w-sm mx-auto">
+          <div className="py-20 flex flex-col items-center justify-center text-center space-y-3 max-w-md mx-auto">
+            <div className="w-16 h-16 rounded-3xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-red-500 shadow-xl">
+              <Tv className="w-8 h-8 opacity-80" />
+            </div>
+            <h3 className="text-lg font-bold text-white">سجل مشاهدة الأنمي فارغ!</h3>
+            <p className="text-zinc-400 text-xs sm:text-sm leading-relaxed">
               لم تشاهد أي حلقات أنمي بعد. تصفح الأنميات المفضلة لديك وابدأ المشاهدة ليتم حفظ فصولك تلقائياً وبدقة عالية.
             </p>
           </div>

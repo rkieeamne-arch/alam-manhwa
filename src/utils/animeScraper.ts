@@ -108,6 +108,14 @@ function extractAnimeTitleFromEpisodeTitle(title: string): string {
   return cleanTitle(title);
 }
 
+export interface RelatedSeason {
+  id: string;
+  title: string;
+  url: string;
+  coverUrl?: string;
+  type?: string;
+}
+
 export interface Anime {
   id: string;
   title: string;
@@ -123,6 +131,7 @@ export interface Anime {
   latestEpisode?: string;
   sourceUrl: string;
   sourceId: string;
+  relatedSeasons?: RelatedSeason[];
 }
 
 export interface Episode {
@@ -138,7 +147,7 @@ export async function fetchLatestEpisodes(pageNum: number = 1): Promise<Anime[]>
   try {
     let url = ANIME_HOME_URL;
     if (pageNum > 1) {
-      url = ANIME_HOME_URL.replace(/\/$/, '') + `/page/${pageNum}/`;
+      url = `${ANIME_HOME_URL.replace(/\/$/, '')}/filtering/page/${pageNum}/`;
     }
     const res = await retryFetch(url);
     if (!res.ok) throw new Error(`Status: ${res.status}`);
@@ -147,24 +156,26 @@ export async function fetchLatestEpisodes(pageNum: number = 1): Promise<Anime[]>
 
     const episodes: Anime[] = [];
     
-    $('a.CARTA, a.bita9a-link, .MovieItem a, .animiyat a').each((_, el) => {
-      const href = $(el).attr('href') || '';
-      if (!href) return;
+    $('.CARTA, .bita9a-link, .MovieItem, .animiyat, .DivCARTA, .ABBIYAT, .anime-card, .series-card').each((_, el) => {
+      const a = $(el).find('a').first();
+      const href = a.attr('href') || $(el).attr('href') || '';
+      if (!href || href === '#' || href.includes('/category/') || href.includes('/genre/')) return;
       
-      let titleRaw = $(el).find('h4').text().trim() || $(el).find('.title').text().trim() || $(el).text().trim().replace(/\s+/g, ' ');
+      let titleRaw = $(el).find('h4').text().trim() || $(el).find('.title').text().trim() || $(el).find('.title h4').text().trim() || a.text().trim();
       if (!titleRaw) return;
 
       const imgEl = $(el).find('img').first();
-      let rawCover = imgEl.attr('src') || imgEl.attr('data-src') || '';
+      let rawCover = imgEl.attr('src') || imgEl.attr('data-src') || imgEl.attr('data-lazy-src') || '';
       if (!rawCover) {
-        const style = $(el).find('.poster').attr('data-style') || $(el).find('.poster').attr('style') || '';
+        const style = $(el).find('.poster').attr('data-style') || $(el).find('.poster').attr('style') || $(el).attr('style') || '';
         rawCover = style.match(/url\(['"]?(.*?)['"]?\)/)?.[1] || '';
       }
       const coverUrl = getProxiedUrl(rawCover); 
       
       const epNum = parseEpisodeNumber(titleRaw);
       const animeTitle = extractAnimeTitleFromEpisodeTitle(titleRaw);
-      const id = href.split('/').filter(Boolean).pop() || '';
+      const slug = href.split('/').filter(Boolean).pop() || '';
+      const id = slug || `anime-p${pageNum}-${episodes.length}`;
       
       if (!episodes.some(item => item.id === id)) {
         const item: Anime = {
@@ -172,16 +183,16 @@ export async function fetchLatestEpisodes(pageNum: number = 1): Promise<Anime[]>
           title: animeTitle || titleRaw,
           coverUrl,
           rawCoverUrl: rawCover,
-          description: `شاهد الحلقة ${epNum} من انمي ${animeTitle || 'هذا'} مترجم بجودة عالية.`,
+          description: `شاهد ${animeTitle || 'هذا العمل'} مترجم بجودة عالية.`,
           rating: 8.0,
           views: Math.floor(Math.random() * 5000) + 1000,
           status: 'مستمر',
           categories: ['اكشن', 'مغامرة'],
           releaseYear: new Date().getFullYear(),
           episodes: [
-            { id, animeId: id, title: titleRaw || `الحلقة ${epNum}`, episodeNumber: epNum, servers: [], url: href }
+            { id, animeId: id, title: titleRaw || `الحلقة ${epNum || 1}`, episodeNumber: epNum || 1, servers: [], url: href }
           ],
-          latestEpisode: `الحلقة ${epNum}`,
+          latestEpisode: epNum ? `الحلقة ${epNum}` : 'مشاهدة',
           sourceUrl: href,
           sourceId: 'witanime'
         };
@@ -191,6 +202,51 @@ export async function fetchLatestEpisodes(pageNum: number = 1): Promise<Anime[]>
         }
       }
     });
+
+    // Fallback for page > 1 if filtering yielded no results
+    if (episodes.length === 0 && pageNum > 1) {
+      const fallbackUrl = `${ANIME_HOME_URL.replace(/\/$/, '')}/series/page/${pageNum}/`;
+      const fallbackRes = await retryFetch(fallbackUrl);
+      if (fallbackRes.ok) {
+        const fbText = await fallbackRes.text();
+        const $fb = cheerio.load(fbText);
+        $fb('.MovieItem, .CARTA, .animiyat, .ABBIYAT, .DivCARTA').each((_, el) => {
+          const a = $fb(el).find('a').first();
+          const href = a.attr('href') || $fb(el).attr('href') || '';
+          if (!href || href === '#' || href.includes('/category/')) return;
+          const titleRaw = $fb(el).find('h4').text().trim() || $fb(el).find('.title').text().trim() || a.text().trim();
+          if (!titleRaw) return;
+          const imgEl = $fb(el).find('img').first();
+          let rawCover = imgEl.attr('src') || imgEl.attr('data-src') || '';
+          if (!rawCover) {
+            const style = $fb(el).find('.poster').attr('data-style') || $fb(el).find('.poster').attr('style') || '';
+            rawCover = style.match(/url\(['"]?(.*?)['"]?\)/)?.[1] || '';
+          }
+          const coverUrl = getProxiedUrl(rawCover);
+          const slug = href.split('/').filter(Boolean).pop() || '';
+          const id = slug || `anime-fb-p${pageNum}-${episodes.length}`;
+          if (!episodes.some(item => item.id === id)) {
+            episodes.push({
+              id,
+              title: cleanTitle(titleRaw) || titleRaw,
+              coverUrl,
+              rawCoverUrl: rawCover,
+              description: `مشاهدة وتحميل ${cleanTitle(titleRaw)} مترجم بجودة عالية.`,
+              rating: 8.0,
+              views: 1200,
+              status: 'مستمر',
+              categories: ['أنمي'],
+              releaseYear: new Date().getFullYear(),
+              episodes: [],
+              latestEpisode: 'مشاهدة',
+              sourceUrl: href,
+              sourceId: 'witanime'
+            });
+          }
+        });
+      }
+    }
+
     return episodes;
   } catch (err) {
     console.error('[Anime Scraper] fetchLatestEpisodes failed:', err);
@@ -198,21 +254,25 @@ export async function fetchLatestEpisodes(pageNum: number = 1): Promise<Anime[]>
   }
 }
 
-export async function fetchLatestSeries(): Promise<Anime[]> {
+export async function fetchLatestSeries(pageNum: number = 1): Promise<Anime[]> {
   try {
-    const res = await retryFetch(ANIME_HOME_URL.replace(/\/$/, '') + '/series/');
+    let url = `${ANIME_HOME_URL.replace(/\/$/, '')}/series/`;
+    if (pageNum > 1) {
+      url = `${ANIME_HOME_URL.replace(/\/$/, '')}/filtering/page/${pageNum}/`;
+    }
+    const res = await retryFetch(url);
     const text = await res.text();
     const $ = cheerio.load(text);
     const seriesList: Anime[] = [];
 
-    $('.MovieItem, .animiyat, .ABBIYAT').each((_, el) => {
+    $('.MovieItem, .animiyat, .ABBIYAT, .CARTA, .DivCARTA').each((_, el) => {
       const a = $(el).find('a').first();
-      const href = a.attr('href') || '';
-      if (!href) return;
+      const href = a.attr('href') || $(el).attr('href') || '';
+      if (!href || href === '#' || href.includes('/category/')) return;
       
-      const img = $(el).find('img');
+      const img = $(el).find('img').first();
       const altTitle = img.attr('alt') || '';
-      let rawCover = img.attr('src') || img.attr('data-src') || '';
+      let rawCover = img.attr('src') || img.attr('data-src') || img.attr('data-lazy-src') || '';
       if (!rawCover) {
         const style = $(el).find('.poster').attr('data-style') || $(el).find('.poster').attr('style') || '';
         rawCover = style.match(/url\(['"]?(.*?)['"]?\)/)?.[1] || '';
@@ -224,21 +284,23 @@ export async function fetchLatestSeries(): Promise<Anime[]> {
       const cleanAnimeTitle = altTitle || cleanTitle(titleRaw);
       const slug = href.split('/').filter(Boolean).pop() || '';
 
-      seriesList.push({
-        id: `series-${slug}`,
-        title: cleanAnimeTitle,
-        coverUrl,
-        rawCoverUrl: rawCover,
-        description: `تابع حلقات انمي ${cleanAnimeTitle} مترجمة بالكامل وبأعلى جودة.`,
-        rating: 8.5,
-        status: isCompleted ? 'مكتمل' : 'مستمر',
-        categories: ['خيال', 'خارق للطبيعة'],
-        releaseYear: 2025,
-        episodes: [],
-        latestEpisode: isCompleted ? 'مكتمل' : 'مستمر',
-        sourceUrl: href,
-        sourceId: 'witanime'
-      });
+      if (cleanAnimeTitle && !seriesList.some(s => s.id === `series-${slug}`)) {
+        seriesList.push({
+          id: `series-${slug}`,
+          title: cleanAnimeTitle,
+          coverUrl,
+          rawCoverUrl: rawCover,
+          description: `تابع حلقات انمي ${cleanAnimeTitle} مترجمة بالكامل وبأعلى جودة.`,
+          rating: 8.5,
+          status: isCompleted ? 'مكتمل' : 'مستمر',
+          categories: ['خيال', 'خارق للطبيعة'],
+          releaseYear: 2025,
+          episodes: [],
+          latestEpisode: isCompleted ? 'مكتمل' : 'مستمر',
+          sourceUrl: href,
+          sourceId: 'witanime'
+        });
+      }
     });
     return seriesList;
   } catch (err) {
@@ -250,47 +312,371 @@ export async function fetchLatestSeries(): Promise<Anime[]> {
 export async function searchAnime(query: string, pageNum: number = 1): Promise<Anime[]> {
   if (!query || query.trim() === '') return [];
   try {
-    let searchUrl = `${SEARCH_BASE_URL}?s=${encodeURIComponent(query)}`;
+    let searchUrl = `${ANIME_HOME_URL}?s=${encodeURIComponent(query)}`;
     if (pageNum > 1) {
-      searchUrl = `${SEARCH_BASE_URL}page/${pageNum}/?s=${encodeURIComponent(query)}`;
+      searchUrl = `${ANIME_HOME_URL}page/${pageNum}/?s=${encodeURIComponent(query)}`;
     }
-    const res = await proxiedFetch(searchUrl);
+    const res = await retryFetch(searchUrl);
     const text = await res.text();
     const $ = cheerio.load(text);
     const results: Anime[] = [];
 
-    $('.MovieItem').each((_, el) => {
-      const a = $(el).find('a');
-      const href = a.attr('href') || '';
-      if (!href) return;
+    $('.MovieItem, .CARTA, .animiyat, .DivCARTA, .ABBIYAT, .bita9a-link, .anime-card, .series-card').each((_, el) => {
+      const a = $(el).find('a').first();
+      const href = a.attr('href') || $(el).attr('href') || '';
+      if (!href || href === '#' || href.includes('/category/') || href.includes('/genre/')) return;
 
-      const titleRaw = $(el).find('.title h4').text().trim() || $(el).find('.title p').text().trim();
-      const style = $(el).find('.poster').attr('data-style') || $(el).find('.poster').attr('style') || '';
-      const rawCover = style.match(/url\(['"]?(.*?)['"]?\)/)?.[1] || '';
+      let titleRaw = $(el).find('h4').text().trim() || $(el).find('.title').text().trim() || $(el).find('.title h4').text().trim() || $(el).find('.title p').text().trim() || a.text().trim();
+      if (!titleRaw) return;
+
+      const imgEl = $(el).find('img').first();
+      let rawCover = imgEl.attr('src') || imgEl.attr('data-src') || imgEl.attr('data-lazy-src') || '';
+      if (!rawCover) {
+        const style = $(el).find('.poster').attr('data-style') || $(el).find('.poster').attr('style') || '';
+        rawCover = style.match(/url\(['"]?(.*?)['"]?\)/)?.[1] || '';
+      }
       const coverUrl = getProxiedUrl(rawCover);
       const genre = $(el).find('.genre').text().trim() || 'عام';
       const yearStr = $(el).find('.year').text().trim();
+      const slug = href.split('/').filter(Boolean).pop() || '';
+      const id = slug || `search-${results.length}`;
 
-      results.push({
-        id: `series-${href.split('/').filter(Boolean).pop()}`,
-        title: cleanTitle(titleRaw) || titleRaw,
-        coverUrl,
-        rawCoverUrl: rawCover,
-        description: `مشاهدة وتحميل انمي ${cleanTitle(titleRaw)} مترجم بجودة عالية.`,
-        rating: 8.2,
-        views: 0,
-        status: 'مستمر',
-        categories: [genre],
-        releaseYear: parseInt(yearStr) || 2025,
-        episodes: [],
-        sourceUrl: href,
-        sourceId: 'witanime'
-      });
+      if (!results.some(r => r.id === id)) {
+        results.push({
+          id,
+          title: cleanTitle(titleRaw) || titleRaw,
+          coverUrl,
+          rawCoverUrl: rawCover,
+          description: `مشاهدة وتحميل انمي ${cleanTitle(titleRaw)} مترجم بجودة عالية.`,
+          rating: 8.2,
+          views: 0,
+          status: 'مستمر',
+          categories: [genre],
+          releaseYear: parseInt(yearStr) || 2025,
+          episodes: [],
+          sourceUrl: href,
+          sourceId: 'witanime'
+        });
+      }
     });
     return results;
   } catch (err) {
     return [];
   }
+}
+
+async function probeLatestEpisodes(sampleUrl: string, currentMax: number): Promise<number> {
+  if (!sampleUrl || sampleUrl.includes('NaN') || isNaN(currentMax) || currentMax < 1) {
+    return currentMax || 1;
+  }
+
+  const numStr = currentMax.toString();
+  let template = '';
+  if (sampleUrl.includes(`-${numStr}-`)) {
+    template = sampleUrl.replace(`-${numStr}-`, '-{EP}-');
+  } else if (sampleUrl.includes(`-${numStr}/`)) {
+    template = sampleUrl.replace(`-${numStr}/`, '-{EP}/');
+  } else if (sampleUrl.includes(`/${numStr}/`)) {
+    template = sampleUrl.replace(`/${numStr}/`, '/{EP}/');
+  } else if (numStr.length >= 2) {
+    const idx = sampleUrl.lastIndexOf(numStr);
+    if (idx !== -1) {
+      template = sampleUrl.substring(0, idx) + '{EP}' + sampleUrl.substring(idx + numStr.length);
+    }
+  }
+
+  if (!template || template.includes('NaN')) return currentMax;
+
+  let highest = currentMax;
+  let batchStart = currentMax + 1;
+  const BATCH_SIZE = 4;
+  let consecutiveEmptyBatches = 0;
+
+  while (consecutiveEmptyBatches < 2 && (batchStart - currentMax) <= 80) {
+    const probes = [];
+    for (let i = 0; i < BATCH_SIZE; i++) {
+      probes.push(batchStart + i);
+    }
+
+    const results = await Promise.all(
+      probes.map(async ep => {
+        const url = template.replace('{EP}', ep.toString());
+        try {
+          const res = await retryFetch(url);
+          return { ep, ok: res.ok };
+        } catch {
+          return { ep, ok: false };
+        }
+      })
+    );
+
+    let foundInBatch = 0;
+    for (const r of results) {
+      if (r.ok) {
+        if (r.ep > highest) highest = r.ep;
+        foundInBatch++;
+      }
+    }
+
+    if (foundInBatch === 0) {
+      consecutiveEmptyBatches++;
+    } else {
+      consecutiveEmptyBatches = 0;
+    }
+
+    batchStart += BATCH_SIZE;
+  }
+
+  return highest;
+}
+
+function extractSmartKeywords(title: string): string[] {
+  const keywords: string[] = [];
+  let clean = title
+    .replace(/^مشاهدة\s+/gi, '')
+    .replace(/^تحميل\s+/gi, '')
+    .replace(/^انمي\s+/gi, '')
+    .replace(/^جميع\s+حلقات\s+/gi, '')
+    .replace(/مترجم\s+اونلاين.*/gi, '')
+    .replace(/مترجم\s+اون\s+لاين.*/gi, '')
+    .replace(/مترجم.*/gi, '')
+    .replace(/(الموسم|Season|Movie|فيلم|الحلقة|Part|الأول|الثاني|الثالث|الرابع|الخامس|السادس|الأخير).*/gi, '')
+    .trim();
+
+  const engMatch = clean.match(/[a-zA-Z0-9\s']{3,}/g);
+  if (engMatch) {
+    engMatch.forEach(eng => {
+      const trimmed = eng.trim();
+      const words = trimmed.split(/\s+/).filter(w => w.length > 2);
+      if (words.length > 0) {
+        keywords.push(words.slice(0, 3).join(' '));
+        if (words[0].length >= 4) {
+          keywords.push(words[0]);
+        }
+      }
+    });
+  }
+
+  const arbMatch = clean.match(/[\u0600-\u06FF\s]{3,}/g);
+  if (arbMatch) {
+    arbMatch.forEach(arb => {
+      const trimmed = arb.trim();
+      const words = trimmed.split(/\s+/).filter(w => w.length > 2 && !['مشاهدة', 'تحميل', 'حلقات', 'انمي', 'جميع', 'مترجم'].includes(w));
+      if (words.length > 0) {
+        keywords.push(words.slice(0, 3).join(' '));
+        if (words[0].length >= 3) {
+          keywords.push(words[0]);
+        }
+      }
+    });
+  }
+
+  return Array.from(new Set(keywords.filter(k => k.length >= 3)));
+}
+
+function cleanSeasonTitle(raw: string): string {
+  let title = raw;
+  if (title.includes('....')) {
+    title = title.split('....').pop() || title;
+  }
+  return title
+    .replace(/^مشاهدة\s+/i, '')
+    .replace(/^تحميل\s+/i, '')
+    .replace(/مترجم\s+اونلاين/gi, '')
+    .replace(/مترجم\s+اون\s+لاين/gi, '')
+    .replace(/مترجم/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isStrictlyRelatedFranchise(mainTitle: string, candidateTitle: string): boolean {
+  if (!mainTitle || !candidateTitle) return false;
+
+  const normMain = mainTitle.toLowerCase();
+  const normCand = candidateTitle.toLowerCase();
+
+  const cleanMain = normMain
+    .replace(/^مشاهدة\s+/gi, '')
+    .replace(/^تحميل\s+/gi, '')
+    .replace(/^انمي\s+/gi, '')
+    .replace(/^جميع\s+حلقات\s+/gi, '')
+    .replace(/مترجم\s+اونلاين.*/gi, '')
+    .replace(/مترجم\s+اون\s+لاين.*/gi, '')
+    .replace(/مترجم.*/gi, '')
+    .replace(/(الموسم|season|movie|فيلم|الحلقة|part|الأول|الثاني|الثالث|الرابع|الخامس|السادس|الأخير).*/gi, '')
+    .trim();
+
+  const stopWords = new Set([
+    'مشاهدة', 'تحميل', 'حلقات', 'انمي', 'جميع', 'مترجم', 'اونلاين', 'الموسم', 'حلقة', 'فيلم', 'الجزء',
+    'anime', 'season', 'movie', 'episodes', 'episode', 'series', 'part', 'mowasem', 'isekai', 'no', 'to', 'wa', 'ga', 'san', 'kun', 'sama', 'hen'
+  ]);
+
+  const engWords = (cleanMain.match(/[a-z0-9]{3,}/g) || []).filter(w => !stopWords.has(w));
+  const arbWords = (cleanMain.match(/[\u0600-\u06FF]{3,}/g) || []).filter(w => !stopWords.has(w));
+
+  if (engWords.length > 0) {
+    const match = engWords.some(w => normCand.includes(w));
+    if (match) return true;
+  }
+
+  if (arbWords.length > 0) {
+    const match = arbWords.some(w => normCand.includes(w));
+    if (match) return true;
+  }
+
+  return false;
+}
+
+function detectSeasonType(title: string): string {
+  if (title.includes('فيلم') || title.toLowerCase().includes('movie')) return 'فيلم';
+  if (title.includes('أونا') || title.toLowerCase().includes('ona')) return 'أونا';
+  if (title.includes('أوفا') || title.toLowerCase().includes('ova')) return 'أوفا';
+  if (title.includes('خاصة') || title.toLowerCase().includes('special')) return 'خاصة';
+  if (title.includes('الموسم') || title.toLowerCase().includes('season')) return 'موسم';
+  return 'مواسم أخرى';
+}
+
+async function fetchRelatedSeasons(
+  $: cheerio.CheerioAPI,
+  animeTitle: string,
+  targetUrl: string
+): Promise<RelatedSeason[]> {
+  const seasons: RelatedSeason[] = [];
+  const addedUrls = new Set<string>();
+
+  const normUrl = (u: string) => {
+    try {
+      return decodeURIComponent(u).replace(/\/$/, '').toLowerCase();
+    } catch (e) {
+      return u.replace(/\/$/, '').toLowerCase();
+    }
+  };
+
+  const isInvalidSeasonLink = (href: string) => {
+    if (!href || href.startsWith('javascript:') || href.startsWith('#')) return true;
+    if (href.includes('/episode/') || href.includes('/watch') || href.includes('/filtering/')) return true;
+    const decoded = normUrl(href);
+    if (decoded.includes('الحلقة') || decoded.includes('episode')) return true;
+    return false;
+  };
+
+  addedUrls.add(normUrl(targetUrl));
+
+  // 1. Direct HTML Selectors for Season Links
+  const containerSelectors = [
+    '.related-anime', '.anime-seasons', '.seasons-list', '.related-series',
+    '.related_posts', '.series-seasons', '.seasons', '.other-seasons',
+    '#seasons', '.anime-relations', '.related-list', '.mowasem',
+    '.related-content', '.related_anime', '.anime-parts', '.parts-list',
+    '.series-parts', '.mowasem-list', '.seasons-container', '.related-box'
+  ].join(', ');
+
+  $(containerSelectors).find('a').each((_, a) => {
+    const href = $(a).attr('href') || '';
+    if (isInvalidSeasonLink(href) || addedUrls.has(normUrl(href))) return;
+
+    let title = $(a).find('h3, h4, h5, .title, .season-title, .name').first().text().trim() ||
+                $(a).attr('title') || $(a).text().trim().replace(/\s+/g, ' ');
+
+    if (!title || title.length < 2 || title.includes('الرئيسية')) return;
+    let coverUrl = $(a).find('img').attr('src') || $(a).find('img').attr('data-src') || '';
+    if (coverUrl && coverUrl.includes('http')) {
+      coverUrl = coverUrl.substring(coverUrl.indexOf('http'));
+    }
+
+    seasons.push({
+      id: `season-${href.split('/').filter(Boolean).pop() || Math.random()}`,
+      title: cleanSeasonTitle(title),
+      url: href,
+      coverUrl: coverUrl ? getProxiedUrl(coverUrl) : undefined,
+      type: detectSeasonType(title)
+    });
+    addedUrls.add(normUrl(href));
+  });
+
+  // 2. Check headings for season keywords
+  if (seasons.length === 0) {
+    $('h1, h2, h3, h4, h5, h6, div, span, .widget-title, .title').each((_, el) => {
+      const ownText = $(el).clone().children().remove().end().text().trim();
+      if (
+        ownText.includes('مواسم') || ownText.includes('المواسم') ||
+        ownText.includes('أجزاء') || ownText.includes('الأجزاء') ||
+        ownText.includes('سلاسل') || ownText.includes('مرتبطة') ||
+        ownText.toLowerCase().includes('seasons') || ownText.toLowerCase().includes('related')
+      ) {
+        const parent = $(el).closest('div, section, ul, article, aside');
+        parent.find('a').each((_, a) => {
+          const href = $(a).attr('href') || '';
+          if (isInvalidSeasonLink(href) || addedUrls.has(normUrl(href))) return;
+
+          let title = $(a).find('h3, h4, h5, .title, .season-title, .name').first().text().trim() ||
+                      $(a).attr('title') || $(a).text().trim().replace(/\s+/g, ' ');
+
+          if (!title || title.length < 2 || title.includes('الرئيسية') || title.includes('قائمة')) return;
+          let coverUrl = $(a).find('img').attr('src') || $(a).find('img').attr('data-src') || '';
+          if (coverUrl && coverUrl.includes('http')) {
+            coverUrl = coverUrl.substring(coverUrl.indexOf('http'));
+          }
+
+          seasons.push({
+            id: `season-${href.split('/').filter(Boolean).pop() || Math.random()}`,
+            title: cleanSeasonTitle(title),
+            url: href,
+            coverUrl: coverUrl ? getProxiedUrl(coverUrl) : undefined,
+            type: detectSeasonType(title)
+          });
+          addedUrls.add(normUrl(href));
+        });
+      }
+    });
+  }
+
+  // 3. Smart Search Enrichment if no or few seasons found directly in HTML
+  if (seasons.length < 3 && animeTitle && animeTitle !== 'RISTO') {
+    const keywords = extractSmartKeywords(animeTitle);
+    for (const kw of keywords) {
+      if (!kw || kw.length < 3) continue;
+      try {
+        const searchUrl = `https://ristoanime.me/?s=${encodeURIComponent(kw)}`;
+        const res = await retryFetch(searchUrl);
+        if (res.ok) {
+          const html = await res.text();
+          const $s = cheerio.load(html);
+
+          $s('a[href*="/series/"]').each((_, a) => {
+            const href = $s(a).attr('href') || '';
+            if (isInvalidSeasonLink(href) || addedUrls.has(normUrl(href)) || href === 'https://ristoanime.me/series/') return;
+
+            let title = $s(a).find('h3, h4, h5, .title, .name').first().text().trim() ||
+                        $s(a).attr('title') || $s(a).text().trim().replace(/\s+/g, ' ');
+
+            title = cleanSeasonTitle(title);
+            if (!title || title.length < 3 || title.includes('الرئيسية') || title.includes('قائمة الأنمي')) return;
+            if (!isStrictlyRelatedFranchise(animeTitle, title)) return;
+
+            let coverUrl = $s(a).find('img').attr('src') || $s(a).find('img').attr('data-src') || '';
+            if (coverUrl && coverUrl.includes('http')) {
+              coverUrl = coverUrl.substring(coverUrl.indexOf('http'));
+            }
+
+            seasons.push({
+              id: `season-${href.split('/').filter(Boolean).pop() || Math.random()}`,
+              title,
+              url: href,
+              coverUrl: coverUrl ? getProxiedUrl(coverUrl) : undefined,
+              type: detectSeasonType(title)
+            });
+            addedUrls.add(normUrl(href));
+          });
+        }
+      } catch (err) {
+        console.warn('[Anime Scraper] Season enrichment search error:', err);
+      }
+      if (seasons.length >= 2) break;
+    }
+  }
+
+  return seasons;
 }
 
 export async function fetchAnimeDetails(animeUrl: string): Promise<Anime | null> {
@@ -501,14 +887,106 @@ export async function fetchAnimeDetails(animeUrl: string): Promise<Anime | null>
     let finalEpisodes = deduplicate(episodes);
     finalEpisodes = finalEpisodes.map(ep => {
       const extracted = extractNumber(ep.title);
+      const epNum = (extracted !== null && !isNaN(extracted)) ? extracted : (ep.episodeNumber && !isNaN(ep.episodeNumber) ? ep.episodeNumber : 1);
       return {
         ...ep,
-        episodeNumber: extracted !== null ? extracted : ep.episodeNumber
+        episodeNumber: epNum
       };
-    }).sort((a, b) => {
-      // Sort ascending numerically by episode number
-      return a.episodeNumber - b.episodeNumber;
-    });
+    })
+    .filter(e => typeof e.episodeNumber === 'number' && !isNaN(e.episodeNumber) && e.episodeNumber > 0 && e.episodeNumber <= 2500)
+    .sort((a, b) => a.episodeNumber - b.episodeNumber);
+
+    // --- GAP FILLING LOGIC FOR LONG ANIMES (e.g. One Piece, Detective Conan) ---
+    // Only run gap-filling/probing if there are AT LEAST 2 episodes and max episode > 1
+    if (finalEpisodes.length >= 2) {
+      const origMinEp = finalEpisodes[0].episodeNumber;
+      let origMaxEp = finalEpisodes[finalEpisodes.length - 1].episodeNumber;
+
+      if (!isNaN(origMinEp) && !isNaN(origMaxEp) && origMaxEp > origMinEp && origMaxEp >= 2) {
+        const startEp = 1;
+
+        // Probe for newly released episodes beyond origMaxEp
+        if (origMaxEp > 10) {
+          const lastEp = finalEpisodes[finalEpisodes.length - 1];
+          if (lastEp && lastEp.url && !lastEp.url.includes('NaN')) {
+            const probedMax = await probeLatestEpisodes(lastEp.url, origMaxEp);
+            if (probedMax > origMaxEp && !isNaN(probedMax)) {
+              origMaxEp = probedMax;
+            }
+          }
+        }
+
+        const maxEp = origMaxEp;
+        const existingMap = new Map(finalEpisodes.map(e => [e.episodeNumber, e]));
+
+        // Select reference episode for pattern URL
+        const refEp = finalEpisodes[finalEpisodes.length - 1] || finalEpisodes[0];
+        const patternUrl = refEp.url;
+        const epNumStr = refEp.episodeNumber.toString();
+        let urlTemplate = '';
+
+        if (patternUrl && !patternUrl.includes('NaN')) {
+          if (patternUrl.includes(`-${epNumStr}-`)) {
+            urlTemplate = patternUrl.replace(`-${epNumStr}-`, '-{EP}-');
+          } else if (patternUrl.includes(`-${epNumStr}/`)) {
+            urlTemplate = patternUrl.replace(`-${epNumStr}/`, '-{EP}/');
+          } else if (patternUrl.includes(`/${epNumStr}/`)) {
+            urlTemplate = patternUrl.replace(`/${epNumStr}/`, '/{EP}/');
+          } else if (epNumStr.length >= 2) {
+            const idx = patternUrl.lastIndexOf(epNumStr);
+            if (idx !== -1) {
+              urlTemplate = patternUrl.substring(0, idx) + '{EP}' + patternUrl.substring(idx + epNumStr.length);
+            }
+          }
+        }
+
+        let isValidTemplate = false;
+        if (urlTemplate && !urlTemplate.includes('NaN')) {
+          const checkEp = finalEpisodes[0];
+          if (checkEp && checkEp.episodeNumber !== refEp.episodeNumber) {
+            const testUrl = urlTemplate.replace('{EP}', checkEp.episodeNumber.toString());
+            const checkSlug = checkEp.url.split('/').filter(Boolean).pop() || '';
+            const testSlug = testUrl.split('/').filter(Boolean).pop() || '';
+            if (checkSlug === testSlug || testUrl.replace('-hi-', '-') === checkEp.url.replace('-hi-', '-')) {
+              isValidTemplate = true;
+            }
+          } else {
+            isValidTemplate = true;
+          }
+        }
+
+        if (isValidTemplate && urlTemplate) {
+          const filled: Episode[] = [];
+          for (let i = startEp; i <= maxEp; i++) {
+            if (existingMap.has(i)) {
+              filled.push(existingMap.get(i)!);
+            } else {
+              filled.push({
+                id: `ep-filled-${i}-${slug}`,
+                animeId,
+                title: `الحلقة ${i}`,
+                episodeNumber: i,
+                servers: [],
+                url: urlTemplate.replace('{EP}', i.toString())
+              });
+            }
+          }
+          finalEpisodes = filled;
+        }
+      }
+    }
+    // --------------------------------------------------------
+
+    if (finalEpisodes.length === 0) {
+      finalEpisodes.push({
+        id: `ep-1-${slug}`,
+        animeId,
+        title: 'مشاهدة الفيلم / الحلقة 1',
+        episodeNumber: 1,
+        servers: [],
+        url: targetUrl
+      });
+    }
 
     let rawCover = $('img').first().attr('src') || '';
     if (!rawCover || rawCover.includes('logo')) {
@@ -519,9 +997,12 @@ export async function fetchAnimeDetails(animeUrl: string): Promise<Anime | null>
           rawCover = $('.Thumbnail img, .anime-poster img').attr('src') || rawCover;
       }
     }
+    const cleanFinalTitle = cleanAnimeTitle(titleText) || titleText || 'أنمي غير معروف';
+    const relatedSeasons = await fetchRelatedSeasons($, cleanFinalTitle, targetUrl);
+
     return {
       id: `series-${slug}`,
-      title: cleanAnimeTitle(titleText) || titleText || 'أنمي غير معروف',
+      title: cleanFinalTitle,
       coverUrl: getProxiedUrl(rawCover),
       rawCoverUrl: rawCover,
       description: storyText || 'لا يوجد ملخص متاح لهذا الأنمي حالياً.',
@@ -531,7 +1012,8 @@ export async function fetchAnimeDetails(animeUrl: string): Promise<Anime | null>
       releaseYear,
       episodes: finalEpisodes,
       sourceUrl: targetUrl,
-      sourceId: 'witanime'
+      sourceId: 'witanime',
+      relatedSeasons
     };
   } catch (err) {
     console.error('[Anime Scraper] fetchAnimeDetails failed:', err);
@@ -541,6 +1023,11 @@ export async function fetchAnimeDetails(animeUrl: string): Promise<Anime | null>
 
 export async function fetchWatchServers(watchUrl: string): Promise<{ name: string; url: string }[]> {
   try {
+    if (!watchUrl || watchUrl.includes('NaN') || watchUrl.includes('undefined') || watchUrl.includes('null')) {
+      console.warn('[Anime Scraper] Invalid watchUrl passed to fetchWatchServers:', watchUrl);
+      return [];
+    }
+
     let urlsToTry = [watchUrl];
     if (!watchUrl.endsWith('/watch') && !watchUrl.endsWith('/watch/')) {
       urlsToTry.unshift(watchUrl.replace(/\/$/, '') + '/watch');
@@ -556,8 +1043,19 @@ export async function fetchWatchServers(watchUrl: string): Promise<{ name: strin
         const $ = cheerio.load(text);
 
         $('li[data-watch], li[data-url], a[data-url]').each((_, el) => {
-          const rawUrl = $(el).attr('data-watch') || $(el).attr('data-url') || '';
+          let rawUrl = $(el).attr('data-watch') || $(el).attr('data-url') || '';
           if (!rawUrl) return;
+
+          // Try to decode base64 if it is base64
+          if (!rawUrl.startsWith('http') && rawUrl.length > 20 && !rawUrl.includes(' ')) {
+            try {
+              // Usually Witanime base64 encodes the iframe URL
+              const decoded = Buffer.from(rawUrl, 'base64').toString('utf-8');
+              if (decoded.startsWith('http')) {
+                rawUrl = decoded;
+              }
+            } catch(e) {}
+          }
 
           const serverText = $(el).text().trim();
           const cleanName = serverText.replace(/^\d+/, '').replace('سيرفر', 'سيرفر ').replace(/\s+/g, ' ').trim();

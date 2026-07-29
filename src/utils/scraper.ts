@@ -128,24 +128,26 @@ export async function scrapeMangaDetails(source: ScraperSource, mangaUrl: string
     const uniqueChapters = deduplicate(manga.chapters || []);
     const sortedChapters = sortNumerically(uniqueChapters.map((ch, idx) => ({
       ...ch,
-      chapterNumber: extractNumber(ch.name, idx + 1)
+      chapterNumber: extractNumber(ch.name, idx + 1) ?? (idx + 1)
     })));
 
     const chapters: Chapter[] = sortedChapters.map(ch => ({
       id: `ch-${source.id}-${ch.id}`,
       manhuaId: `scr-${source.id}-${manga.id}`,
       title: ch.name,
-      chapterNumber: ch.chapterNumber,
+      chapterNumber: ch.chapterNumber ?? 1,
       releaseDate: 'محدث',
       pages: [ch.url],
       views: 0,
       isLocked: ch.isLocked
     }));
 
+    const cleanT = cleanTitle(manga.title);
+
     const details: Manhua = {
       id: `scr-${source.id}-${manga.id}`,
-      title: cleanTitle(manga.title),
-      description: manga.description || 'لا يوجد ملخص متوفر.',
+      title: cleanT || manga.title || 'عمل بدون عنوان',
+      description: manga.description && manga.description.trim().length > 3 ? manga.description.trim() : 'لا يوجد ملخص متوفر حالياً.',
       coverUrl: getProxiedUrl(manga.cover),
       author: 'غير معروف',
       artist: 'غير معروف',

@@ -10,6 +10,11 @@ import { Home, Search, Heart, History, FolderDown, User, MessageSquare, Bell, Tv
 import Header from './components/Header';
 import SettingsDrawer from './components/SettingsDrawer';
 import BypassModal from './components/BypassModal';
+import CompanionWidget from './components/CompanionWidget';
+import CompanionModal from './components/CompanionModal';
+import CompanionEffects from './components/CompanionEffects';
+import { CompanionState } from './types';
+import { getCompanionState, addReadingProgress } from './utils/companionStorage';
 
 // Views
 import HomeView from './views/HomeView';
@@ -169,6 +174,10 @@ export default function App() {
 
   const [activeToast, setActiveToast] = useState<NotificationItem | null>(null);
 
+  // Reading Companion State
+  const [companionState, setCompanionState] = useState<CompanionState>(() => getCompanionState());
+  const [isCompanionModalOpen, setIsCompanionModalOpen] = useState(false);
+
   // Save Notifications to LocalStorage
   useEffect(() => {
     localStorage.setItem('user_notifications', JSON.stringify(notifications));
@@ -198,8 +207,9 @@ export default function App() {
     if (notif.type === 'anime') {
       setAppMode('anime');
       setSelectedManhuaId(notif.targetId);
+      setScrapedManhuaCache(null);
       if (notif.chapterOrEp) {
-        setSelectedChapterId(notif.chapterOrEp.toString());
+        setSelectedChapterId(notif.chapterOrEp ? notif.chapterOrEp.toString() : '');
         setCurrentView('anime-player');
       } else {
         setCurrentView('anime-details');
@@ -223,11 +233,11 @@ export default function App() {
           rating: 4.8,
           views: 0,
           categories: ['مانهوا'],
-          chapters: []
+          chapters: [], releaseYear: new Date().getFullYear()
         });
       }
       if (notif.chapterOrEp) {
-        setSelectedChapterId(notif.chapterOrEp.toString());
+        setSelectedChapterId(notif.chapterOrEp ? notif.chapterOrEp.toString() : '');
         setCurrentView('reader');
       } else {
         setCurrentView('manhua');
@@ -519,6 +529,16 @@ export default function App() {
 
   // History Functions
   const handleAddHistory = async (item: Omit<ReadingHistoryItem, 'id' | 'lastReadTime'>) => {
+    // Award progress to Reading Companion (+10 XP)
+    const { newState, leveledUp } = addReadingProgress('chapter', 1);
+    setCompanionState(newState);
+
+    if (leveledUp) {
+      window.dispatchEvent(new CustomEvent('companion-effect', { 
+        detail: { type: 'evolve', level: newState.level } 
+      }));
+    }
+
     if (user?.id) {
       try {
         const savedItem = await saveUserReadingHistory(user.id, item);
@@ -570,6 +590,16 @@ export default function App() {
 
   // Anime History Functions
   const handleAddAnimeHistory = async (item: Omit<AnimeWatchHistoryItem, 'id' | 'lastWatchedTime'>) => {
+    // Award progress to Reading Companion (+15 XP)
+    const { newState, leveledUp } = addReadingProgress('episode', 1);
+    setCompanionState(newState);
+
+    if (leveledUp) {
+      window.dispatchEvent(new CustomEvent('companion-effect', { 
+        detail: { type: 'evolve', level: newState.level } 
+      }));
+    }
+
     if (user?.id) {
       try {
         const savedItem = await saveUserAnimeHistory(user.id, item);
@@ -655,6 +685,8 @@ export default function App() {
 
     if (optionalMangaShell) {
       setScrapedManhuaCache(optionalMangaShell);
+    } else {
+      setScrapedManhuaCache(null);
     }
     setSelectedManhuaId(id);
     if (isAnime) {
@@ -792,6 +824,7 @@ export default function App() {
       {currentView !== 'reader' && (
         <Header 
           onOpenSettings={() => setIsDrawerOpen(true)}
+          onOpenCompanionModal={() => setIsCompanionModalOpen(true)}
           user={user}
           onNavigate={handleNavigate}
           currentView={currentView}
@@ -813,6 +846,7 @@ export default function App() {
       <SettingsDrawer 
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
+        onOpenCompanionModal={() => setIsCompanionModalOpen(true)}
         user={user}
         onLogin={loginWithEmail}
         onSignup={signupWithEmail}
@@ -836,6 +870,7 @@ export default function App() {
               if (appMode === 'anime' && optionalMangaShell) {
                 // Navigate to anime details
                 setSelectedManhuaId(optionalMangaShell.sourceUrl || '');
+                setScrapedManhuaCache(optionalMangaShell);
                 setCurrentView('anime-details');
               } else {
                 handleSelectManhua(id, optionalMangaShell);
@@ -902,30 +937,35 @@ export default function App() {
             scrapedManhuaCache={scrapedManhuaCache}
             onBack={() => setCurrentView('home')} 
             onSelectEpisode={(epNum) => {
-              setSelectedChapterId(epNum.toString());
+              setSelectedChapterId(epNum !== null && epNum !== undefined ? epNum.toString() : '1');
               setCurrentView('anime-player');
             }}
-            setAnime={setScrapedManhuaCache}
+            setAnime={(anime: any) => setScrapedManhuaCache(anime)}
             user={user}
             readingList={readingList}
             onAddToList={handleAddToList}
             onRemoveFromList={handleRemoveFromList}
             onNavigate={handleNavigate}
+            onSelectAnimeUrl={(url) => {
+              setSelectedManhuaId(url);
+              setScrapedManhuaCache(null);
+              setCurrentView('anime-details');
+            }}
           />
         )}
         
         {currentView === 'anime-player' && (
           <AnimePlayerView 
             anime={scrapedManhuaCache as any}
-            episodeNumber={parseInt(selectedChapterId || '1')}
+            episodeNumber={parseInt(selectedChapterId || '1') || 1}
             onNavigateEpisode={(id, ep) => {
-              setSelectedChapterId(ep.toString());
+              setSelectedChapterId(ep !== null && ep !== undefined && !isNaN(ep) ? ep.toString() : '1');
             }}
             onBack={() => setCurrentView('anime-details')}
             onAddAnimeHistory={handleAddAnimeHistory}
             initialStoppedSeconds={
               animeHistory.find(
-                (h) => h.animeId === selectedManhuaId && h.episodeNumber === parseInt(selectedChapterId || '1')
+                (h) => h.animeId === selectedManhuaId && h.episodeNumber === (parseInt(selectedChapterId || '1') || 1)
               )?.stoppedAtSeconds || 0
             }
           />
@@ -978,14 +1018,14 @@ export default function App() {
             onSelectEpisode={async (animeId, episodeNumber) => {
               setSelectedManhuaId(animeId);
               setAppMode('anime');
-              setSelectedChapterId(episodeNumber.toString());
+              setSelectedChapterId(episodeNumber !== null && episodeNumber !== undefined ? episodeNumber.toString() : '1');
               setCurrentView('anime-player');
               
               // Prefetch anime details in the background so player can load
               try {
                 const details = await fetchAnimeDetails(animeId);
                 if (details) {
-                  setScrapedManhuaCache(details);
+                  setScrapedManhuaCache(details as any);
                 }
               } catch (e) {
                 console.error("Failed to prefetch anime details:", e);
@@ -1022,6 +1062,7 @@ export default function App() {
             onNavigateToAnime={(animeId) => {
               setSelectedManhuaId(animeId);
               setAppMode('anime');
+              setScrapedManhuaCache(null);
               setCurrentView('anime-details');
             }}
           />
@@ -1048,25 +1089,14 @@ export default function App() {
               )}
             </p>
             <p className="font-sans max-w-2xl mx-auto">
-              {appMode === 'anime' ? (
-                <>منصة تجمع عشاق الأنمي في تجربة مشاهدة مريحة وممتعة لآخر الحلقات المترجمة. جميع الحقوق محفوظة © 2026.</>
-              ) : (
-                <>منصة تجمع عشاق المانهو والمانجا في تجربة قراءة مريحة وممتعة. جميع الحقوق محفوظة © 2026.</>
-              )}
+              منصة تجمع عشاق المانهو وانمي في تجربة قراءة مريحة وممتعة. جميع الحقوق محفوظة © 2026.
             </p>
             <div className="pt-2 flex flex-col items-center gap-3">
               <div className="flex items-center justify-center gap-4 text-zinc-400">
-                <a href="mailto:hdmdudn93@gmail.com" className="hover:text-white underline cursor-pointer font-bold transition-colors flex items-center gap-1.5">
-                  تواصل معنا ✉️
-                </a>
-                <span>•</span>
                 <a href="https://discord.gg/NM59xtZtX3" target="_blank" rel="noopener noreferrer" className="hover:text-[#5865F2] underline cursor-pointer font-bold transition-colors flex items-center gap-1.5">
                   ديسكورد المنصة 💬
                 </a>
               </div>
-              <p className="text-[10px] text-zinc-600 font-mono">
-                للمقترحات والشكاوى: hdmdudn93@gmail.com
-              </p>
             </div>
           </div>
         </footer>
@@ -1281,7 +1311,25 @@ export default function App() {
         </div>
       )}
 
+      {/* FLOATING READING/WATCHING COMPANION WIDGET */}
+      <CompanionWidget
+        state={companionState}
+        onUpdateState={setCompanionState}
+        onOpenModal={() => setIsCompanionModalOpen(true)}
+        isReadingOrWatching={currentView === 'reader' || currentView === 'anime-player'}
+        contentType={appMode}
+      />
 
+      {/* COMPANION MANAGEMENT MODAL */}
+      <CompanionModal
+        isOpen={isCompanionModalOpen}
+        onClose={() => setIsCompanionModalOpen(false)}
+        state={companionState}
+        onUpdateState={setCompanionState}
+      />
+
+      {/* COMPANION GLOBAL PAGE EFFECTS */}
+      <CompanionEffects />
     </div>
   );
 }

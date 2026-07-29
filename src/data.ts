@@ -310,5 +310,30 @@ export const defaultScraperSources: ScraperSource[] = [
     detailChapterTitleSelector: 'span, h4, a',
     pageImgSelector: 'iframe',
     pageImgAttr: 'src'
+  },
+  {
+    id: 'animerco',
+    name: 'Animerco',
+    baseUrl: 'https://eta.animerco.org',
+    icon: 'https://eta.animerco.org/wp-content/uploads/2022/02/favicon.png', // Assuming standard WP favicon
+    popularPath: '/animes/page/1/',
+    type: 'anime',
+    lang: 'ar',
+    listCardSelector: '.anime-card, .post-item, .item, .box-item, article',
+    listTitleSelector: 'h3, h4, .title, .anime-title',
+    listLinkSelector: 'a',
+    listCoverSelector: 'img',
+    listCoverAttr: 'src',
+    detailTitleSelector: 'h1.entry-title, h1',
+    detailDescSelector: '.anime-story, .story, .description, .entry-content',
+    detailAuthorSelector: 'unknown',
+    detailArtistSelector: 'unknown',
+    detailStatusSelector: 'unknown',
+    detailGenreSelector: '.genres a, .anime-genres a, a[href*="/genre/"]',
+    detailChapterItemSelector: '.episodes-list a, .episodio a, a[href*="/episode/"], a[href*="/ep-"], .List-Episodes a',
+    detailChapterLinkSelector: 'a',
+    detailChapterTitleSelector: 'span, h4, h3, .title',
+    pageImgSelector: 'iframe, .server-list a, .servers a, ul.servers li a, #episode-servers li a',
+    pageImgAttr: 'src'
   }
 ];
