@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { defaultScraperSources } from './data';
 import { UserProfile, ReadingHistoryItem, AnimeWatchHistoryItem, ReaderSettings, Manhua, Chapter, ScraperSource, ReadingListItem, NotificationItem } from './types';
 import { updateUserProfile, fetchUserReadingHistory, saveUserReadingHistory, deleteUserHistoryItem, clearUserReadingHistory, fetchUserReadingList, addManhuaToReadingList, removeManhuaFromReadingList, fetchUserAnimeHistory, saveUserAnimeHistory, deleteUserAnimeHistoryItem, clearUserAnimeHistory } from './lib/firebaseDb';
@@ -65,6 +65,10 @@ export default function App() {
   // Search parameters state passed to search view
   const [searchQuery, setSearchQuery] = useState('');
   const [searchCategory, setSearchCategory] = useState<string | null>(null);
+
+  // Companion XP tracking refs
+  const lastXpChapterId = useRef<string | null>(null);
+  const lastXpEpisodeId = useRef<string | null>(null);
 
   // Dynamic Scraper Sources State
   const [sources, setSources] = useState<ScraperSource[]>(() => {
@@ -539,14 +543,17 @@ export default function App() {
 
   // History Functions
   const handleAddHistory = async (item: Omit<ReadingHistoryItem, 'id' | 'lastReadTime'>) => {
-    // Award progress to Reading Companion (+10 XP)
-    const { newState, leveledUp } = addReadingProgress('chapter', 1);
-    setCompanionState(newState);
+    // Award progress to Reading Companion (+10 XP) ONLY if it's a new chapter
+    if (lastXpChapterId.current !== item.chapterId) {
+      lastXpChapterId.current = item.chapterId;
+      const { newState, leveledUp } = addReadingProgress('chapter', 1);
+      setCompanionState(newState);
 
-    if (leveledUp) {
-      window.dispatchEvent(new CustomEvent('companion-effect', { 
-        detail: { type: 'evolve', level: newState.level } 
-      }));
+      if (leveledUp) {
+        window.dispatchEvent(new CustomEvent('companion-effect', { 
+          detail: { type: 'evolve', level: newState.level } 
+        }));
+      }
     }
 
     if (user?.id) {
@@ -600,14 +607,18 @@ export default function App() {
 
   // Anime History Functions
   const handleAddAnimeHistory = async (item: Omit<AnimeWatchHistoryItem, 'id' | 'lastWatchedTime'>) => {
-    // Award progress to Reading Companion (+15 XP)
-    const { newState, leveledUp } = addReadingProgress('episode', 1);
-    setCompanionState(newState);
+    // Award progress to Reading Companion (+15 XP) ONLY if it's a new episode
+    const epIdentifier = `${item.animeId}-${item.episodeNumber}`;
+    if (lastXpEpisodeId.current !== epIdentifier) {
+      lastXpEpisodeId.current = epIdentifier;
+      const { newState, leveledUp } = addReadingProgress('episode', 1);
+      setCompanionState(newState);
 
-    if (leveledUp) {
-      window.dispatchEvent(new CustomEvent('companion-effect', { 
-        detail: { type: 'evolve', level: newState.level } 
-      }));
+      if (leveledUp) {
+        window.dispatchEvent(new CustomEvent('companion-effect', { 
+          detail: { type: 'evolve', level: newState.level } 
+        }));
+      }
     }
 
     if (user?.id) {

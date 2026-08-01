@@ -1,0 +1,11 @@
+  // History Functions
+  const handleAddHistory = async (item: Omit<ReadingHistoryItem, 'id' | 'lastReadTime'>) => {
+    // Award progress to Reading Companion (+10 XP)
+    const { newState, leveledUp } = addReadingProgress('chapter', 1);
+    setCompanionState(newState);
+
+    if (leveledUp) {
+      window.dispatchEvent(new CustomEvent('companion-effect', { 
+        detail: { type: 'evolve', level: newState.level } 
+      }));
+    }

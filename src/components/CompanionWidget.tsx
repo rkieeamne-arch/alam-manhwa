@@ -137,9 +137,7 @@ export default function CompanionWidget({
     return (
       <div className={`fixed bottom-20 md:bottom-5 left-3 z-40 select-none transition-all duration-700 transform ${
         isReadingOrWatching 
-          ? ambientVisible 
-            ? 'opacity-100 scale-100 translate-x-0 pointer-events-auto' 
-            : 'opacity-0 scale-75 -translate-x-12 pointer-events-none'
+          ? 'opacity-0 scale-75 -translate-x-12 pointer-events-none'
           : 'opacity-100 scale-100 translate-x-0 pointer-events-auto'
       }`}>
         <button
@@ -181,9 +179,7 @@ export default function CompanionWidget({
   return (
     <div className={`fixed bottom-20 md:bottom-5 left-3 z-40 w-auto max-w-[210px] select-none transition-all duration-700 transform ${
       isReadingOrWatching 
-        ? ambientVisible 
-          ? 'opacity-100 scale-100 translate-x-0 pointer-events-auto shadow-2xl' 
-          : 'opacity-0 scale-75 -translate-x-12 pointer-events-none'
+        ? 'opacity-0 scale-75 -translate-x-12 pointer-events-none'
         : 'opacity-100 scale-100 translate-x-0 pointer-events-auto shadow-xl'
     }`}>
       
