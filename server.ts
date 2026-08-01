@@ -804,6 +804,124 @@ async function startServer() {
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
   });
+
+  // Automated Recommendation Cron System (Every 25 minutes)
+  const RECOMMENDATION_CATALOG = [
+    // Anime
+    {
+      title: "Solo Leveling Season 2: Arise from the Shadow",
+      arabicTitle: "سولو ليفلينج الموسم الثاني",
+      type: "أنمي 🎬",
+      rating: "9.8 / 10 ⭐",
+      genres: "أكشن، قوة خارقة، خيال تاريك، مغامرة",
+      imageUrl: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800&auto=format&fit=crop&q=80",
+      description: "بعد ارتقاء سونغ جين وو ليكون صياد الدرجة S ومستحضر الأرواح، تبدأ المواجهة الكبرى ضد ملوك الظلال والكوارث المستيقظة!"
+    },
+    {
+      title: "Attack on Titan (Shingeki no Kyojin)",
+      arabicTitle: "هجوم العمالقة",
+      type: "أنمي 🎬",
+      rating: "9.9 / 10 ⭐",
+      genres: "أكشن، دراما، غموض، عسكري، خيال",
+      imageUrl: "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=800&auto=format&fit=crop&q=80",
+      description: "ملحمة صراع البشرية الأخير خلف الأسوار ضد العمالقة وحقيقة العالم الخارجي والحرية."
+    },
+    {
+      title: "Jujutsu Kaisen Season 2 (Shibuya Incident)",
+      arabicTitle: "جوجوتسو كايسن - حادثة شيبويا",
+      type: "أنمي 🎬",
+      rating: "9.7 / 10 ⭐",
+      genres: "أكشن، شياطين، مدرسة، خوارق",
+      imageUrl: "https://images.unsplash.com/photo-1563089145-599997674d42?w=800&auto=format&fit=crop&q=80",
+      description: "المعركة الأعنف في تاريخ اللعنات مستعرة في شيبويا مع احتجاز ساتورو غوجو وسعي إيتادوري لإيقاف سوكونا!"
+    },
+    {
+      title: "Demon Slayer: Kimetsu no Yaiba",
+      arabicTitle: "قاتل الشياطين",
+      type: "أنمي 🎬",
+      rating: "9.6 / 10 ⭐",
+      genres: "أكشن، تاريخي، شياطين، فنون قتالية",
+      imageUrl: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=800&auto=format&fit=crop&q=80",
+      description: "تانجيرو كامادو يواصل رحلته لإنقاذ أخته نيزوكو والانتقام من موزان ملك الشياطين بمساعدة الهاشيرا."
+    },
+    {
+      title: "One Piece: Egghead Island Arc",
+      arabicTitle: "ون بيس - أراد إيغ هيد",
+      type: "أنمي 🎬",
+      rating: "9.8 / 10 ⭐",
+      genres: "مغامرة، كوميديا، أكشن، خيال",
+      imageUrl: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop&q=80",
+      description: "طاقم قبعة القش يصل إلى جزيرة المستقبل إيغ هيد ويلتقون بالعالم العبقري فيغابانك وتنكشف أسرار القرن الخالي!"
+    },
+    // Manhua / Manhwa
+    {
+      title: "Omniscient Reader's Viewpoint",
+      arabicTitle: "وجهة نظر القارئ العليم",
+      type: "مانهو 📖",
+      rating: "9.8 / 10 ⭐",
+      genres: "أكشن، خيال، نماء، بوابات، نظام",
+      imageUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80",
+      description: "كيم دوكجا هو القارئ الوحيد الذي أنهى رواية طوال 10 سنوات، وفجأة أصبحت الرواية حقيقة واقعة وهو الوحيد الذي يعرف النهاية!"
+    },
+    {
+      title: "The Beginning After the End",
+      arabicTitle: "البداية بعد النهاية",
+      type: "مانهو 📖",
+      rating: "9.7 / 10 ⭐",
+      genres: "إيسيكاي، سحر، أكشن، تناسخ، مدرسة",
+      imageUrl: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop&q=80",
+      description: "الملك غراي يُولد من جديد في عالم سحري غريب باسم أرثر بيندراغون ليبدأ رحلة تطوير قدراته وحماية أحبائه من الحروب."
+    },
+    {
+      title: "Nanomachine",
+      arabicTitle: "الآلة النانوية (نانو ماشين)",
+      type: "مانهو 📖",
+      rating: "9.6 / 10 ⭐",
+      genres: "موريم، فنون قتالية، نانو تكنولوجيا، الانتقام",
+      imageUrl: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&auto=format&fit=crop&q=80",
+      description: "تشيو وون العاجز يتلقى حاقن آلات نانوية سحرية من سليل مستقبلي ليصبح أقوى لورد في طائفة الشياطين!"
+    },
+    {
+      title: "Return of the Mount Hua Sect",
+      arabicTitle: "عودة طائفة جبل هوا",
+      type: "مانهو 📖",
+      rating: "9.9 / 10 ⭐",
+      genres: "كوميديا، موريم، فنون قتالية، تناسخ",
+      imageUrl: "https://images.unsplash.com/photo-1514539079130-25950c84af65?w=800&auto=format&fit=crop&q=80",
+      description: "قديس السيف تشيونغ ميونغ يعود للحياة بعد 100 عام ليجد طائفته المحبوبة قد انهارت، ويبدأ بإعادتها للمجد بأسلوبه المجنون!"
+    }
+  ];
+
+  function startAutomatedRecommendations() {
+    const INTERVAL_MS = 25 * 60 * 1000; // 25 minutes
+    
+    setInterval(async () => {
+      const webhookUrl = process.env.DISCORD_RECOMMENDATION_WEBHOOK_URL || process.env.DISCORD_WEBHOOK_URL;
+      if (!webhookUrl) return;
+
+      const randomItem = RECOMMENDATION_CATALOG[Math.floor(Math.random() * RECOMMENDATION_CATALOG.length)];
+      
+      console.log(`[Cron 25-Min]: Sending automated Discord recommendation: ${randomItem.arabicTitle}`);
+
+      await sendDiscordNotification(webhookUrl, {
+        title: `🎲 اقتراح اليوم التلقائي: ${randomItem.arabicTitle}`,
+        description: `${randomItem.description}\n\n🔗 **[اضغط هنا للمشاهدة والقراءة فوراً على المنصة](https://gregarious-crostata-f01961.netlify.app/)**`,
+        color: randomItem.type.includes('أنمي') ? 0x3b82f6 : 0x10b981,
+        imageUrl: randomItem.imageUrl,
+        url: 'https://gregarious-crostata-f01961.netlify.app/',
+        fields: [
+          { name: '🏷️ اسم العمل:', value: `${randomItem.arabicTitle} (${randomItem.title})`, inline: false },
+          { name: '📌 النوع:', value: randomItem.type, inline: true },
+          { name: '⭐ التقييم:', value: randomItem.rating, inline: true },
+          { name: '🎭 التصنيف:', value: randomItem.genres, inline: false }
+        ],
+        content: `✨ **اقتراح جديد كل 25 دقيقة تلقائياً من بوت عالم الأنمي والمانهو! 🍿**`
+      });
+    }, INTERVAL_MS);
+  }
+
+  // Launch automated recommendations interval
+  startAutomatedRecommendations();
 }
 
 startServer();
