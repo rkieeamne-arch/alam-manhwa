@@ -110,19 +110,19 @@ async function startServer() {
       const payload = {
         content: embedData.content || undefined,
         username: "عالم الأنمي والمانهو Bot",
-        avatar_url: "https://gregarious-crostata-f01961.netlify.app/icon.png",
+        avatar_url: "https://manhwa-world.onrender.com/icon.png",
         embeds: [
           {
             title: embedData.title,
             description: embedData.description,
             color: embedData.color || 0xe11d48, // Default rose red
-            url: embedData.url,
+            url: embedData.url || "https://manhwa-world.onrender.com/",
             author: embedData.authorName ? { name: embedData.authorName } : undefined,
             fields: embedData.fields || [],
             image: embedData.imageUrl ? { url: embedData.imageUrl } : undefined,
             footer: {
               text: "تنسيق تلقائي من موقع عالم الأنمي والمانهو",
-              icon_url: "https://gregarious-crostata-f01961.netlify.app/icon.png"
+              icon_url: "https://manhwa-world.onrender.com/icon.png"
             },
             timestamp: new Date().toISOString()
           }
@@ -242,7 +242,7 @@ async function startServer() {
       color: embedColor,
       fields,
       imageUrl,
-      url: itemUrl || 'https://gregarious-crostata-f01961.netlify.app/',
+      url: itemUrl || 'https://manhwa-world.onrender.com/',
       content: messageContent.trim() || undefined
     });
 
@@ -814,7 +814,7 @@ async function startServer() {
       type: "أنمي 🎬",
       rating: "9.8 / 10 ⭐",
       genres: "أكشن، قوة خارقة، خيال تاريك، مغامرة",
-      imageUrl: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800&auto=format&fit=crop&q=80",
+      imageUrl: "https://cdn.myanimelist.net/images/anime/1801/142316.jpg",
       description: "بعد ارتقاء سونغ جين وو ليكون صياد الدرجة S ومستحضر الأرواح، تبدأ المواجهة الكبرى ضد ملوك الظلال والكوارث المستيقظة!"
     },
     {
@@ -823,7 +823,7 @@ async function startServer() {
       type: "أنمي 🎬",
       rating: "9.9 / 10 ⭐",
       genres: "أكشن، دراما، غموض، عسكري، خيال",
-      imageUrl: "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=800&auto=format&fit=crop&q=80",
+      imageUrl: "https://cdn.myanimelist.net/images/anime/10/47347.jpg",
       description: "ملحمة صراع البشرية الأخير خلف الأسوار ضد العمالقة وحقيقة العالم الخارجي والحرية."
     },
     {
@@ -832,7 +832,7 @@ async function startServer() {
       type: "أنمي 🎬",
       rating: "9.7 / 10 ⭐",
       genres: "أكشن، شياطين، مدرسة، خوارق",
-      imageUrl: "https://images.unsplash.com/photo-1563089145-599997674d42?w=800&auto=format&fit=crop&q=80",
+      imageUrl: "https://cdn.myanimelist.net/images/anime/1171/109222.jpg",
       description: "المعركة الأعنف في تاريخ اللعنات مستعرة في شيبويا مع احتجاز ساتورو غوجو وسعي إيتادوري لإيقاف سوكونا!"
     },
     {
@@ -841,7 +841,7 @@ async function startServer() {
       type: "أنمي 🎬",
       rating: "9.6 / 10 ⭐",
       genres: "أكشن، تاريخي، شياطين، فنون قتالية",
-      imageUrl: "https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=800&auto=format&fit=crop&q=80",
+      imageUrl: "https://cdn.myanimelist.net/images/anime/1286/99889.jpg",
       description: "تانجيرو كامادو يواصل رحلته لإنقاذ أخته نيزوكو والانتقام من موزان ملك الشياطين بمساعدة الهاشيرا."
     },
     {
@@ -850,7 +850,7 @@ async function startServer() {
       type: "أنمي 🎬",
       rating: "9.8 / 10 ⭐",
       genres: "مغامرة، كوميديا، أكشن، خيال",
-      imageUrl: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop&q=80",
+      imageUrl: "https://cdn.myanimelist.net/images/anime/6/73245.jpg",
       description: "طاقم قبعة القش يصل إلى جزيرة المستقبل إيغ هيد ويلتقون بالعالم العبقري فيغابانك وتنكشف أسرار القرن الخالي!"
     },
     // Manhua / Manhwa
@@ -860,7 +860,7 @@ async function startServer() {
       type: "مانهو 📖",
       rating: "9.8 / 10 ⭐",
       genres: "أكشن، خيال، نماء، بوابات، نظام",
-      imageUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80",
+      imageUrl: "https://upload.wikimedia.org/wikipedia/en/2/2a/Omniscient_Reader%27s_Viewpoint.jpg",
       description: "كيم دوكجا هو القارئ الوحيد الذي أنهى رواية طوال 10 سنوات، وفجأة أصبحت الرواية حقيقة واقعة وهو الوحيد الذي يعرف النهاية!"
     },
     {
@@ -869,7 +869,7 @@ async function startServer() {
       type: "مانهو 📖",
       rating: "9.7 / 10 ⭐",
       genres: "إيسيكاي، سحر، أكشن، تناسخ، مدرسة",
-      imageUrl: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&auto=format&fit=crop&q=80",
+      imageUrl: "https://m.media-amazon.com/images/I/91e0sB+bQQL._AC_UF1000,1000_QL80_.jpg",
       description: "الملك غراي يُولد من جديد في عالم سحري غريب باسم أرثر بيندراغون ليبدأ رحلة تطوير قدراته وحماية أحبائه من الحروب."
     },
     {
@@ -878,7 +878,7 @@ async function startServer() {
       type: "مانهو 📖",
       rating: "9.6 / 10 ⭐",
       genres: "موريم، فنون قتالية، نانو تكنولوجيا، الانتقام",
-      imageUrl: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&auto=format&fit=crop&q=80",
+      imageUrl: "https://upload.wikimedia.org/wikipedia/en/thumb/0/08/Nano_Machine.jpeg/220px-Nano_Machine.jpeg",
       description: "تشيو وون العاجز يتلقى حاقن آلات نانوية سحرية من سليل مستقبلي ليصبح أقوى لورد في طائفة الشياطين!"
     },
     {
@@ -887,41 +887,143 @@ async function startServer() {
       type: "مانهو 📖",
       rating: "9.9 / 10 ⭐",
       genres: "كوميديا، موريم، فنون قتالية، تناسخ",
-      imageUrl: "https://images.unsplash.com/photo-1514539079130-25950c84af65?w=800&auto=format&fit=crop&q=80",
+      imageUrl: "https://upload.wikimedia.org/wikipedia/en/3/30/Return_of_the_Blossoming_Blade.jpeg",
       description: "قديس السيف تشيونغ ميونغ يعود للحياة بعد 100 عام ليجد طائفته المحبوبة قد انهارت، ويبدأ بإعادتها للمجد بأسلوبه المجنون!"
     }
   ];
 
+  // Latest ongoing works catalog for 10-min updates
+  const LATEST_UPDATES_CATALOG = [
+    {
+      category: "anime",
+      title: "ون بيس (One Piece)",
+      latestUnit: "الحلقة 1115 مترجمة",
+      imageUrl: "https://cdn.myanimelist.net/images/anime/6/73245.jpg",
+      type: "أنمي 🎬"
+    },
+    {
+      category: "anime",
+      title: "سولو ليفلينج (Solo Leveling)",
+      latestUnit: "الحلقة 12 الموسم الثاني",
+      imageUrl: "https://cdn.myanimelist.net/images/anime/1801/142316.jpg",
+      type: "أنمي 🎬"
+    },
+    {
+      category: "anime",
+      title: "جوجوتسو كايسن (Jujutsu Kaisen)",
+      latestUnit: "الحلقة 23 جودة جبارة 4K",
+      imageUrl: "https://cdn.myanimelist.net/images/anime/1171/109222.jpg",
+      type: "أنمي 🎬"
+    },
+    {
+      category: "manhua",
+      title: "وجهة نظر القارئ العليم (Omniscient Reader)",
+      latestUnit: "الفصل 215 مترجم احترافي",
+      imageUrl: "https://upload.wikimedia.org/wikipedia/en/2/2a/Omniscient_Reader%27s_Viewpoint.jpg",
+      type: "مانهو 📖"
+    },
+    {
+      category: "manhua",
+      title: "الآلة النانوية (Nano Machine)",
+      latestUnit: "الفصل 204 بجودة فائقة",
+      imageUrl: "https://upload.wikimedia.org/wikipedia/en/thumb/0/08/Nano_Machine.jpeg/220px-Nano_Machine.jpeg",
+      type: "مانهو 📖"
+    },
+    {
+      category: "manhua",
+      title: "البداية بعد النهاية (TBATE)",
+      latestUnit: "الفصل 188 جودة عالية",
+      imageUrl: "https://m.media-amazon.com/images/I/91e0sB+bQQL._AC_UF1000,1000_QL80_.jpg",
+      type: "مانهو 📖"
+    }
+  ];
+
+  async function sendSingleRecommendation() {
+    const webhookUrl = process.env.DISCORD_RECOMMENDATION_WEBHOOK_URL || process.env.DISCORD_WEBHOOK_URL;
+    if (!webhookUrl) return;
+
+    const randomItem = RECOMMENDATION_CATALOG[Math.floor(Math.random() * RECOMMENDATION_CATALOG.length)];
+    const mainSiteUrl = process.env.APP_URL || 'https://manhwa-world.onrender.com/';
+    
+    console.log(`[Cron 25-Min]: Sending automated Discord recommendation: ${randomItem.arabicTitle}`);
+
+    await sendDiscordNotification(webhookUrl, {
+      title: `🎲 اقتراح اليوم التلقائي: ${randomItem.arabicTitle}`,
+      description: `${randomItem.description}\n\n🔗 **[اضغط هنا للمشاهدة والقراءة فوراً على المنصة](${mainSiteUrl})**`,
+      color: randomItem.type.includes('أنمي') ? 0x3b82f6 : 0x10b981,
+      imageUrl: randomItem.imageUrl,
+      url: mainSiteUrl,
+      fields: [
+        { name: '🏷️ اسم العمل:', value: `${randomItem.arabicTitle} (${randomItem.title})`, inline: false },
+        { name: '📌 النوع:', value: randomItem.type, inline: true },
+        { name: '⭐ التقييم:', value: randomItem.rating, inline: true },
+        { name: '🎭 التصنيف:', value: randomItem.genres, inline: false }
+      ],
+      content: `✨ **اقتراح جديد كل 25 دقيقة تلقائياً من بوت عالم الأنمي والمانهو! 🍿**`
+    });
+  }
+
   function startAutomatedRecommendations() {
     const INTERVAL_MS = 25 * 60 * 1000; // 25 minutes
     
-    setInterval(async () => {
-      const webhookUrl = process.env.DISCORD_RECOMMENDATION_WEBHOOK_URL || process.env.DISCORD_WEBHOOK_URL;
-      if (!webhookUrl) return;
+    // 1. Send first recommendation immediately upon server launch!
+    sendSingleRecommendation().catch(console.error);
 
-      const randomItem = RECOMMENDATION_CATALOG[Math.floor(Math.random() * RECOMMENDATION_CATALOG.length)];
-      
-      console.log(`[Cron 25-Min]: Sending automated Discord recommendation: ${randomItem.arabicTitle}`);
-
-      await sendDiscordNotification(webhookUrl, {
-        title: `🎲 اقتراح اليوم التلقائي: ${randomItem.arabicTitle}`,
-        description: `${randomItem.description}\n\n🔗 **[اضغط هنا للمشاهدة والقراءة فوراً على المنصة](https://gregarious-crostata-f01961.netlify.app/)**`,
-        color: randomItem.type.includes('أنمي') ? 0x3b82f6 : 0x10b981,
-        imageUrl: randomItem.imageUrl,
-        url: 'https://gregarious-crostata-f01961.netlify.app/',
-        fields: [
-          { name: '🏷️ اسم العمل:', value: `${randomItem.arabicTitle} (${randomItem.title})`, inline: false },
-          { name: '📌 النوع:', value: randomItem.type, inline: true },
-          { name: '⭐ التقييم:', value: randomItem.rating, inline: true },
-          { name: '🎭 التصنيف:', value: randomItem.genres, inline: false }
-        ],
-        content: `✨ **اقتراح جديد كل 25 دقيقة تلقائياً من بوت عالم الأنمي والمانهو! 🍿**`
-      });
+    // 2. Schedule every 25 minutes
+    setInterval(() => {
+      sendSingleRecommendation().catch(console.error);
     }, INTERVAL_MS);
   }
 
-  // Launch automated recommendations interval
+  let latestIndex = 0;
+  async function sendLatestUpdate() {
+    const item = LATEST_UPDATES_CATALOG[latestIndex % LATEST_UPDATES_CATALOG.length];
+    latestIndex++;
+
+    const isAnime = item.category === 'anime';
+    const webhookUrl = isAnime 
+      ? (process.env.DISCORD_ANIME_WEBHOOK_URL || process.env.DISCORD_WEBHOOK_URL)
+      : (process.env.DISCORD_MANHUA_WEBHOOK_URL || process.env.DISCORD_WEBHOOK_URL);
+
+    if (!webhookUrl) return;
+
+    const mainSiteUrl = process.env.APP_URL || 'https://manhwa-world.onrender.com/';
+
+    console.log(`[Cron 10-Min]: Sending automated latest update to Discord (${item.category}): ${item.title} - ${item.latestUnit}`);
+
+    await sendDiscordNotification(webhookUrl, {
+      title: isAnime ? `🎬 أحدث حلقة متوفرة الآن: ${item.title}` : `📖 أحدث فصل متوفر الآن: ${item.title}`,
+      description: `تم تحديث وسحب أحدث الاصدارات المتوفرة على الموقع للعمل **${item.title}**!\n\n🔗 **[انقر هنا لمشاهدة / قراءة ${item.latestUnit} الآن مجاناً](${mainSiteUrl})**`,
+      color: isAnime ? 0x3b82f6 : 0x10b981,
+      imageUrl: item.imageUrl,
+      url: mainSiteUrl,
+      fields: [
+        { name: isAnime ? '📺 العمل:' : '📕 العمل:', value: item.title, inline: true },
+        { name: isAnime ? '🔢 رقم الحلقة:' : '📑 رقم الفصل:', value: item.latestUnit, inline: true }
+      ],
+      content: isAnime 
+        ? `🔥 **تحديث كل 10 دقائق: حلقة أنمي متوفرة الآن للحلقة الجديدة! مشاهدة ممتعة 🎬**`
+        : `⚡ **تحديث كل 10 دقائق: فصل مانهو متوفر الآن للقراءة الجبارة! قراءة ممتعة 📖**`
+    });
+  }
+
+  function startAutomatedLatestUpdates() {
+    const INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+
+    // Send first update after 10 seconds of startup
+    setTimeout(() => {
+      sendLatestUpdate().catch(console.error);
+    }, 10000);
+
+    // Schedule every 10 minutes
+    setInterval(() => {
+      sendLatestUpdate().catch(console.error);
+    }, INTERVAL_MS);
+  }
+
+  // Launch automated cron systems
   startAutomatedRecommendations();
+  startAutomatedLatestUpdates();
 }
 
 startServer();
