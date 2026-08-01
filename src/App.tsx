@@ -4,7 +4,7 @@ import { UserProfile, ReadingHistoryItem, AnimeWatchHistoryItem, ReaderSettings,
 import { updateUserProfile, fetchUserReadingHistory, saveUserReadingHistory, deleteUserHistoryItem, clearUserReadingHistory, fetchUserReadingList, addManhuaToReadingList, removeManhuaFromReadingList, fetchUserAnimeHistory, saveUserAnimeHistory, deleteUserAnimeHistoryItem, clearUserAnimeHistory } from './lib/firebaseDb';
 import { subscribeToAuthChanges, logout, loginWithEmail, signupWithEmail, resetPassword, signInWithGoogle } from './lib/firebaseAuth';
 import { auth } from './lib/firebaseAuth';
-import { Home, Search, Heart, History, FolderDown, User, MessageSquare, Bell, Tv, BookOpen, X } from 'lucide-react';
+import { Home, Search, Heart, History, FolderDown, User, MessageSquare, Bell, Tv, BookOpen, X, Sparkles } from 'lucide-react';
 
 // Components
 import Header from './components/Header';
@@ -173,6 +173,16 @@ export default function App() {
   });
 
   const [activeToast, setActiveToast] = useState<NotificationItem | null>(null);
+
+  // Download app announcement modal upon entry state
+  const [showDownloadModal, setShowDownloadModal] = useState<boolean>(() => {
+    return !localStorage.getItem('has_seen_download_announcement_v5');
+  });
+
+  const handleCloseDownloadModal = () => {
+    setShowDownloadModal(false);
+    localStorage.setItem('has_seen_download_announcement_v5', 'true');
+  };
 
   // Reading Companion State
   const [companionState, setCompanionState] = useState<CompanionState>(() => getCompanionState());
@@ -1330,6 +1340,93 @@ export default function App() {
 
       {/* COMPANION GLOBAL PAGE EFFECTS */}
       <CompanionEffects />
+
+      {/* ENTRY ANNOUNCEMENT & DOWNLOAD APP MODAL */}
+      {showDownloadModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-lg animate-fade-in" dir="rtl">
+          <div className="relative w-full max-w-md bg-gradient-to-b from-zinc-900 to-zinc-950 border-2 border-red-500/40 rounded-3xl shadow-2xl shadow-red-500/10 overflow-hidden p-6 text-right transition-all transform scale-100 hover:border-red-500/60">
+            
+            {/* Animated pulsing neon overlays */}
+            <div className="absolute -top-16 -left-16 w-40 h-40 bg-gradient-to-br from-red-600 to-rose-600 rounded-full blur-[60px] opacity-40 animate-pulse pointer-events-none"></div>
+            <div className="absolute -bottom-16 -right-16 w-40 h-40 bg-gradient-to-tr from-amber-500 to-yellow-500 rounded-full blur-[60px] opacity-40 animate-pulse pointer-events-none"></div>
+
+            {/* Close Button */}
+            <button
+              onClick={handleCloseDownloadModal}
+              className="absolute top-4 left-4 p-2 text-zinc-400 hover:text-white bg-zinc-900/80 border border-zinc-800 rounded-full hover:bg-zinc-800 transition-all cursor-pointer shadow-sm"
+              title="إغلاق"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Vibrant Festive Header */}
+            <div className="flex flex-col items-center text-center mt-3 mb-6">
+              <div className="relative mb-4">
+                {/* Outer pulsing ring */}
+                <div className="absolute inset-0 bg-red-500 rounded-3xl blur-md opacity-50 animate-ping"></div>
+                <div className="relative w-16 h-16 rounded-3xl bg-gradient-to-br from-red-500 via-rose-500 to-amber-500 flex items-center justify-center shadow-2xl border border-red-400/40">
+                  <Sparkles className="w-8 h-8 text-white animate-bounce" />
+                </div>
+                {/* Small floating sparkles */}
+                <span className="absolute -top-1 -right-1 text-base">✨</span>
+                <span className="absolute -bottom-2 -left-2 text-base">🚀</span>
+              </div>
+              
+              <span className="text-[11px] font-black uppercase tracking-wider text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-1 rounded-full shadow-inner">
+                تحديث أسطوري رائع 🎉
+              </span>
+              <h3 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-zinc-100 to-amber-300 mt-2">
+                تنزيل تطبيق عالم الانمي والمانهو
+              </h3>
+            </div>
+
+            {/* Lively, engaging description */}
+            <div className="space-y-4 text-center text-zinc-300 text-sm leading-relaxed mb-6 px-1">
+              <p className="font-bold text-white text-base">
+                أهلاً بك يا بطل! 🌟
+              </p>
+              <p className="text-xs text-zinc-400">
+                لقد وفرنا لك التطبيق الرسمي المستقل لتستمتع بـ <span className="text-amber-400 font-bold">سرعة مضاعفة</span>، <span className="text-red-400 font-bold">وبدون إعلانات مزعجة</span>، مع حفظ تلقائي ومزامنة كاملة لفصولك المفضلة!
+              </p>
+              <div className="flex justify-center gap-4 py-1.5 bg-zinc-900/60 border border-zinc-800/80 rounded-2xl">
+                <div className="flex flex-col items-center">
+                  <span className="text-lg">🚫</span>
+                  <span className="text-[10px] text-zinc-400 font-bold">بدون إعلانات</span>
+                </div>
+                <div className="w-px bg-zinc-800 my-1"></div>
+                <div className="flex flex-col items-center">
+                  <span className="text-lg">⚡</span>
+                  <span className="text-[10px] text-zinc-400 font-bold">فائق السرعة</span>
+                </div>
+                <div className="w-px bg-zinc-800 my-1"></div>
+                <div className="flex flex-col items-center">
+                  <span className="text-lg">💾</span>
+                  <span className="text-[10px] text-zinc-400 font-bold">حفظ التقدم</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Clean, high-impact interactive action buttons - Raw URL hidden behind the clean button */}
+            <div className="flex flex-col gap-3">
+              <a
+                href="https://gregarious-crostata-f01961.netlify.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black text-sm py-3.5 px-4 rounded-2xl shadow-xl shadow-red-600/20 hover:shadow-red-600/30 transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 cursor-pointer text-center border-t border-white/20"
+              >
+                <FolderDown className="w-5 h-5 animate-bounce" />
+                <span>تحميل التطبيق الرسمي مجاناً</span>
+              </a>
+              <button
+                onClick={handleCloseDownloadModal}
+                className="w-full bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-800/80 font-bold text-xs py-3 rounded-2xl transition-all cursor-pointer text-center"
+              >
+                دخول الموقع مباشرة
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

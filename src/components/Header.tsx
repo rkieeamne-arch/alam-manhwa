@@ -112,6 +112,24 @@ export default function Header({
                 </h1>
               </div>
 
+              {/* Download App Button */}
+              <a
+                href="https://gregarious-crostata-f01961.netlify.app/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`flex items-center gap-1 px-2 py-1.5 xs:px-2.5 xs:py-2 sm:px-3 rounded-xl text-xs font-black transition-all shadow-md hover:scale-105 active:scale-95 ${
+                  isAnime
+                    ? 'bg-amber-500 text-zinc-950 hover:bg-amber-400 shadow-amber-500/10'
+                    : 'bg-gradient-to-r from-red-600 to-rose-600 text-white hover:from-red-500 hover:to-rose-500 shadow-red-600/10'
+                }`}
+                title="تنزيل التطبيق الرسمي"
+                id="header-download-app-btn"
+              >
+                <FolderDown className="w-4 h-4 text-white sm:text-inherit" />
+                <span className="hidden md:inline">تنزيل التطبيق</span>
+                <span className="hidden sm:inline md:hidden">تنزيل</span>
+              </a>
+
               {/* Notification Button & Panel (Circle mark on the right) */}
               <div className="relative">
                 <button

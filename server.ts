@@ -94,9 +94,168 @@ async function startServer() {
     res.json({ success: true });
   });
 
+  // Discord Webhook helper function
+  async function sendDiscordNotification(webhookUrl: string, embedData: {
+    title: string;
+    description: string;
+    color?: number;
+    fields?: Array<{ name: string; value: string; inline?: boolean }>;
+    imageUrl?: string;
+    url?: string;
+    authorName?: string;
+    content?: string;
+  }) {
+    if (!webhookUrl) return false;
+    try {
+      const payload = {
+        content: embedData.content || undefined,
+        username: "عالم الأنمي والمانهو Bot",
+        avatar_url: "https://gregarious-crostata-f01961.netlify.app/icon.png",
+        embeds: [
+          {
+            title: embedData.title,
+            description: embedData.description,
+            color: embedData.color || 0xe11d48, // Default rose red
+            url: embedData.url,
+            author: embedData.authorName ? { name: embedData.authorName } : undefined,
+            fields: embedData.fields || [],
+            image: embedData.imageUrl ? { url: embedData.imageUrl } : undefined,
+            footer: {
+              text: "تنسيق تلقائي من موقع عالم الأنمي والمانهو",
+              icon_url: "https://gregarious-crostata-f01961.netlify.app/icon.png"
+            },
+            timestamp: new Date().toISOString()
+          }
+        ]
+      };
+
+      const resp = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      return resp.ok;
+    } catch (err) {
+      console.error('[Discord Webhook Error]:', err);
+      return false;
+    }
+  }
+
+  // API endpoint for Discord broadcast across multiple rooms (Anime, Manhua, Recommendations)
+  app.post('/api/discord/notify', async (req, res) => {
+    const { 
+      type, 
+      title, 
+      itemTitle, 
+      episodeOrChapter, 
+      imageUrl, 
+      itemUrl, 
+      senderName, 
+      customMessage,
+      pingMention,
+      // Room Webhook Overrides
+      animeWebhookUrl,
+      manhuaWebhookUrl,
+      recommendationWebhookUrl,
+      webhookUrl 
+    } = req.body;
+
+    let targetWebhook = webhookUrl;
+
+    if (type === 'episode') {
+      targetWebhook = animeWebhookUrl || process.env.DISCORD_ANIME_WEBHOOK_URL || webhookUrl || process.env.DISCORD_WEBHOOK_URL;
+    } else if (type === 'chapter') {
+      targetWebhook = manhuaWebhookUrl || process.env.DISCORD_MANHUA_WEBHOOK_URL || webhookUrl || process.env.DISCORD_WEBHOOK_URL;
+    } else if (type === 'recommendation' || type === 'random_recommendation' || type === 'suggestion') {
+      targetWebhook = recommendationWebhookUrl || process.env.DISCORD_RECOMMENDATION_WEBHOOK_URL || webhookUrl || process.env.DISCORD_WEBHOOK_URL;
+    } else if (type === 'site_update' || type === 'major_update') {
+      targetWebhook = process.env.DISCORD_WEBHOOK_URL || webhookUrl;
+    } else {
+      targetWebhook = webhookUrl || process.env.DISCORD_WEBHOOK_URL;
+    }
+
+    if (!targetWebhook) {
+      return res.status(400).json({ 
+        error: 'لم يتم تزويد رابط Discord Webhook لهذه الروم. الرجاء إدخال رابط Webhook الخاص بها في الإعدادات.' 
+      });
+    }
+
+    let embedColor = 0xe11d48;
+    let embedTitle = '📢 إشعار جديد من الموقع!';
+    let fields: Array<{ name: string; value: string; inline?: boolean }> = [];
+    let defaultMessagePrefix = '';
+
+    if (pingMention === 'everyone') {
+      defaultMessagePrefix = '@everyone ';
+    } else if (pingMention === 'here') {
+      defaultMessagePrefix = '@here ';
+    }
+
+    let messageContent = customMessage ? `${defaultMessagePrefix}${customMessage}` : defaultMessagePrefix;
+
+    if (type === 'episode') {
+      embedColor = 0x3b82f6; // Blue
+      embedTitle = '🎬 تم إضافة حلقة أنمي جديدة!';
+      fields = [
+        { name: '📺 اسم الأنمي:', value: itemTitle || 'غير محدد', inline: true },
+        { name: '🔢 رقم الحلقة:', value: episodeOrChapter || 'الحلقة الجديدة', inline: true }
+      ];
+      if (!customMessage) messageContent += '🔥 **حلقة أنمي جديدة صدرت الآن! مشاهدة ممتعة** 🎬';
+    } else if (type === 'chapter') {
+      embedColor = 0x10b981; // Green
+      embedTitle = '📖 تم إضافة فصل مانهو جديد!';
+      fields = [
+        { name: '📕 اسم المانهو:', value: itemTitle || 'غير محدد', inline: true },
+        { name: '📑 رقم الفصل:', value: episodeOrChapter || 'الفصل الجديد', inline: true }
+      ];
+      if (!customMessage) messageContent += '⚡ **فصل مانهو جديد متاح الآن للقراءة! قراءة ممتعة** 📖';
+    } else if (type === 'random_recommendation' || type === 'recommendation') {
+      embedColor = 0x8b5cf6; // Purple / Violet
+      embedTitle = '🎲 اقتراح اليوم المميز للمشاهدة والقراءة ✨';
+      fields = [
+        { name: '🏷️ اسم العمل المقترح:', value: itemTitle || 'عمل أسطوري مميز', inline: true },
+        { name: '⭐️ التقييم:', value: req.body.rating || '9.2 / 10', inline: true },
+        { name: '🎭 التصنيف والنوع:', value: req.body.genres || req.body.category || 'أكشن، مغامرة، دراما', inline: false }
+      ];
+      if (!customMessage) messageContent += '✨ **اقتراح أسطوري جديد للمشاهدة والقراءة اليوم! 🍿**';
+    } else if (type === 'suggestion') {
+      embedColor = 0xf59e0b; // Amber
+      embedTitle = '💡 اقتراح عمل جديد من زائر!';
+      fields = [
+        { name: '👤 اسم المرسل:', value: senderName || 'مجهول', inline: true },
+        { name: '📝 اسم العمل المقترح:', value: itemTitle || 'غير محدد', inline: true }
+      ];
+      if (!customMessage) messageContent += '📩 **وصل اقتراح عمل جديد من أحد الزوار!**';
+    } else if (type === 'site_update' || type === 'major_update') {
+      embedColor = 0xec4899; // Pink / Magenta for major updates
+      embedTitle = title || '🚀 تحديث رئيسي وضخم في الموقع!';
+      fields = [
+        { name: '🌟 الإصدار / التحديث:', value: itemTitle || 'إصدار جديد ومميز', inline: true },
+        { name: '📢 الحالة:', value: 'متاح الآن للجميع على المنصة', inline: true }
+      ];
+      if (!customMessage) messageContent += '🚨 **تحديث جديد وهام تم إطلاقه على منصة عالم الأنمي والمانهو! تفقد التفاصيل أدناه 👇**';
+    }
+
+    const success = await sendDiscordNotification(targetWebhook, {
+      title: title || embedTitle,
+      description: req.body.description || `تم التحديث بنجاح على منصة عالم الأنمي والمانهو. اضغط على الرابط أدناه للانتقال المباشر.`,
+      color: embedColor,
+      fields,
+      imageUrl,
+      url: itemUrl || 'https://gregarious-crostata-f01961.netlify.app/',
+      content: messageContent.trim() || undefined
+    });
+
+    if (success) {
+      return res.json({ success: true, message: 'تم إرسال الإشعار والرسالة إلى روم الديسكورد المحددة بنجاح! 🎉' });
+    } else {
+      return res.status(500).json({ error: 'فشل الإرسال إلى ديسكورد. تأكد من صحة رابط الـ Webhook الخاص بهاته الروم.' });
+    }
+  });
+
   // Support Ticket route
   app.post('/api/support/ticket', async (req, res) => {
-    const { name, email, type, subject, message, imageBase64, imageName } = req.body;
+    const { name, email, type, subject, message, imageBase64, imageName, discordWebhookUrl } = req.body;
 
     if (!name || !email || !subject) {
       return res.status(400).json({ error: 'الرجاء تعبئة جميع الحقول المطلوبة (الاسم، البريد الإلكتروني، والموضوع).' });
@@ -105,6 +264,21 @@ async function startServer() {
     try {
       const typeLabel = type === 'complaint' ? 'شكوى ⚠️' : type === 'suggestion' ? 'اقتراح 💡' : 'سؤال ❓';
       
+      // Also send to Discord if Webhook is provided or set in env
+      const targetDiscord = discordWebhookUrl || process.env.DISCORD_WEBHOOK_URL;
+      if (targetDiscord) {
+        sendDiscordNotification(targetDiscord, {
+          title: `📩 تذكرة دعم جديدة: ${typeLabel}`,
+          description: subject,
+          color: type === 'complaint' ? 0xef4444 : type === 'suggestion' ? 0xf59e0b : 0x6366f1,
+          fields: [
+            { name: '👤 المرسل:', value: `${name} (${email})`, inline: true },
+            { name: '🏷️ النوع:', value: typeLabel, inline: true }
+          ],
+          authorName: name
+        });
+      }
+
       // Construct email body content
       let emailMessage = `الاسم الكامل: ${name}\n` +
                          `البريد الإلكتروني للارسال: ${email}\n` +
